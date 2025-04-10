@@ -1,0 +1,27 @@
+{% extends 'base.html' %}
+{% block content %}
+<h2>Apply Leave</h2>
+<form method="POST">
+    <div class="mb-3">
+        <label>User</label>
+        <select name="user_id" class="form-control">
+            {% for user in users %}
+                <option value="{{ user.id }}">{{ user.name }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="mb-3">
+        <label>Start Date</label>
+        <input type="date" name="start_date" class="form-control">
+    </div>
+    <div class="mb-3">
+        <label>End Date</label>
+        <input type="date" name="end_date" class="form-control">
+    </div>
+    <div class="mb-3">
+        <label>Leave Type</label>
+        <input type="text" name="leave_type" class="form-control">
+    </div>
+    <button type="submit" class="btn btn-primary">Submit</button>
+</form>
+{% endblock %}

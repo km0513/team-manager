@@ -1,0 +1,58 @@
+{% extends 'base.html' %}
+{% block content %}
+<h2>Jira Timelog Detailed Summary</h2>
+
+<form method="POST" class="mb-3 d-flex gap-2 align-items-center">
+    <input type="date" name="start" class="form-control" value="{{ start }}">
+    <input type="date" name="end" class="form-control" value="{{ end }}">
+    <button type="submit" class="btn btn-primary">Fetch Logs</button>
+</form>
+
+{% if summary_data %}
+    <h4>Summary</h4>
+    <table class="table table-bordered">
+        <thead>
+            <tr>
+                <th>User</th>
+                <th>Total Logged Hours</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in summary_data %}
+            <tr>
+                <td><strong>{{ row.user }}</strong></td>
+                <td><strong>{{ row.total_hours }}</strong></td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <h4>Details</h4>
+    {% for user, logs in detailed_data.items() %}
+        <h5>{{ user }}</h5>
+        <table class="table table-sm table-striped">
+            <thead>
+                <tr>
+                    <th>Issue Key</th>
+                    <th>Summary</th>
+                    <th>Parent Summary</th>
+                    <th>Logged Hours</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for log in logs %}
+                <tr>
+                    <td><a href="{{ log.link }}" target="_blank">{{ log.issue_key }}</a></td>
+                    <td>{{ log.summary }}</td>
+                    <td>{{ log.parent_summary }}</td>
+                    <td>{{ log.hours }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% endfor %}
+{% else %}
+<p>Please select a date range to view Jira worklogs.</p>
+{% endif %}
+
+{% endblock %}

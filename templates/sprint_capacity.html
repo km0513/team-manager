@@ -1,0 +1,53 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<h2>Sprint Capacity Calculator</h2>
+
+{% if error %}
+<div class="alert alert-danger">{{ error }}</div>
+{% endif %}
+
+<form method="POST" class="mb-3 d-flex gap-2 align-items-center">
+    <input type="date" name="start" class="form-control" value="{{ start.strftime('%Y-%m-%d') if start else '' }}" required>
+    <input type="date" name="end" class="form-control" value="{{ end.strftime('%Y-%m-%d') if end else '' }}" required>
+    <button type="submit" class="btn btn-warning">Calculate Sprint Capacity</button>
+</form>
+
+{% if sprint_data %}
+<form method="POST" action="/sprint-capacity-export" class="mb-2 d-flex gap-2">
+    <input type="hidden" name="start" value="{{ start.strftime('%Y-%m-%d') }}">
+    <input type="hidden" name="end" value="{{ end.strftime('%Y-%m-%d') }}">
+    <button type="submit" class="btn btn-success">Export Sprint CSV</button>
+</form>
+<table class="table table-bordered text-center">
+    <thead>
+        <tr>
+            <th>User</th>
+            <th>Total Working Days</th>
+            <th>Leaves (FD + HD)</th>
+            <th>Available Capacity (Hours)</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for entry in sprint_data %}
+        <tr>
+            <td class="text-start">{{ entry.user.name }}</td>
+            <td>{{ entry.total_days }}</td>
+            <td>{{ entry.leaves }}</td>
+            <td>{{ entry.capacity_hours }}</td>
+        </tr>
+        {% endfor %}
+        <tr>
+            <td colspan="3" class="text-end"><strong>Total Sprint Capacity</strong></td>
+            <td><strong>{{ total_capacity }}</strong></td>
+        </tr>
+    </tbody>
+</table>
+{% endif %}
+<script>
+    {% if request.args.get('exported') %}
+        showToast('Sprint Capacity CSV Exported Successfully!');
+    {% endif %}
+</script>
+
+{% endblock %}

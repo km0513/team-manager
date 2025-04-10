@@ -1,0 +1,93 @@
+@app.route('/timelog', methods=['GET', 'POST'])
+def timelog():
+    users = User.query.all()
+    summary_data = []
+    detailed_data = defaultdict(list)
+    ordered_detailed_data = {}  # ✅ Ensure it's defined early
+    total_logged_by_user = {}
+    start = end = selected_function = None
+
+    work_functions = sorted(set([u.work_function for u in users if u.work_function]))
+
+    if request.method == 'POST':
+        start = request.form.get('start')
+        end = request.form.get('end')
+        selected_function = request.form.get('work_function')
+
+        filtered_users = [u for u in users if u.jira_account_id and (selected_function == 'All' or u.work_function == selected_function)]
+
+        if start and end:
+            start_date = datetime.strptime(start, "%Y-%m-%d")
+            end_date = datetime.strptime(end, "%Y-%m-%d")
+
+            assignee_ids = [u.jira_account_id for u in filtered_users]
+            jql = f"""
+                issuetype = Sub-task AND
+                assignee in ({','.join(assignee_ids)}) AND
+                worklogDate >= "{start}" AND
+                worklogDate <= "{end}"
+            """
+
+            url = f"{JIRA_BASE_URL}/rest/api/2/search"
+            params = {
+                "jql": jql,
+                "fields": "summary,parent,assignee,worklog",
+                "maxResults": 1000
+            }
+
+            response = requests.get(url, headers=headers, params=params, auth=auth)
+
+            if not response.ok:
+                return render_template("timelog.html", summary_data=[], detailed_data={}, start=start, end=end, work_functions=work_functions, selected_function=selected_function)
+
+            issues = response.json().get("issues", [])
+
+            user_map = {u.jira_account_id: u.name for u in filtered_users}
+            user_order = [u.name for u in filtered_users]
+            ordered_detailed_data = {name: [] for name in user_order}
+
+            for issue in issues:
+                issue_key = issue.get("key")
+                summary = issue["fields"].get("summary", "")
+                parent = issue["fields"].get("parent", {}).get("fields", {}).get("summary", "")
+                assignee_id = issue["fields"].get("assignee", {}).get("accountId")
+
+                worklog_url = f"{JIRA_BASE_URL}/rest/api/3/issue/{issue_key}/worklog"
+                worklog_resp = requests.get(worklog_url, headers=headers, auth=auth)
+                if not worklog_resp.ok:
+                    continue
+
+                for worklog in worklog_resp.json().get("worklogs", []):
+                    started = worklog.get("started", "")[:10]
+                    if start <= started <= end:
+                        time_spent = worklog.get("timeSpentSeconds", 0)
+                        user_name = user_map.get(worklog["author"].get("accountId"))
+                        if user_name:
+                            ordered_detailed_data[user_name].append({
+                                "issue_key": issue_key,
+                                "summary": summary,
+                                "parent_summary": parent,
+                                "hours": round(time_spent / 3600, 2),
+                                "link": f"https://{JIRA_BASE_URL}/browse/{issue_key}"
+                            })
+                        if user_name:
+                            total_logged_by_user[user_name] = total_logged_by_user.get(user_name, 0) + time_spent / 3600
+
+            working_days = sum(1 for d in (start_date + timedelta(days=i) for i in range((end_date - start_date).days + 1)) if d.weekday() < 5)
+
+            for name in user_order:
+                entries = ordered_detailed_data.get(name, [])
+                total_hours = round(sum(item["hours"] for item in entries), 2)
+                expected = working_days * 8
+                status = "good" if total_hours >= expected else "low"
+                filter_url = f"{JIRA_BASE_URL}/issues/?jql=assignee%20in%20({','.join([u.jira_account_id for u in filtered_users if u.name == name])})%20AND%20worklogDate%3E%3D{start}%20AND%20worklogDate%3C%3D{end}"
+                summary_data.append({
+                    "user": name,
+                    "total_hours": total_hours,
+                    "expected": expected,
+                    "status": status,
+                    "link": filter_url,
+                    "anchor": name.replace(' ', '_').replace('.', '').lower()
+                })
+
+    return render_template("timelog.html", summary_data=summary_data, detailed_data=ordered_detailed_data, start=start, end=end, work_functions=work_functions, selected_function=selected_function)

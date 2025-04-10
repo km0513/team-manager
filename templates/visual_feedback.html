@@ -1,0 +1,81 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container mt-4">
+    <h3 class="mb-4">Visual Feedback</h3>
+
+    <!-- Selection Form -->
+    <form method="POST" enctype="multipart/form-data" id="feedbackForm">
+        <div class="mb-3">
+            <label for="inputType" class="form-label">Choose Input Type</label>
+            <select class="form-select" id="inputType" name="input_type" required>
+                <option value="">-- Select --</option>
+                <option value="upload">📷 Upload Screenshot</option>
+                <option value="url">🌐 Enter Web Page URL</option>
+            </select>
+        </div>
+
+        <div class="mb-3" id="uploadGroup" style="display: none;">
+            <label for="screenshot" class="form-label">Upload Image</label>
+            <input type="file" name="screenshot" class="form-control" accept="image/*">
+        </div>
+
+        <div class="mb-3" id="urlGroup" style="display: none;">
+            <label for="page_url" class="form-label">Enter Page URL</label>
+            <input type="url" class="form-control" name="page_url" placeholder="https://example.com">
+        </div>
+
+        <button type="submit" class="btn btn-primary">🔍 Analyze</button>
+    </form>
+
+    {% if image_url %}
+    <div class="row mt-5">
+        <div class="col-md-6">
+{% if page_url %}
+            <h5>Analyzed URL</h5>
+        <code>{{ page_url }}</code>
+        {% endif %}
+            <img src="{{ image_url }}" class="img-fluid rounded shadow border" alt="Screenshot">
+         </div>
+        <div class="col-md-6">
+            <h5>AI Analysis</h5>
+            <div class="p-3 bg-light border rounded markdown-body" style="min-height: 200px;">
+                {{ feedback | safe if feedback else "No analysis found." }}
+            </div>
+        </div>
+    </div>
+
+   
+    {% endif %}
+</div>
+
+<script>
+document.getElementById("inputType").addEventListener("change", function () {
+    const type = this.value;
+    const uploadGroup = document.getElementById("uploadGroup");
+    const urlGroup = document.getElementById("urlGroup");
+
+    uploadGroup.style.display = type === "upload" ? "block" : "none";
+    urlGroup.style.display = type === "url" ? "block" : "none";
+
+    // Reset required fields
+    document.querySelector('[name="screenshot"]').required = (type === "upload");
+    document.querySelector('[name="page_url"]').required = (type === "url");
+});
+
+// Prevent empty submission
+document.getElementById("feedbackForm").addEventListener("submit", function (e) {
+    const type = document.getElementById("inputType").value;
+    const upload = document.querySelector('[name="screenshot"]');
+    const url = document.querySelector('[name="page_url"]');
+
+    if (type === "upload" && !upload.value) {
+        e.preventDefault();
+        alert("Please upload an image.");
+    } else if (type === "url" && !url.value) {
+        e.preventDefault();
+        alert("Please enter a URL.");
+    }
+});
+</script>
+
+{% endblock %}

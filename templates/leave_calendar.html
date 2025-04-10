@@ -1,0 +1,48 @@
+{% extends 'base.html' %}
+{% block content %}
+<h2>Leave Calendar - {{ dates[0].strftime('%B %Y') }}</h2>
+
+<div class="d-flex gap-2 mb-2">
+    <a href="/leave-calendar?year={{ prev_year }}&month={{ prev_month }}" class="btn btn-secondary">◀ Prev</a>
+    <a href="/leave-calendar?year={{ next_year }}&month={{ next_month }}" class="btn btn-secondary">Next ▶</a>
+    <a href="/leave-calendar-export?year={{ year }}&month={{ month }}" class="btn btn-success">Export CSV</a>
+</div>
+
+
+<form method="POST" class="mt-3">
+    <table class="table table-bordered text-center">
+        <thead>
+            <tr>
+                <th>User</th>
+                {% for day in dates %}
+                    <th {% if day.weekday() >= 5 %}style="background-color:#f8d7da"{% endif %}>
+                        {{ day.day }} <br> <small>{{ day.strftime('%a') }}</small>
+                    </th>
+                {% endfor %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for user in users %}
+            <tr>
+                <td>{{ user.name }}</td>
+                {% for day in dates %}
+                <td {% if day.weekday() >= 5 %}style="background-color:#f8d7da"{% endif %}>
+                {% if day.weekday() < 5 %}
+    {% set selected_leave = leaves.get((user.id, day.day), '') %}
+    <select name="leave_{{ user.id }}_{{ day.day }}" class="form-select" style="min-width:60px;">
+        <option value="" {% if selected_leave == '' %}selected{% endif %}>-</option>
+        <option value="FD" {% if selected_leave == 'FD' %}selected{% endif %}>FD</option>
+        <option value="HD" {% if selected_leave == 'HD' %}selected{% endif %}>HD</option>
+    </select>
+{% endif %}
+
+
+                </td>
+                {% endfor %}
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <button type="submit" class="btn btn-primary">Save</button>
+</form>
+{% endblock %}

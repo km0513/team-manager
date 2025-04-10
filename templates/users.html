@@ -1,0 +1,33 @@
+{% extends 'base.html' %}
+{% block content %}
+<h2>User Management</h2>
+
+<form method="POST" class="mb-3">
+    <input type="text" name="name" placeholder="Name" class="form-control mb-2" required>
+    <input type="email" name="email" placeholder="Email" class="form-control mb-2" required>
+    <input type="text" name="designation" placeholder="Designation" class="form-control mb-2" required>
+    <button type="submit" class="btn btn-success">Add User</button>
+</form>
+
+<a href="/export-users" class="btn btn-success mb-2">Export User Data</a>
+
+<h4>Existing Users</h4>
+<table class="table table-bordered">
+    <tr>
+        <th>ID</th><th>Name</th><th>Email</th><th>Designation</th><th>Actions</th>
+    </tr>
+    {% for user in users %}
+    <tr>
+        <td>{{ user.id }}</td>
+        <td>{{ user.name }}</td>
+        <td>{{ user.email }}</td>
+        <td>{{ user.designation }}</td>
+        <td>
+            <a href="/users/edit/{{ user.id }}" class="btn btn-warning btn-sm">Edit</a>
+      <a href="/users/delete/{{ user.id }}" class="btn btn-danger btn-sm" onclick="return confirm('Are you sure you want to delete {{ user.name }}?')">Delete</a>
+
+        </td>
+    </tr>
+    {% endfor %}
+</table>
+{% endblock %}

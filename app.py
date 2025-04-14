@@ -28,7 +28,7 @@ from collections import defaultdict
 
 # Initialize Flask app
 app = Flask(__name__)
-
+app.config['SERVER_NAME'] = 'teammanagerqai.herokuapp.com'
 from generate_testcases_route import testcase_bp
 app.register_blueprint(testcase_bp)
 

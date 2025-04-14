@@ -37,6 +37,7 @@ app.register_blueprint(testcase_bp)
 
 
 load_dotenv()  # This loads the .env file
+print("🔑 OpenAI Key begins with:", os.getenv("OPENAI_API_KEY")[:8])
 from openai import OpenAI
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///database.db'
@@ -73,7 +74,7 @@ migrate = Migrate(app, db)
 # Jira configuration
 JIRA_BASE_URL = "https://upgrad-jira.atlassian.net"
 JIRA_EMAIL = "kishore.murkhanad@upgrad.com"
-JIRA_API_TOKEN = "REMOVED3xFfGF092uypGX-1LAgIBLo96QhturPWgV-LVLd0rIrxLNFHQmgx-ateg1PbmrjCCR8P7U0uCN8Npa8geSu_3Qya-v_etGvP9bxBSSLAfgNvnMwg8syRhLXtc2kFWzhkzY952N40JHg5MueBKGkUht1OdWOEDnTzgA7lCcb4BQ7VfCyqmA=B9998DF4"  # 🔒 Truncated for security
+JIRA_API_TOKEN = os.getenv('JIRA_API_TOKEN')
 auth = HTTPBasicAuth(JIRA_EMAIL, JIRA_API_TOKEN)
 headers = {"Accept": "application/json"}
 
@@ -637,6 +638,7 @@ def timelog():
                 worklogDate >= "{start}" AND
                 worklogDate <= "{end}"
             """
+            print("JQL:", jql)
 
             url = f"{JIRA_BASE_URL}/rest/api/2/search"
             params = {

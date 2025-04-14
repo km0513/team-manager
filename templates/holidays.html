@@ -1,0 +1,23 @@
+{% extends 'base.html' %}
+{% block content %}
+<h2>Holiday List</h2>
+
+<form method="POST" class="mb-3">
+    <input type="date" name="date" class="form-control mb-2" required>
+    <input type="text" name="description" placeholder="Holiday description" class="form-control mb-2" required>
+    <button type="submit" class="btn btn-success">Add Holiday</button>
+</form>
+
+<table class="table table-bordered">
+    <tr>
+        <th>Date</th>
+        <th>Description</th>
+    </tr>
+    {% for holiday in holidays %}
+    <tr>
+        <td>{{ holiday.date.strftime('%Y-%m-%d') }}</td>
+        <td>{{ holiday.description }}</td>
+    </tr>
+    {% endfor %}
+</table>
+{% endblock %}

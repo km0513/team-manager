@@ -5,13 +5,24 @@
 <form method="POST" class="mb-3">
     <input type="text" name="name" placeholder="Name" class="form-control mb-2" required>
     <input type="email" name="email" placeholder="Email" class="form-control mb-2" required>
-    <input type="text" name="designation" placeholder="Designation" class="form-control mb-2" required>
+    <select name="designation" class="form-select mb-2" required>
+        <option value="">Select Designation</option>
+        <option value="QA">QA</option>
+        <option value="Development">Development</option>
+        <option value="Product Management">Product Management</option>
+        <option value="UI/UX">UI/UX</option>
+    </select>
     <button type="submit" class="btn btn-success">Add User</button>
 </form>
-
-<a href="/export-users" class="btn btn-success mb-2">Export User Data</a>
+<form method="POST" action="/import-users" enctype="multipart/form-data" class="mb-3">
+    <label for="excel_file" class="form-label">Import from Excel</label>
+    <input type="file" name="excel_file" accept=".xlsx" class="form-control mb-2" required>
+    <button type="submit" class="btn btn-primary">Import Users</button>
+</form>
 
 <h4>Existing Users</h4>
+
+<a href="/update-jira-id" class="btn btn-success mb-3">Jira ID Mapping</a>
 <table class="table table-bordered">
     <tr>
         <th>ID</th><th>Name</th><th>Email</th><th>Designation</th><th>Actions</th>
@@ -24,10 +35,30 @@
         <td>{{ user.designation }}</td>
         <td>
             <a href="/users/edit/{{ user.id }}" class="btn btn-warning btn-sm">Edit</a>
-      <a href="/users/delete/{{ user.id }}" class="btn btn-danger btn-sm" onclick="return confirm('Are you sure you want to delete {{ user.name }}?')">Delete</a>
-
+            <a href="/users/delete/{{ user.id }}" class="btn btn-danger btn-sm" onclick="return confirm('Are you sure you want to delete {{ user.name }}?')">Delete</a>
         </td>
     </tr>
     {% endfor %}
 </table>
+
+{% if pagination %}
+<nav>
+  <ul class="pagination">
+    {% if pagination.has_prev %}
+    <li class="page-item"><a class="page-link" href="{{ url_for('users', page=pagination.prev_num) }}">Previous</a></li>
+    {% endif %}
+    {% for p in pagination.iter_pages() %}
+      {% if p %}
+        <li class="page-item {% if p == pagination.page %}active{% endif %}">
+            <a class="page-link" href="{{ url_for('users', page=p) }}">{{ p }}</a>
+        </li>
+      {% endif %}
+    {% endfor %}
+    {% if pagination.has_next %}
+    <li class="page-item"><a class="page-link" href="{{ url_for('users', page=pagination.next_num) }}">Next</a></li>
+    {% endif %}
+  </ul>
+</nav>
+{% endif %}
+
 {% endblock %}

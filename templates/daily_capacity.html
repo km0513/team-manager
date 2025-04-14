@@ -1,46 +1,45 @@
 {% extends 'base.html' %}
 {% block content %}
-
-{% if date %}
-    <h2>Daily Capacity - {{ date.strftime('%d %b %Y') }}</h2>
-{% else %}
-    <h2>Daily Capacity</h2>
-{% endif %}
+<h2>Daily Capacity - {{ date.strftime('%d %b %Y') if date else '' }}</h2>
 
 <form method="GET" class="mb-3 d-flex gap-2 align-items-center">
     <input type="date" name="date" class="form-control" value="{{ date.strftime('%Y-%m-%d') if date else '' }}">
+    <select name="function" class="form-select" style="width:200px;">
+        <option value="All" {% if selected_function == 'All' %}selected{% endif %}>All Functions</option>
+        {% for func in functions %}
+            <option value="{{ func }}" {% if func == selected_function %}selected{% endif %}>{{ func }}</option>
+        {% endfor %}
+    </select>
     <button type="submit" class="btn btn-primary">Show</button>
 </form>
 
 {% if not date %}
-    <p><strong>Please select a date to view capacity data.</strong></p>
+<p><strong>Please select a date to view capacity data.</strong></p>
 {% else %}
-    <table class="table">
-        <thead>
-  <tr>
-    <th>User</th>
-    <th>Leave Type</th>
-    <th>Available Capacity (Hours)</th>
-    <th>Jira Logged Hours</th>
-  </tr>
-</thead>
-<tbody>
-  {% for row in data %}
-  <tr>
-    <td>{{ row.name }}</td>
-    <td>{{ row.leave_type }}</td>
-    <td>{{ row.capacity_hours }}</td>
-    <td>{{ row.logged_hours }}</td>
-  </tr>
-  {% endfor %}
-  <tr>
-    <td colspan="2"><strong>Total Team Capacity</strong></td>
-    <td><strong>{{ total_capacity }} Hours</strong></td>
-    <td></td>
-  </tr>
-</tbody>
-
-    </table>
+<table class="table table-bordered text-center">
+    <thead>
+        <tr>
+            <th>User</th>
+            <th>Leave Type</th>
+            <th>Available Capacity (Hours)</th>
+            <th>Jira Logged Hours</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for row in data %}
+        <tr>
+            <td>{{ row.name }}</td>
+            <td>{{ row.leave_type }}</td>
+            <td>{{ row.capacity_hours }}</td>
+            <td>{{ row.logged_hours }}</td>
+        </tr>
+        {% endfor %}
+        <tr class="fw-bold">
+            <td colspan="2" class="text-end">TOTAL</td>
+            <td>{{ total_capacity }}</td>
+            <td></td>
+        </tr>
+    </tbody>
+</table>
 {% endif %}
-
 {% endblock %}

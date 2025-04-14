@@ -1,26 +1,33 @@
 {% extends 'base.html' %}
 {% block content %}
+<h2 class="mb-4">Sprint Capacity Calculator</h2>
 
-<h2>Sprint Capacity Calculator</h2>
-
-{% if error %}
-<div class="alert alert-danger">{{ error }}</div>
-{% endif %}
-
-<form method="POST" class="mb-3 d-flex gap-2 align-items-center">
-    <input type="date" name="start" class="form-control" value="{{ start.strftime('%Y-%m-%d') if start else '' }}" required>
-    <input type="date" name="end" class="form-control" value="{{ end.strftime('%Y-%m-%d') if end else '' }}" required>
-    <button type="submit" class="btn btn-warning">Calculate Sprint Capacity</button>
+<form method="POST" class="row g-2 align-items-end mb-4">
+    <div class="col-md-3">
+        <label class="form-label">Start Date</label>
+        <input type="date" name="start" class="form-control" value="{{ start.strftime('%Y-%m-%d') if start else '' }}" required>
+    </div>
+    <div class="col-md-3">
+        <label class="form-label">End Date</label>
+        <input type="date" name="end" class="form-control" value="{{ end.strftime('%Y-%m-%d') if end else '' }}" required>
+    </div>
+    <div class="col-md-3">
+        <label class="form-label">Function</label>
+        <select name="function" class="form-select">
+            <option value="All" {% if selected_function == 'All' %}selected{% endif %}>All Functions</option>
+            {% for func in functions %}
+                <option value="{{ func }}" {% if func == selected_function %}selected{% endif %}>{{ func }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="col-md-3 d-grid">
+        <button type="submit" class="btn btn-warning">Calculate</button>
+    </div>
 </form>
 
 {% if sprint_data %}
-<form method="POST" action="/sprint-capacity-export" class="mb-2 d-flex gap-2">
-    <input type="hidden" name="start" value="{{ start.strftime('%Y-%m-%d') }}">
-    <input type="hidden" name="end" value="{{ end.strftime('%Y-%m-%d') }}">
-    <button type="submit" class="btn btn-success">Export Sprint CSV</button>
-</form>
 <table class="table table-bordered text-center">
-    <thead>
+    <thead class="table-light">
         <tr>
             <th>User</th>
             <th>Total Working Days</th>
@@ -37,17 +44,11 @@
             <td>{{ entry.capacity_hours }}</td>
         </tr>
         {% endfor %}
-        <tr>
-            <td colspan="3" class="text-end"><strong>Total Sprint Capacity</strong></td>
-            <td><strong>{{ total_capacity }}</strong></td>
+        <tr class="fw-bold">
+            <td colspan="3" class="text-end">TOTAL</td>
+            <td>{{ total_capacity }}</td>
         </tr>
     </tbody>
 </table>
 {% endif %}
-<script>
-    {% if request.args.get('exported') %}
-        showToast('Sprint Capacity CSV Exported Successfully!');
-    {% endif %}
-</script>
-
 {% endblock %}

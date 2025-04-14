@@ -2,9 +2,9 @@
 {% block content %}
 
 <div class="mb-4">
-  <p><strong>Total Users:</strong> {{ total_users }}</p>
+  <p><strong>Total Employees:</strong> {{ total_users }}</p>
 
- <p><strong>Users on leave today ({{ today }}):</strong></p>
+ <p><strong>On leave today ({{ today }}):</strong></p>
 {% if users_on_leave %}
     <ul>
         {% for user in users_on_leave %}
@@ -17,34 +17,7 @@
 </div>
 
 
-<div class="card mt-4 p-3 border">
-  <h5>AI Cost Estimator</h5>
-  <div class="row g-3 align-items-center">
-    <div class="col-md-4">
-      <label class="form-label">Images per month:</label>
-      <input type="number" id="imageCount" class="form-control" value="100">
-    </div>
-    <div class="col-md-4">
-      <label class="form-label">Avg. cost per image (USD):</label>
-      <input type="number" id="costPerImage" class="form-control" value="0.025" step="0.001">
-    </div>
-    <div class="col-md-4 d-flex align-items-end">
-      <button class="btn btn-primary w-100" onclick="estimateCost()">Estimate</button>
-    </div>
-  </div>
-  <div class="mt-3">
-    <strong>Estimated Monthly Cost:</strong> <span id="costEstimate">$2.50</span>
-  </div>
-</div>
 
-<script>
-  function estimateCost() {
-    const count = parseFloat(document.getElementById('imageCount').value);
-    const cost = parseFloat(document.getElementById('costPerImage').value);
-    const total = (count * cost).toFixed(2);
-    document.getElementById('costEstimate').textContent = `$${total}`;
-  }
-</script>
 
 
 

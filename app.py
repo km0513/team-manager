@@ -11,6 +11,7 @@ import matplotlib
 matplotlib.use('Agg')  # use non-interactive backend for server environments
 import matplotlib.pyplot as plt
 
+import re
 import os
 import json
 import base64
@@ -21,19 +22,23 @@ from datetime import date
 
 
 
-
-load_dotenv()  # This loads the .env file
-from openai import OpenAI
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-
-
-
 import requests
 from requests.auth import HTTPBasicAuth
 from collections import defaultdict
 
 # Initialize Flask app
 app = Flask(__name__)
+
+from generate_testcases_route import testcase_bp
+app.register_blueprint(testcase_bp)
+
+
+
+
+
+load_dotenv()  # This loads the .env file
+from openai import OpenAI
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///database.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.secret_key = 'supersecretkey'
@@ -64,6 +69,7 @@ mail = Mail(app)
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
 
+
 # Jira configuration
 JIRA_BASE_URL = "https://upgrad-jira.atlassian.net"
 JIRA_EMAIL = "kishore.murkhanad@upgrad.com"
@@ -86,9 +92,36 @@ class Leave(db.Model):
     leave_type = db.Column(db.String(50))
     user = db.relationship('User', backref='leaves')
 
+class Holiday(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    date = db.Column(db.Date, unique=True, nullable=False)
+    description = db.Column(db.String(200))
+
+
+
+
+
+
+
 # Helper functions
 def get_time_spent_by_user(date):
     return get_time_spent_by_user_range(date, date)
+
+import logging
+logging.basicConfig(level=logging.INFO)
+
+def fetch_jira_account_id(email):
+    url = f"{JIRA_BASE_URL}/rest/api/3/user/search?query={email}"
+    response = requests.get(url, headers=headers, auth=auth)
+    if response.ok:
+        results = response.json()
+        logging.info(f"JIRA SEARCH for {email}: {results}")
+        if results:
+            return results[0].get("accountId")
+    return None
+
+
+
 
 def get_time_spent_by_user_range(start, end):
     worklog_author_ids = [
@@ -165,9 +198,14 @@ def fetch_jira_sprints(board_id):
 
 
 # Routes
+
+@app.template_filter('round_half')
+def round_half(value):
+    return round(float(value) * 2) / 2
+
 @app.before_request
 def require_login():
-    if 'logged_in' not in session and request.endpoint not in ['login', 'static']:
+    if 'logged_in' not in session and request.endpoint not in ['login', 'static','HelperQA_AI','generate_testcases']:
         return redirect('/login')
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -210,19 +248,88 @@ def dashboard():
 
 
 
-
 @app.route('/users', methods=['GET', 'POST'])
 def users():
+    page = int(request.args.get('page', 1))
+    per_page = 10
+
     if request.method == 'POST':
         name = request.form['name']
         email = request.form['email']
         designation = request.form['designation']
-        user = User(name=name, email=email, designation=designation)
+
+        if User.query.filter_by(email=email).first():
+            return "⚠️ User with this email already exists."
+
+        jira_account_id = fetch_jira_account_id(email)
+        user = User(name=name, email=email, designation=designation, jira_account_id=jira_account_id)
         db.session.add(user)
         db.session.commit()
         return redirect('/users')
-    all_users = User.query.all()
-    return render_template('users.html', users=all_users)
+
+    pagination = User.query.paginate(page=page, per_page=per_page)
+    return render_template('users.html', users=pagination.items, pagination=pagination)
+
+
+
+
+
+
+
+from flask import send_file
+from io import BytesIO
+
+@app.route('/import-users', methods=['POST'])
+def import_users():
+    file = request.files.get('excel_file')
+    if not file or file.filename == '':
+        return "No file selected", 400
+
+    try:
+        df = pd.read_excel(file)
+        existing_emails = {u.email.lower() for u in User.query.all()}
+        skipped_rows = []
+
+        for index, row in df.iterrows():
+            name = str(row.get('Name')).strip()
+            email = str(row.get('Email')).strip().lower()
+            designation = str(row.get('Designation')).strip()
+
+            if not name or not email or not designation:
+                skipped_rows.append(f"Row {index + 2}: Missing required fields.")
+                continue
+
+            if email in existing_emails:
+                skipped_rows.append(f"Row {index + 2}: Duplicate email '{email}'")
+                continue
+
+            jira_account_id = fetch_jira_account_id(email)
+            if not jira_account_id:
+                skipped_rows.append(f"Row {index + 2}: Jira ID not found for '{email}'")
+                continue
+
+            user = User(name=name, email=email, designation=designation, jira_account_id=jira_account_id)
+            db.session.add(user)
+            existing_emails.add(email)
+
+        db.session.commit()
+
+        if skipped_rows:
+            # Create Excel with skipped rows
+            skipped_df = pd.DataFrame({'Issue': skipped_rows})
+            output = BytesIO()
+            filename = f"user_import_errors_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+            with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+                skipped_df.to_excel(writer, index=False, sheet_name='Skipped Users')
+            output.seek(0)
+            return send_file(output, download_name=filename, as_attachment=True)
+
+        return redirect('/users')
+
+    except Exception as e:
+        return str(e), 500
+
+
 
 @app.route('/export-users')
 def export_users():
@@ -256,6 +363,28 @@ def edit_user(user_id):
 
     return render_template('edit_user.html', user=user)
 
+@app.route('/users/delete/<int:user_id>', methods=['GET'])
+def delete_user(user_id):
+    user = User.query.get_or_404(user_id)
+    db.session.delete(user)
+    db.session.commit()
+    return redirect('/users')
+
+
+@app.route('/holidays', methods=['GET', 'POST'])
+def manage_holidays():
+    if request.method == 'POST':
+        date_str = request.form['date']
+        description = request.form['description']
+        holiday_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+
+        # Avoid duplicates
+        if not Holiday.query.filter_by(date=holiday_date).first():
+            db.session.add(Holiday(date=holiday_date, description=description))
+            db.session.commit()
+
+    holidays = Holiday.query.order_by(Holiday.date).all()
+    return render_template('holidays.html', holidays=holidays)
 
 
 @app.route('/leave-calendar', methods=['GET', 'POST'])
@@ -266,6 +395,7 @@ def leave_calendar():
     month_days = calendar.monthrange(year, month)[1]
     dates = [datetime(year, month, day) for day in range(1, month_days + 1)]
 
+    # Handle saving leave data
     if request.method == 'POST':
         for user in users:
             Leave.query.filter(
@@ -282,93 +412,111 @@ def leave_calendar():
         db.session.commit()
         return redirect(f'/leave-calendar?year={year}&month={month}')
 
+    # Load existing leaves
     leaves = {(leave.user_id, leave.start_date.day): leave.leave_type
               for leave in Leave.query.filter(
                   Leave.start_date >= datetime(year, month, 1),
                   Leave.start_date <= datetime(year, month, month_days)
               ).all()}
 
+    # Previous & next month/year values for navigation
     prev_month = month - 1 if month > 1 else 12
     next_month = month + 1 if month < 12 else 1
     prev_year = year if month > 1 else year - 1
     next_year = year if month < 12 else year + 1
 
-    return render_template('leave_calendar.html', users=users, dates=dates, leaves=leaves,
-                           year=year, month=month, prev_month=prev_month, next_month=next_month,
-                           prev_year=prev_year, next_year=next_year)
+    # Group dates by ISO week
+    weeks = {}
+    for date in dates:
+        week_key = f"{date.isocalendar()[0]}-W{date.isocalendar()[1]}"
+        weeks.setdefault(week_key, []).append(date)
+
+    holiday_dates = {h.date for h in Holiday.query.filter(
+    Holiday.date >= datetime(year, month, 1).date(),
+    Holiday.date <= datetime(year, month, month_days).date()
+).all()}
+
+    return render_template('leave_calendar.html',
+                           users=users,
+                           dates=dates,
+                           leaves=leaves,
+                           year=year,
+                           month=month,
+                           current_date=datetime.today(),
+                           prev_month=prev_month,
+                           next_month=next_month,
+                           prev_year=prev_year,
+                           next_year=next_year,
+                           weeks=weeks,holidays=holiday_dates)
+
+@app.route('/holiday-calendar', methods=['GET'])
+def holiday_calendar():
+    year = int(request.args.get('year', datetime.now().year))
+    holidays = Holiday.query.filter(Holiday.date.like(f'{year}%')).all()
+
+    # Generate dates for the calendar view
+    first_day = datetime(year, 1, 1)
+    last_day = datetime(year, 12, 31)
+    dates = [first_day + timedelta(days=i) for i in range((last_day - first_day).days + 1)]
+
+    return render_template('holiday_calendar.html', holidays=holidays, dates=dates, year=year)
+
+
 
 @app.route('/capacity', methods=['GET'])
 def capacity():
     users = User.query.all()
     year = int(request.args.get('year', datetime.now().year))
     month = int(request.args.get('month', datetime.now().month))
+    selected_function = request.args.get('function', 'All')
 
     first_day = datetime(year, month, 1)
     month_days = calendar.monthrange(year, month)[1]
     last_day = datetime(year, month, month_days)
 
+    # Get holidays just once
+    holiday_dates = {h.date for h in Holiday.query.filter(
+        Holiday.date >= first_day.date(), Holiday.date <= last_day.date()).all()
+    }
+
+    filtered_users = [u for u in users if selected_function == 'All' or u.designation == selected_function]
+
     capacity_data = []
-    for user in users:
-        working_days = [d for d in (first_day + timedelta(days=i) for i in range(month_days)) if d.weekday() < 5]
+    total_capacity = 0
+    total_leaves = 0
+
+    for user in filtered_users:
+        working_days = [
+            d for d in (first_day + timedelta(days=i) for i in range(month_days))
+            if d.weekday() < 5 and d.date() not in holiday_dates
+        ]
+
         leaves = Leave.query.filter(
             Leave.user_id == user.id,
             Leave.start_date >= first_day,
             Leave.start_date <= last_day
         ).all()
+
         leave_sum = sum([1 if l.leave_type == 'FD' else 0.5 for l in leaves])
         leave_sum = min(leave_sum, len(working_days))
         available_hours = max(0, (len(working_days) - leave_sum) * 8)
+
         capacity_data.append({
             'user': user,
             'total_days': len(working_days),
             'leaves': leave_sum,
             'capacity_hours': available_hours
         })
-
-    return render_template("capacity.html", capacity_data=capacity_data, year=year, month=month)
-
-@app.route('/daily-capacity', methods=['GET'])
-def daily_capacity():
-    users = User.query.all()
-    selected_date = request.args.get("date")
-
-    if not selected_date:
-        return render_template("daily_capacity.html", data=None, total_capacity=None, date=None)
-
-    day = datetime.strptime(selected_date, "%Y-%m-%d")
-    total_capacity = 0
-    data = []
-
-    jira_logged_hours = get_time_spent_by_user(selected_date)
-
-    for user in users:
-        if day.weekday() >= 5:
-            available_hours = 0
-            leave_type = "Weekend"
-        else:
-            leave = Leave.query.filter_by(user_id=user.id, start_date=day.date()).first()
-            if leave:
-                leave_factor = 1 if leave.leave_type == 'FD' else 0.5
-                available_hours = max(0, 8 * (1 - leave_factor))
-                leave_type = leave.leave_type
-            else:
-                available_hours = 8
-                leave_type = "Present"
-
-        logged_hours = jira_logged_hours.get(user.email, 0)
+        total_leaves += leave_sum
         total_capacity += available_hours
 
-        data.append({
-            "name": user.name,
-            "leave_type": leave_type,
-            "capacity_hours": available_hours,
-            "logged_hours": logged_hours
-        })
+    functions = sorted(set(u.designation for u in users if u.designation))
+    return render_template("capacity.html", capacity_data=capacity_data, year=year, month=month,
+                           functions=functions, selected_function=selected_function,
+                           total_capacity=total_capacity, total_leaves=total_leaves)
 
-    return render_template("daily_capacity.html",
-                           data=data,
-                           total_capacity=total_capacity,
-                           date=day)
+
+
 
 
 @app.route('/sprint-capacity', methods=['GET', 'POST'])
@@ -376,6 +524,7 @@ def sprint_capacity():
     users = User.query.all()
     start_date = request.form.get("start") or request.args.get("start")
     end_date = request.form.get("end") or request.args.get("end")
+    selected_function = request.form.get("function") or request.args.get("function", "All")
     start = datetime.strptime(start_date, "%Y-%m-%d") if start_date else None
     end = datetime.strptime(end_date, "%Y-%m-%d") if end_date else None
 
@@ -383,8 +532,15 @@ def sprint_capacity():
     total_capacity = 0
 
     if start and end and start <= end:
-        for user in users:
-            working_days = [d for d in (start + timedelta(days=i) for i in range((end - start).days + 1)) if d.weekday() < 5]
+        holiday_dates = {h.date for h in Holiday.query.filter(
+            Holiday.date >= start.date(), Holiday.date <= end.date()).all()
+        }
+
+        filtered_users = [u for u in users if selected_function == "All" or u.designation == selected_function]
+
+        for user in filtered_users:
+            working_days = [d for d in (start + timedelta(days=i) for i in range((end - start).days + 1))
+                            if d.weekday() < 5 and d.date() not in holiday_dates]
 
             leaves = Leave.query.filter(
                 Leave.user_id == user.id,
@@ -404,8 +560,13 @@ def sprint_capacity():
             })
             total_capacity += available_hours
 
+    functions = sorted(set(u.designation for u in users if u.designation))
     return render_template("sprint_capacity.html", users=users, sprint_data=sprint_data,
-                           total_capacity=total_capacity, start=start, end=end)
+                           total_capacity=total_capacity, start=start, end=end,
+                           functions=functions, selected_function=selected_function)
+
+
+
 
 
 @app.route('/sprint-capacity-export', methods=['POST'])
@@ -445,6 +606,8 @@ def sprint_capacity_export():
     csv_path = f'static/{filename}'
     df.to_csv(csv_path, index=False)
     return send_file(csv_path, as_attachment=True, download_name=filename)
+
+
 @app.route('/timelog', methods=['GET', 'POST'])
 def timelog():
     users = User.query.all()
@@ -514,19 +677,34 @@ def timelog():
                                 "summary": summary,
                                 "parent_summary": parent,
                                 "hours": round(time_spent / 3600, 2),
-                                "link": f"{JIRA_BASE_URL}/browse/{issue_key}"
+                                "link": f"{JIRA_BASE_URL}/browse/{issue_key}",
+                                "started": started
                             })
                         if user_name:
                             total_logged_by_user[user_name] = total_logged_by_user.get(user_name, 0) + time_spent / 3600
 
-            working_days = sum(1 for d in (start_date + timedelta(days=i) for i in range((end_date - start_date).days + 1)) if d.weekday() < 5)
+            # Get working weekdays in range
+            all_working_days = [d for d in (start_date + timedelta(days=i) for i in range((end_date - start_date).days + 1)) if d.weekday() < 5]
 
             for name in user_order:
+                user = next((u for u in filtered_users if u.name == name), None)
+
+                leave_days = Leave.query.filter(
+                    Leave.user_id == user.id,
+                    Leave.start_date >= start_date.date(),
+                    Leave.start_date <= end_date.date()
+                ).all()
+
+                leave_map = {(l.start_date, l.leave_type) for l in leave_days}
+                leave_sum = sum([1 if l_type == 'FD' else 0.5 for (l_date, l_type) in leave_map if l_date in [d.date() for d in all_working_days]])
+                available_days = max(0, len(all_working_days) - leave_sum)
+                expected = available_days * 8
+
                 entries = ordered_detailed_data.get(name, [])
                 total_hours = round(sum(item["hours"] for item in entries), 2)
-                expected = working_days * 8
                 status = "good" if total_hours >= expected else "low"
                 filter_url = f"{JIRA_BASE_URL}/issues/?jql=assignee%20in%20({','.join([u.jira_account_id for u in filtered_users if u.name == name])})%20AND%20worklogDate%3E%3D{start}%20AND%20worklogDate%3C%3D{end}"
+
                 summary_data.append({
                     "user": name,
                     "total_hours": total_hours,
@@ -539,86 +717,6 @@ def timelog():
     return render_template("timelog.html", summary_data=summary_data, detailed_data=ordered_detailed_data, start=start, end=end, work_functions=work_functions, selected_function=selected_function)
 
 
-
-
-@app.route('/generate-ai-summary', methods=['POST'])
-def generate_ai_summary():
-    from openai import OpenAI
-    import json
-
-    print("🔍 Debug: Checking session contents...")
-    print("session keys:", list(session.keys()))
-    print("summary_data (raw):", session.get('summary_data'))
-    print("detailed_data (raw):", session.get('detailed_data'))
-
-    # Get from session first
-    raw_summary_data = session.get('summary_data', [])
-    raw_detailed_data = session.get('detailed_data', {})
-
-    try:
-        # If they are strings, parse them
-        summary_data = json.loads(raw_summary_data) if isinstance(raw_summary_data, str) else raw_summary_data
-        detailed_data = json.loads(raw_detailed_data) if isinstance(raw_detailed_data, str) else raw_detailed_data
-    except Exception as e:
-        print("❌ JSON parsing error:", str(e))
-        return "Failed to parse session data", 500
-
-    if not summary_data or not detailed_data:
-        print("⚠️ No data found to summarize.")
-        return "No data to summarize.", 400
-
-    # Build prompt
-    prompt = (
-        "Create a detailed but concise summary of the following Jira worklogs:\n\n"
-        "Each entry includes: user, hours logged, expected hours, and their task breakdown.\n"
-        "Use bullet points for each user, and show their status (OK/LOW), top tasks (if any), and total hours.\n\n"
-    )
-
-    for row in summary_data:
-        status = "LOW" if row['status'] == 'low' else "OK"
-        logs = detailed_data.get(row['user'], [])
-        task_summaries = ", ".join([item['summary'] for item in logs[:3]]) if logs else "No tasks"
-        prompt += (
-            f"- {row['user']}: Logged {row['total_hours']} hrs, "
-            f"Expected {row['expected']} hrs — Status: {status}. "
-            f"Top Tasks: {task_summaries}\n"
-        )
-
-    # Call OpenAI
-    client = OpenAI()
-    response = client.chat.completions.create(
-        model="gpt-3.5-turbo",
-        messages=[
-            {
-                "role": "system",
-                "content": (
-                    "You are a helpful assistant that summarizes Jira time logs for a team manager. "
-                    "Make the summary easy to read, formatted, and insightful."
-                ),
-            },
-            {"role": "user", "content": prompt},
-        ],
-        max_tokens=1000,
-    )
-
-    ai_summary = response.choices[0].message.content.strip()
-       
-
-    # Format line breaks and bullets for HTML
-    formatted = ai_summary.replace("\n", "<br>").replace("•", "&#8226;").replace("-", "&#8211;")
-
-    html_output = f"""
-    <div class="card mt-3 border-success">
-        <div class="card-header bg-success text-white fw-bold">
-            AI-Generated Jira Timelog Summary
-        </div>
-        <div class="card-body" style="max-height: 500px; overflow-y: auto;">
-            <p style="white-space: pre-wrap;">{formatted}</p>
-        </div>
-    </div>
-    """
-
-    return html_output
 
 
 
@@ -651,15 +749,16 @@ from werkzeug.utils import secure_filename
 import os
 
 
-@app.route('/visual-feedback', methods=['GET', 'POST'])
-def visual_feedback():
+@app.route('/HelperQA-AI', methods=['GET', 'POST'])
+def HelperQA_AI():
     feedback_html = None
     image_url = None
     page_url = None
 
     if request.method == 'POST':
         input_type = request.form.get('input_type')
-        access_key = '8akGljPIc5sEfw'  # Replace with your actual ScreenshotOne access key
+        ai_mode = request.form.get('ai_mode', 'review')  # default to review
+        access_key = '8akGljPIc5sEfw'  # Replace with your ScreenshotOne key
 
         image_b64 = None
 
@@ -667,7 +766,6 @@ def visual_feedback():
             page_url = request.form.get('page_url')
             if page_url:
                 screenshot_url = f"https://api.screenshotone.com/take?access_key={access_key}&url={page_url}&format=png"
-
                 response = requests.get(screenshot_url)
                 if response.status_code == 200:
                     filename = secure_filename(f"{page_url.replace('https://', '').replace('/', '_')}.png")
@@ -694,23 +792,33 @@ def visual_feedback():
                 with open(filepath, "rb") as f:
                     image_b64 = base64.b64encode(f.read()).decode()
 
-        # Proceed with AI analysis if image_b64 is available
+        # Run OpenAI analysis
         if image_b64:
-            prompt_text = (
-                "Please analyze this UI screenshot thoroughly:\n\n"
-                "1. Check for **UI layout and alignment issues** — spacing, padding, misalignments, responsiveness.\n"
-                "2. Identify any **spelling or grammatical mistakes**.\n"
-                "3. Suggest improvements or best practices where applicable.\n\n"
-                "Format the response with markdown sections like:\n"
-                "### Summary\n### Layout Issues\n### Spelling Errors\n### Suggestions"
-            )
+            if ai_mode == 'review':
+                prompt_text = (
+                    "Please analyze this UI screenshot thoroughly:\n\n"
+                    "1. Check for **UI layout and alignment issues** — spacing, padding, misalignments, responsiveness.\n"
+                    "2. Identify any **spelling or grammatical mistakes**.\n"
+                    "3. Suggest improvements or best practices where applicable.\n\n"
+                    "Format the response with markdown sections like:\n"
+                    "### Summary\n### Layout Issues\n### Spelling Errors\n### Suggestions"
+                )
+                system_message = "You are a helpful UI reviewer analyzing screenshots. Use markdown formatting."
+            elif ai_mode == 'testcases':
+                prompt_text = (
+                    "Based on this UI screenshot, draft **relevant test cases** covering UI, UX, functionality, edge cases, and responsiveness.\n"
+                    "Organize them in markdown format with sections like:\n"
+                    "### UI Test Cases\n### Functional Test Cases\n### Negative/Edge Cases\n\n"
+                    "Each test case should include a title and a short description."
+                )
+                system_message = "You are an expert test engineer. Draft comprehensive test cases from UI screenshots."
 
             try:
                 client = OpenAI()
                 response = client.chat.completions.create(
                     model="gpt-4o",
                     messages=[
-                        {"role": "system", "content": "You are a helpful UI reviewer analyzing screenshots. Use markdown formatting."},
+                        {"role": "system", "content": system_message},
                         {"role": "user", "content": [
                             {"type": "text", "text": prompt_text},
                             {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{image_b64}", "detail": "high"}}
@@ -719,63 +827,18 @@ def visual_feedback():
                     max_tokens=800
                 )
                 feedback = response.choices[0].message.content if response.choices else "No feedback returned."
-                feedback_html = md_convert(feedback)
+                # Remove fenced code block (like ```markdown ... ```)
+                cleaned = re.sub(r"```(?:markdown)?\n?", "", feedback).strip()
+                feedback_html = md_convert(cleaned)
 
             except Exception as e:
                 feedback_html = f"❌ Error during AI analysis: {str(e)}"
 
-    return render_template("visual_feedback.html", image_url=image_url, page_url=page_url, feedback=feedback_html)
-
-
-
-
-
-@app.route('/sprint-calendar')
-def sprint_calendar():
-    board_id = 332  # ✅ Make sure this is your correct board ID
-    sprints = fetch_jira_sprints(board_id)
-
-    now = datetime.now()
-    current_month = now.month
-    current_year = now.year
-
-    events = []
-    for s in sprints:
-        if "startDate" in s and "endDate" in s:
-            try:
-                start_date = datetime.strptime(s["startDate"][:10], "%Y-%m-%d")
-                end_date = datetime.strptime(s["endDate"][:10], "%Y-%m-%d")
-
-                # ✅ Filter: show sprints that start or end this month
-                if (start_date.month == current_month and start_date.year == current_year) or \
-                   (end_date.month == current_month and end_date.year == current_year):
-
-                    events.append({
-                        "title": s["name"],
-                        "start": s["startDate"][:10],
-                        "end": s["endDate"][:10],
-                        "color": "blue" if s["state"] == "active" else "gray",
-                        "extendedProps": {
-                            "status": s["state"],
-                            "goal": s.get("goal", "No goal set")
-                        }
-                    })
-            except Exception as e:
-                print("⚠️ Date parsing error:", e)
-
-    print("🔍 Filtered Events:", events)
-    current_month_label = now.strftime('%B %Y')
-    return render_template("sprint_calendar.html", events=events, current_month=current_month_label)
-
-
-
-
-
-
+    return render_template("HelperQA-AI.html", image_url=image_url, page_url=page_url, feedback=feedback_html)
 
 
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
-    app.run(debug=True)
+    app.run(host='0.0.0.0', port=5000, debug=True)
 

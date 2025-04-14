@@ -1,0 +1,115 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container mt-4">
+  <h3 class="mb-4">HelperQA-AI</h3>
+<div class="alert alert-info small" role="alert">
+  <strong>HelperQA-AI Guide:</strong> This tool helps QA teams by analyzing UI layouts or generating structured test cases.
+  <ul class="mb-1 mt-1">
+    <li><strong>📷 Upload Screenshot</strong>: Performs UI analysis like layout issues or suggestions.</li>
+    <li><strong>🌐 Web Page URL</strong>: Captures and analyzes live web page layout.</li>
+    <li><strong>🧪 Test Case Generator</strong>: Provide Jira ID, paste story, or upload document to get test cases.</li>
+  </ul>
+  The result will appear below with options to expand requirements or view Jira directly in-app.
+</div>
+
+  <form method="POST" enctype="multipart/form-data" id="feedbackForm">
+    <div class="mb-3">
+      <label for="inputType" class="form-label">Choose Input Type</label>
+      <select class="form-select" id="inputType" name="input_type" required>
+        <option value="">-- Select --</option>
+        <option value="upload">📷 Upload Screenshot</option>
+        <option value="url">🌐 Enter Web Page URL</option>
+        <option value="testcase_story">✍️ Test Case Generator (Story/Epic/Bug)</option>
+      </select>
+    </div>
+
+    <!-- Screenshot Upload -->
+    <div class="mb-3" id="uploadGroup" style="display: none;">
+      <label class="form-label">Upload Image</label>
+      <input type="file" name="screenshot" class="form-control" accept="image/*">
+    </div>
+
+    <!-- URL Input -->
+    <div class="mb-3" id="urlGroup" style="display: none;">
+      <label class="form-label">Enter Page URL</label>
+      <input type="url" name="page_url" class="form-control" placeholder="https://example.com">
+    </div>
+
+    <!-- Test Case Generator Section -->
+    <div id="testcaseGroup" style="display: none;" class="mt-3">
+      <label class="form-label">Enter Jira ID or Paste Story Description</label>
+      <input type="text" name="jira_id" class="form-control mb-2" placeholder="Optional: JIRA-1234">
+      <textarea name="story_text" class="form-control mb-2" rows="4" placeholder="Or paste the story/epic/bug here..."></textarea>
+      <label class="form-label">Or Upload a Document</label>
+      <input type="file" name="story_doc" class="form-control" accept=".txt,.pdf,.doc,.docx">
+    </div>
+
+    <!-- Button Groups -->
+    <div class="d-flex gap-2 mt-3" id="btnGroup" style="display: none;">
+      <input type="hidden" name="ai_mode" id="aiMode" value="review">
+      <button type="submit" id="analyzeBtn" class="btn btn-primary">🔍 Analyze UI</button>
+      <button type="submit" id="testcaseBtn" class="btn btn-outline-info">🧪 Generate Test Cases</button>
+    </div>
+  </form>
+
+  {% if image_url %}
+  <div class="row mt-5">
+    <div class="col-md-6">
+      {% if page_url %}
+      <h5>Analyzed URL</h5>
+      <code>{{ page_url }}</code>
+      {% endif %}
+      <img src="{{ image_url }}" class="img-fluid rounded shadow border" alt="Screenshot">
+    </div>
+    <div class="col-md-6">
+      <h5>Analysis / Testcases</h5>
+      <div class="p-3 bg-light border rounded markdown-body" style="min-height: 200px;">
+        {{ feedback | safe if feedback else "No analysis found." }}
+      </div>
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+<script>
+  const feedbackForm = document.getElementById("feedbackForm");
+  const inputType = document.getElementById("inputType");
+  const uploadGroup = document.getElementById("uploadGroup");
+  const urlGroup = document.getElementById("urlGroup");
+  const testcaseGroup = document.getElementById("testcaseGroup");
+  const btnGroup = document.getElementById("btnGroup");
+  const analyzeBtn = document.getElementById("analyzeBtn");
+  const testcaseBtn = document.getElementById("testcaseBtn");
+  const aiMode = document.getElementById("aiMode");
+
+  inputType.addEventListener("change", function () {
+    const type = this.value;
+
+    // Visibility toggles
+    uploadGroup.style.display = type === "upload" ? "block" : "none";
+    urlGroup.style.display = type === "url" ? "block" : "none";
+    testcaseGroup.style.display = type === "testcase_story" ? "block" : "none";
+
+    // Button logic
+    if (type === "upload" || type === "url") {
+      btnGroup.style.display = "flex";
+      analyzeBtn.style.display = "inline-block";
+      testcaseBtn.style.display = "inline-block";
+      feedbackForm.action = "/HelperQA-AI";
+      aiMode.value = "review";
+    } else if (type === "testcase_story") {
+      btnGroup.style.display = "flex";
+      analyzeBtn.style.display = "none";
+      testcaseBtn.style.display = "inline-block";
+      feedbackForm.action = "/generate-testcases";
+      aiMode.value = "testcases";
+    } else {
+      btnGroup.style.display = "none";
+    }
+
+    // Required fields
+    document.querySelector('[name="screenshot"]').required = (type === "upload");
+    document.querySelector('[name="page_url"]').required = (type === "url");
+  });
+</script>
+{% endblock %}

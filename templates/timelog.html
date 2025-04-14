@@ -36,35 +36,38 @@
 </form>
 
 {% if summary_data %}
-<h4>Summary</h4>
-
-<div class="mt-3">
-    <button id="ai-summary-btn" class="btn btn-success btn-sm" onclick="generateAISummary()">Generate AI Summary</button>
-    <span id="ai-summary-loader" class="spinner-border spinner-border-sm text-success ms-2" role="status" style="display:none;"></span>
-    <div id="aiSummaryOutput" class="mt-2"></div>
-</div>
-
-<table class="table table-bordered" id="summaryTable">
-    <thead class="table-light">
-        <tr>
-            <th>User</th>
-            <th>Logged Hours</th>
-            <th>Expected Hours</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for row in summary_data %}
-        <tr class="summary-row" data-user="{{ row.user | lower }}">
-            <td><a href="#collapse-{{ loop.index }}" class="summary-link" data-target="collapse-{{ loop.index }}"><strong>{{ row.user }}</strong></a></td>
-            <td>
-                <a href="{{ row.link }}" target="_blank" style="color: {% if row.status == 'low' %}red{% else %}green{% endif %}; font-weight: bold;">
-                    {{ row.total_hours }}
-                </a>
-            </td>
-            <td>{{ row.expected }}</td>
-        </tr>
-        {% endfor %}
-    </tbody>
+<h5 class="mt-4">Summary</h5>
+<table class="table table-bordered text-center align-middle">
+  <thead class="table-light">
+    <tr>
+      <th>User</th>
+      <th>Logged Hours</th>
+      <th>Expected Hours</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% set ns = namespace(total_logged=0, total_expected=0) %}
+    {% for row in summary_data %}
+    {% set ns.total_logged = ns.total_logged + row.total_hours %}
+    {% set ns.total_expected = ns.total_expected + row.expected %}
+    <tr class="summary-row" data-user="{{ row.user | lower }}">
+      <td class="text-start">
+        <a href="#collapse-{{ loop.index }}" class="summary-link text-decoration-none fw-medium" data-bs-toggle="collapse" data-target="#collapse-{{ loop.index }}">{{ row.user }}</a>
+      </td>
+      <td>
+        <a href="#collapse-{{ loop.index }}" class="summary-link text-decoration-none" data-bs-toggle="collapse" data-target="#collapse-{{ loop.index }}" style="color: {{ 'green' if row.status == 'good' else 'red' }};">
+          {{ row.total_hours | round_half }}
+        </a>
+      </td>
+      <td>{{ row.expected | round_half }}</td>
+    </tr>
+    {% endfor %}
+    <tr class="fw-bold table-secondary">
+      <td class="text-end">TOTAL</td>
+      <td>{{ ns.total_logged | round_half }}</td>
+      <td>{{ ns.total_expected | round_half }}</td>
+    </tr>
+  </tbody>
 </table>
 
 <div class="mb-3">
@@ -76,38 +79,42 @@
 {% for row in summary_data %}
   <div class="accordion-item user-accordion" data-user="{{ row.user | lower }}">
     <h2 class="accordion-header" id="heading-{{ loop.index }}">
-      <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-{{ loop.index }}" aria-expanded="false" aria-controls="collapse-{{ loop.index }}" style="color: {% if row.status == 'low' %}red{% else %}green{% endif %}; font-weight: bold;">
-        {{ row.user }} ({{ row.total_hours }} hrs)
+      <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-{{ loop.index }}">
+        {{ row.user }} ({{ row.total_hours | round_half }} hrs)
       </button>
     </h2>
     <div id="collapse-{{ loop.index }}" class="accordion-collapse collapse" aria-labelledby="heading-{{ loop.index }}">
       <div class="accordion-body">
-        {% set logs = detailed_data[row.user] %}
-        {% if logs %}
-        <table class="table table-sm table-striped">
-          <thead class="table-secondary">
-            <tr>
-              <th>Issue</th>
-              <th>Parent Summary</th>
-              <th>Task Summary</th>
-              <th>Hours Logged</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for item in logs %}
-            <tr>
-              <td><a href="{{ item.link }}" class="jira-link" data-url="{{ item.link }}">{{ item.issue_key }}</a></td>
-              <td>{{ item.parent_summary }}</td>
-              <td>{{ item.summary }}</td>
-              <td>{{ item.hours }}</td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-        {% else %}
-        <p class="text-muted">No logs found for this user.</p>
-        {% endif %}
-        <div class="text-end mt-2"><a href="#top" class="btn btn-link btn-sm">⬆ Back to Summary</a></div>
+        {% set logs_by_date = {} %}
+{% for item in detailed_data[row.user] %}
+  {% set date = item.started if item.started else 'Unknown' %}
+  {% set _ = logs_by_date.setdefault(date, []).append(item) %}
+{% endfor %}
+
+{% for log_date, items in logs_by_date.items() | sort %}
+<h6 class="text-muted mt-3">{{ log_date }}</h6>
+<table class="table table-sm table-striped">
+  <thead class="table-secondary">
+    <tr>
+      <th>Issue</th>
+      <th>Parent Summary</th>
+      <th>Task Summary</th>
+      <th>Hours Logged</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for item in items %}
+    <tr>
+      <td><a href="{{ item.link }}" class="jira-link" data-url="{{ item.link }}">{{ item.issue_key }}</a></td>
+      <td>{{ item.parent_summary }}</td>
+      <td>{{ item.summary }}</td>
+      <td>{{ item.hours | round_half }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endfor %}
+
       </div>
     </div>
   </div>
@@ -119,7 +126,7 @@
   <div class="modal-dialog modal-xl modal-dialog-scrollable" style="height:90%;">
     <div class="modal-content" style="height:100%;">
       <div class="modal-header">
-        <h5 class="modal-title" id="jiraModalLabel">Jira Ticket</h5>
+        <h5 class="modal-title">Jira Ticket</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body p-0" style="height: calc(100% - 56px);">
@@ -140,91 +147,43 @@ function expandAll(event) {
     bootstrap.Collapse.getOrCreateInstance(el).show();
   });
 }
-
 function collapseAll() {
   document.querySelectorAll('.accordion-collapse.show').forEach(el => {
     bootstrap.Collapse.getOrCreateInstance(el).hide();
   });
 }
-
-function generateAISummary() {
-  const output = document.getElementById("aiSummaryOutput");
-  output.innerHTML = '<div class="text-muted">⏳ Generating summary...</div>';
-
-  fetch("/generate-ai-summary", { method: "POST" })
-    .then(response => {
-      if (!response.ok) {
-        throw new Error("Failed to generate summary.");
-      }
-      return response.text();
-    })
-    .then(data => {
-      output.innerHTML = data;
-    })
-    .catch(error => {
-      output.innerHTML = `<div class="text-danger">❌ ${error.message}</div>`;
-    });
-}
-
-const buttons = document.querySelectorAll('.accordion-button');
-buttons.forEach(button => {
-  const targetSelector = button.getAttribute('data-bs-target');
-  const target = document.querySelector(targetSelector);
-  button.addEventListener('click', function (e) {
+document.querySelectorAll('.jira-link').forEach(link => {
+  link.addEventListener('click', function(e) {
     e.preventDefault();
-    const collapse = bootstrap.Collapse.getOrCreateInstance(target);
-    const isShown = target.classList.contains('show');
-    if (isShown) {
-      collapse.hide();
-    } else {
-      collapse.show();
-      setTimeout(() => {
-        button.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }, 300);
-    }
+    const url = this.dataset.url;
+    document.getElementById('jiraFrame').src = url;
+    new bootstrap.Modal(document.getElementById('jiraModal')).show();
   });
 });
-
+document.getElementById('zoomSlider').addEventListener('input', function () {
+  const scale = this.value / 100;
+  document.getElementById('jiraFrame').style.transform = `scale(${scale})`;
+});
+document.getElementById('userSearch').addEventListener('input', function() {
+  const filter = this.value.toLowerCase();
+  document.querySelectorAll('.summary-row, .user-accordion').forEach(row => {
+    const user = row.getAttribute('data-user');
+    row.style.display = user.includes(filter) ? '' : 'none';
+  });
+});
 document.querySelectorAll('.summary-link').forEach(link => {
   link.addEventListener('click', function(e) {
     e.preventDefault();
     const targetId = this.getAttribute('data-target');
-    const section = document.getElementById(targetId);
+    const section = document.querySelector(targetId);
     const collapse = bootstrap.Collapse.getOrCreateInstance(section);
     collapse.show();
     setTimeout(() => {
-      section.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      section.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, 300);
   });
 });
 
-document.querySelectorAll('.jira-link').forEach(link => {
-  link.addEventListener('click', function(e) {
-    e.preventDefault();
-    const url = this.getAttribute('data-url');
-    const iframe = document.getElementById('jiraFrame');
-    iframe.src = url;
-    new bootstrap.Modal(document.getElementById('jiraModal')).show();
-  });
-});
-
-document.getElementById('zoomSlider').addEventListener('input', function () {
-  const scale = this.value / 100;
-  const iframe = document.getElementById('jiraFrame');
-  iframe.style.transform = `scale(${scale})`;
-});
-
-document.getElementById('userSearch').addEventListener('input', function() {
-  const filter = this.value.toLowerCase();
-  document.querySelectorAll('.summary-row').forEach(row => {
-    const username = row.getAttribute('data-user');
-    row.style.display = username.includes(filter) ? '' : 'none';
-  });
-  document.querySelectorAll('.user-accordion').forEach(row => {
-    const username = row.getAttribute('data-user');
-    row.style.display = username.includes(filter) ? '' : 'none';
-  });
-});
 </script>
 {% else %}
 <p>Please select a date range and function to view Jira worklogs.</p>

@@ -2,20 +2,91 @@
 {% block content %}
 <h2>Leave Calendar - {{ dates[0].strftime('%B %Y') }}</h2>
 
-<div class="d-flex gap-2 mb-2">
+<div class="d-flex flex-wrap gap-2 mb-3">
     <a href="/leave-calendar?year={{ prev_year }}&month={{ prev_month }}" class="btn btn-secondary">◀ Prev</a>
     <a href="/leave-calendar?year={{ next_year }}&month={{ next_month }}" class="btn btn-secondary">Next ▶</a>
     <a href="/leave-calendar-export?year={{ year }}&month={{ month }}" class="btn btn-success">Export CSV</a>
+
+
+    <select id="userFilter" class="form-select" style="width: 200px;">
+        <option value="all">Show All Users</option>
+        {% for user in users %}
+            <option value="{{ user.id }}">{{ user.name }}</option>
+        {% endfor %}
+    </select>
+</div>
+
+<div class="mb-3 d-flex gap-2 align-items-center flex-wrap">
+    <span class="badge bg-success">P = Present</span>
+    <span class="badge bg-danger">L = Full Day Leave</span>
+    <span class="badge bg-warning text-dark">1/2 = Half Day</span>
+    <span class="badge bg-primary">H = Holiday</span>
+    <a href="/holiday-calendar?year={{ year }}" class="btn btn-primary">Holiday Calendar 📅</a>
 </div>
 
 
+
+<style>
+    #main-content, #main-content table, #main-content th, #main-content td, #main-content label, #main-content .btn {
+        font-size: 0.75rem !important;
+    }
+
+    .btn-outline-present {
+        color: green;
+        border-color: green;
+    }
+    .btn-outline-present:hover, .btn-check:checked + .btn-outline-present {
+        background-color: green;
+        color: white;
+    }
+
+    .btn-outline-halfday {
+        color: #ff9900;
+        border-color: #ff9900;
+    }
+    .btn-outline-halfday:hover, .btn-check:checked + .btn-outline-halfday {
+        background-color: #ff9900;
+        color: white;
+    }
+
+    .table thead th {
+        position: sticky;
+        top: 0;
+        background-color: #f8f9fa;
+        z-index: 3;
+    }
+
+    .sticky-col {
+        position: sticky;
+        left: 0;
+        background-color: white;
+        z-index: 4;
+    }
+
+    td:hover {
+        background-color: #f1f1f1;
+    }
+
+    .calendar-scroll-wrapper {
+        overflow-x: auto;
+        max-width: 100%;
+    }
+
+    th[data-today="true"] {
+        background-color: #ffe58f !important;
+    }
+</style>
+
+<div class="calendar-scroll-wrapper" id="calendarWrapper">
 <form method="POST" class="mt-3">
-    <table class="table table-bordered text-center">
+    <table class="table table-bordered text-center align-middle m-0">
         <thead>
             <tr>
-                <th>User</th>
+                <th class="sticky-col">User</th>
                 {% for day in dates %}
-                    <th {% if day.weekday() >= 5 %}style="background-color:#f8d7da"{% endif %}>
+                    <th
+                        {% if day.weekday() >= 5 %}style="background-color:#f8d7da"{% endif %}
+                        {% if day.date() == current_date.date() %} data-today="true" id="today-col"{% endif %}>
                         {{ day.day }} <br> <small>{{ day.strftime('%a') }}</small>
                     </th>
                 {% endfor %}
@@ -23,26 +94,52 @@
         </thead>
         <tbody>
             {% for user in users %}
-            <tr>
-                <td>{{ user.name }}</td>
+            <tr class="user-row" data-user-id="{{ user.id }}">
+                <td class="text-start sticky-col"><strong>{{ user.name }}</strong></td>
                 {% for day in dates %}
                 <td {% if day.weekday() >= 5 %}style="background-color:#f8d7da"{% endif %}>
-                {% if day.weekday() < 5 %}
-    {% set selected_leave = leaves.get((user.id, day.day), '') %}
-    <select name="leave_{{ user.id }}_{{ day.day }}" class="form-select" style="min-width:60px;">
-        <option value="" {% if selected_leave == '' %}selected{% endif %}>-</option>
-        <option value="FD" {% if selected_leave == 'FD' %}selected{% endif %}>FD</option>
-        <option value="HD" {% if selected_leave == 'HD' %}selected{% endif %}>HD</option>
-    </select>
-{% endif %}
+                    {% if day.date() in holidays %}
+                        <span class="badge bg-primary">H</span>
+                    {% elif day.weekday() < 5 %}
+                        {% set leave_type = leaves.get((user.id, day.day)) %}
+                        <div class="btn-group btn-group-sm" role="group">
+                            <input type="radio" class="btn-check" name="leave_{{ user.id }}_{{ day.day }}" id="present_{{ user.id }}_{{ day.day }}" value="" {% if leave_type is none %}checked{% endif %}>
+                            <label class="btn btn-outline-present" for="present_{{ user.id }}_{{ day.day }}" title="Present">P</label>
 
+                            <input type="radio" class="btn-check" name="leave_{{ user.id }}_{{ day.day }}" id="fd_{{ user.id }}_{{ day.day }}" value="FD" {% if leave_type == 'FD' %}checked{% endif %}>
+                            <label class="btn btn-outline-danger" for="fd_{{ user.id }}_{{ day.day }}" title="Full Day Leave">L</label>
 
+                            <input type="radio" class="btn-check" name="leave_{{ user.id }}_{{ day.day }}" id="hd_{{ user.id }}_{{ day.day }}" value="HD" {% if leave_type == 'HD' %}checked{% endif %}>
+                            <label class="btn btn-outline-halfday" for="hd_{{ user.id }}_{{ day.day }}" title="Half Day Leave">1/2</label>
+                        </div>
+                    {% endif %}
                 </td>
                 {% endfor %}
             </tr>
             {% endfor %}
         </tbody>
     </table>
-    <button type="submit" class="btn btn-primary">Save</button>
+
+    <button type="submit" class="btn btn-primary mt-3">Save</button>
 </form>
+</div>
+
+<script>
+document.getElementById('userFilter').addEventListener('change', function () {
+    const selectedId = this.value;
+    document.querySelectorAll('.user-row').forEach(row => {
+        row.style.display = (selectedId === 'all' || row.dataset.userId === selectedId) ? '' : 'none';
+    });
+});
+
+// Auto-scroll to today's column
+window.onload = function () {
+    const todayCol = document.getElementById("today-col");
+    const wrapper = document.getElementById("calendarWrapper");
+    if (todayCol && wrapper) {
+        const offsetLeft = todayCol.offsetLeft;
+        wrapper.scrollLeft = offsetLeft - 220; // Add padding
+    }
+};
+</script>
 {% endblock %}

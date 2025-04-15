@@ -84,7 +84,8 @@ class User(db.Model):
     name = db.Column(db.String(100))
     email = db.Column(db.String(100))
     designation = db.Column(db.String(100))
-    jira_account_id = db.Column(db.String(100))  # Jira mapping
+    jira_account_id = db.Column(db.String(100)) 
+    role = db.Column(db.String(50), default='Team Member')
 
 class Leave(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -206,7 +207,7 @@ def round_half(value):
 
 @app.before_request
 def require_login():
-    if 'logged_in' not in session and request.endpoint not in ['login', 'static','HelperQA_AI','generate_testcases']:
+    if 'logged_in' not in session and request.endpoint not in ['login', 'static','HelperQA_AI','generate_testcases','timelog_today']:
         return redirect('/login')
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -717,6 +718,102 @@ def timelog():
                 })
 
     return render_template("timelog.html", summary_data=summary_data, detailed_data=ordered_detailed_data, start=start, end=end, work_functions=work_functions, selected_function=selected_function)
+
+
+@app.route('/timelog-today', methods=['GET', 'POST'])
+def timelog_today():
+    users = User.query.all()
+    work_functions = sorted(set([u.designation for u in users if u.designation]))
+
+    selected_function = request.form.get('work_function') if request.method == 'POST' else request.args.get('work_function', 'All')
+    filtered_users = [u for u in users if u.jira_account_id and (selected_function == 'All' or u.designation == selected_function)]
+
+    summary_data = []
+    detailed_data = defaultdict(list)
+    user_map = {u.jira_account_id: u.name for u in filtered_users}
+    user_order = [u.name for u in filtered_users]
+    ordered_detailed_data = {name: [] for name in user_order}
+
+    date_str = request.args.get('date')
+    if date_str:
+        current_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+    else:
+        current_date = datetime.today().date()
+
+    today_str = current_date.strftime('%Y-%m-%d')
+    assignee_ids = [u.jira_account_id for u in filtered_users]
+
+    jql = f"""
+        issuetype = Sub-task AND
+        assignee in ({','.join(assignee_ids)}) AND
+        worklogDate = "{today_str}"
+    """
+
+    url = f"{JIRA_BASE_URL}/rest/api/2/search"
+    params = {
+        "jql": jql,
+        "fields": "summary,parent,assignee,worklog",
+        "maxResults": 1000
+    }
+
+    response = requests.get(url, headers=headers, params=params, auth=auth)
+    if not response.ok:
+        return render_template("timelog.html", summary_data=[], detailed_data={}, start=today_str, end=today_str, work_functions=work_functions, selected_function=selected_function, previous_date=None, next_date=None, is_today_view=True, disable_date_inputs=True)
+
+    issues = response.json().get("issues", [])
+
+    for issue in issues:
+        issue_key = issue.get("key")
+        summary = issue["fields"].get("summary", "")
+        parent = issue["fields"].get("parent", {}).get("fields", {}).get("summary", "")
+        assignee_id = issue["fields"].get("assignee", {}).get("accountId")
+
+        worklog_url = f"{JIRA_BASE_URL}/rest/api/3/issue/{issue_key}/worklog"
+        worklog_resp = requests.get(worklog_url, headers=headers, auth=auth)
+        if not worklog_resp.ok:
+            continue
+
+        for worklog in worklog_resp.json().get("worklogs", []):
+            started = worklog.get("started", "")[:10]
+            if started == today_str:
+                time_spent = worklog.get("timeSpentSeconds", 0)
+                user_name = user_map.get(worklog["author"].get("accountId"))
+                if user_name:
+                    ordered_detailed_data[user_name].append({
+                        "issue_key": issue_key,
+                        "summary": summary,
+                        "parent_summary": parent,
+                        "hours": round(time_spent / 3600, 2),
+                        "link": f"{JIRA_BASE_URL}/browse/{issue_key}",
+                        "started": started
+                    })
+
+    for name in user_order:
+        entries = ordered_detailed_data.get(name, [])
+        total_hours = round(sum(item["hours"] for item in entries), 2)
+        summary_data.append({
+            "user": name,
+            "total_hours": total_hours,
+            "expected": 8,
+            "status": "good" if total_hours >= 8 else "low",
+            "link": "#",
+            "anchor": name.replace(' ', '_').replace('.', '').lower()
+        })
+
+    previous_date = (current_date - timedelta(days=1)).strftime('%Y-%m-%d')
+    next_date = (current_date + timedelta(days=1)).strftime('%Y-%m-%d') if current_date < date.today() else None
+
+    return render_template("timelog_today.html",
+                           summary_data=summary_data,
+                           detailed_data=ordered_detailed_data,
+                           start=today_str,
+                           end=today_str,
+                           work_functions=work_functions,
+                           selected_function=selected_function,
+                           previous_date=previous_date,
+                           next_date=next_date,
+                           is_today_view=True,
+                           disable_date_inputs=True)
 
 
 

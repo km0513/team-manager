@@ -1,42 +1,28 @@
 {% extends 'base.html' %}
 {% block content %}
-
-
-<div class="d-flex justify-content-between align-items-center mb-2">
-  <h2 id="top">Jira Timelog Summary</h2>
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h3>📅 Timelog for {{ start }}</h3>
+  <div>
+    <a href="{{ url_for('timelog_today', date=previous_date, work_function=selected_function) }}" class="btn btn-outline-secondary btn-sm">← Previous</a>
+    {% if next_date %}
+      <a href="{{ url_for('timelog_today', date=next_date, work_function=selected_function) }}" class="btn btn-outline-secondary btn-sm">Next →</a>
+    {% endif %}
   </div>
+</div>
 
-
-<form method="POST" class="container my-4">
-  <div class="row g-3 mb-3 align-items-end">
-    <div class="col-md-3">
-      <label for="start" class="form-label">Start Date:</label>
-      <input type="date" class="form-control" id="start" name="start" value="{{ start or '' }}">
-    </div>
-
-    <div class="col-md-3">
-      <label for="end" class="form-label">End Date:</label>
-      <input type="date" class="form-control" id="end" name="end" value="{{ end or '' }}">
-    </div>
-
-    <div class="col-md-3">
-      <label for="functionFilter" class="form-label">Filter by Function:</label>
-      <select class="form-select" id="functionFilter" name="work_function">
-        <option value="All" {% if selected_function == 'All' %}selected{% endif %}>All Functions</option>
-        {% for func in work_functions | unique %}
-          <option value="{{ func }}" {% if func == selected_function %}selected{% endif %}>{{ func }}</option>
-        {% endfor %}
-      </select>
-    </div>
-
-    <div class="col-md-3">
-      <label for="userSearch" class="form-label">Search User:</label>
-      <input type="text" id="userSearch" class="form-control" placeholder="Type to filter users...">
-    </div>
-
-    <div class="col-md-3 d-grid mt-2">
-      <button class="btn btn-primary" type="submit">Fetch Logs</button>
-    </div>
+<form method="POST" class="row g-3 mb-3 align-items-end">
+  <div class="col-md-3">
+    <label for="functionFilter" class="form-label">Function:</label>
+    <select class="form-select" id="functionFilter" name="work_function" onchange="this.form.submit()">
+      <option value="All" {% if selected_function == 'All' %}selected{% endif %}>All</option>
+      {% for wf in work_functions %}
+        <option value="{{ wf }}" {% if selected_function == wf %}selected{% endif %}>{{ wf }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="col-md-3">
+    <label class="form-label">Search User:</label>
+    <input type="text" id="userSearch" class="form-control" placeholder="Type to filter users...">
   </div>
 </form>
 
@@ -44,11 +30,7 @@
 <h5 class="mt-4">Summary</h5>
 <table class="table table-bordered text-center align-middle">
   <thead class="table-light">
-    <tr>
-      <th>User</th>
-      <th>Logged Hours</th>
-      <th>Expected Hours</th>
-    </tr>
+    <tr><th>User</th><th>Logged</th><th>Expected</th></tr>
   </thead>
   <tbody>
     {% set ns = namespace(total_logged=0, total_expected=0) %}
@@ -91,35 +73,29 @@
     <div id="collapse-{{ loop.index }}" class="accordion-collapse collapse" aria-labelledby="heading-{{ loop.index }}">
       <div class="accordion-body">
         {% set logs_by_date = {} %}
-{% for item in detailed_data[row.user] %}
-  {% set date = item.started if item.started else 'Unknown' %}
-  {% set _ = logs_by_date.setdefault(date, []).append(item) %}
-{% endfor %}
+        {% for item in detailed_data[row.user] %}
+          {% set date = item.started if item.started else 'Unknown' %}
+          {% set _ = logs_by_date.setdefault(date, []).append(item) %}
+        {% endfor %}
 
-{% for log_date, items in logs_by_date.items() | sort %}
-<h6 class="text-muted mt-3">{{ log_date }}</h6>
-<table class="table table-sm table-striped">
-  <thead class="table-secondary">
-    <tr>
-      <th>Issue</th>
-      <th>Parent Summary</th>
-      <th>Task Summary</th>
-      <th>Hours Logged</th>
-    </tr>
-  </thead>
-  <tbody>
-    {% for item in items %}
-    <tr>
-      <td><a href="{{ item.link }}" class="jira-link" data-url="{{ item.link }}">{{ item.issue_key }}</a></td>
-      <td>{{ item.parent_summary }}</td>
-      <td>{{ item.summary }}</td>
-      <td>{{ item.hours | round_half }}</td>
-    </tr>
-    {% endfor %}
-  </tbody>
-</table>
-{% endfor %}
-
+        {% for log_date, items in logs_by_date.items() | sort %}
+        <h6 class="text-muted mt-3">{{ log_date }}</h6>
+        <table class="table table-sm table-striped">
+          <thead class="table-secondary">
+            <tr><th>Issue</th><th>Parent Summary</th><th>Task Summary</th><th>Hours</th></tr>
+          </thead>
+          <tbody>
+            {% for item in items %}
+            <tr>
+              <td><a href="{{ item.link }}" class="jira-link" data-url="{{ item.link }}">{{ item.issue_key }}</a></td>
+              <td>{{ item.parent_summary }}</td>
+              <td>{{ item.summary }}</td>
+              <td>{{ item.hours | round_half }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% endfor %}
       </div>
     </div>
   </div>
@@ -188,9 +164,8 @@ document.querySelectorAll('.summary-link').forEach(link => {
     }, 300);
   });
 });
-
 </script>
 {% else %}
-<p>Please select a date range and function to view Jira worklogs.</p>
+<p class="text-muted">No worklogs found for today.</p>
 {% endif %}
 {% endblock %}

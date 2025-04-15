@@ -213,7 +213,7 @@ def require_login():
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        if request.form['username'] == 'admin' and request.form['password'] == 'password':
+        if request.form['username'] == 'admin' and request.form['password'] == 'Supersecure2025':
             session['logged_in'] = True
             return redirect('/')
         return "Invalid credentials"
@@ -333,24 +333,23 @@ def import_users():
 
 
 
-@app.route('/export-users')
-def export_users():
+@app.route('/export-timelog-links')
+def export_timelog_links():
     users = User.query.all()
-    data = []
+    rows = []
     for user in users:
-        leaves = Leave.query.filter_by(user_id=user.id).all()
-        total_leave = sum(1 if l.leave_type == 'FD' else 0.5 for l in leaves)
-        data.append({
-            'ID': user.id,
+        rows.append({
             'Name': user.name,
             'Email': user.email,
             'Designation': user.designation,
-            'Total Leaves': total_leave
+            'Timelog Link': request.url_root.strip('/') + url_for('timelog_today', user_email=user.email)
         })
-    df = pd.DataFrame(data)
-    csv_path = f"static/users_export.csv"
+
+    df = pd.DataFrame(rows)
+    csv_path = 'static/timelog_links.csv'
     df.to_csv(csv_path, index=False)
-    return send_file(csv_path, as_attachment=True, download_name='users_export.csv')
+    return send_file(csv_path, as_attachment=True, download_name='timelog_links.csv')
+
 
 @app.route('/users/edit/<int:user_id>', methods=['GET', 'POST'])
 def edit_user(user_id):
@@ -732,12 +731,13 @@ def timelog_today(user_email=None):
     filtered_users = [u for u in users if u.jira_account_id and (selected_function == 'All' or u.designation == selected_function)]
 
     if is_user_specific:
-        filtered_users = [u for u in filtered_users if u.email == user_email]
+        filtered_users = [u for u in users if u.email == user_email and u.jira_account_id]
 
     summary_data = []
     detailed_data = defaultdict(list)
     user_map = {u.jira_account_id: u.name for u in filtered_users}
     user_email_map = {u.jira_account_id: u.email for u in filtered_users}
+    user_id_map = {u.jira_account_id: u.id for u in filtered_users}
     user_order = [u.name for u in filtered_users]
     ordered_detailed_data = {name: [] for name in user_order}
 
@@ -801,14 +801,23 @@ def timelog_today(user_email=None):
         entries = ordered_detailed_data.get(name, [])
         total_hours = round(sum(item["hours"] for item in entries), 2)
         email = next((u.email for u in filtered_users if u.name == name), '')
-        user_link = url_for('timelog_today', user_email=email)
+        user_id = next((u.id for u in filtered_users if u.name == name), None)
+
+        # check leave status
+        leave_status = None
+        if user_id:
+            leave = Leave.query.filter_by(user_id=user_id, start_date=current_date).first()
+            if leave:
+                leave_status = f"On Leave ({leave.leave_type})"
+
         summary_data.append({
             "user": name,
-            "total_hours": total_hours,
+            "total_hours": leave_status if leave_status else total_hours,
             "expected": 8,
-            "status": "good" if total_hours >= 8 else "low",
-            "link": user_link,
-            "anchor": name.replace(' ', '_').replace('.', '').lower()
+            "status": "good" if not leave_status and total_hours >= 8 else ("onleave" if leave_status else "low"),
+            "link": url_for('timelog_today', user_email=email),
+            "anchor": name.replace(' ', '_').replace('.', '').lower(),
+            "copy_url": request.url_root.strip('/') + url_for('timelog_today', user_email=email)
         })
 
     previous_date = (current_date - timedelta(days=1)).strftime('%Y-%m-%d')
@@ -828,6 +837,7 @@ def timelog_today(user_email=None):
                            display_date_str=display_date_str,
                            is_user_specific=is_user_specific,
                            user_email=user_email)
+
 
 
 

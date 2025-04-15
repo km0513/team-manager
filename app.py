@@ -803,19 +803,26 @@ def timelog_today(user_email=None):
         email = next((u.email for u in filtered_users if u.name == name), '')
         user_id = next((u.id for u in filtered_users if u.name == name), None)
 
-        # check leave status
         leave_status = None
         if user_id:
             leave = Leave.query.filter_by(user_id=user_id, start_date=current_date).first()
             if leave:
                 leave_status = f"On Leave ({leave.leave_type})"
 
+        if leave_status:
+            display_hours = leave_status
+            numeric_hours = 0.0
+        else:
+            display_hours = total_hours
+            numeric_hours = total_hours
+
         summary_data.append({
             "user": name,
-            "total_hours": leave_status if leave_status else total_hours,
+            "total_hours": display_hours,
+            "numeric_hours": numeric_hours,
             "expected": 8,
-            "status": "good" if not leave_status and total_hours >= 8 else ("onleave" if leave_status else "low"),
-            "link": url_for('timelog_today', user_email=email),
+            "status": "good" if not leave_status and numeric_hours >= 8 else ("onleave" if leave_status else "low"),
+            "link": url_for('timelog_today', user_email=email, date=today_str) if is_user_specific else url_for('timelog_today', date=today_str, work_function=selected_function),
             "anchor": name.replace(' ', '_').replace('.', '').lower(),
             "copy_url": request.url_root.strip('/') + url_for('timelog_today', user_email=email)
         })
@@ -837,6 +844,13 @@ def timelog_today(user_email=None):
                            display_date_str=display_date_str,
                            is_user_specific=is_user_specific,
                            user_email=user_email)
+
+
+
+
+
+
+
 
 
 

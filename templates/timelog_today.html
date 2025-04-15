@@ -4,12 +4,13 @@
 <div class="d-flex justify-content-between align-items-center mb-3">
   <h3>📅 Timelog for {{ display_date_str }}</h3>
   <div>
-    <a href="{{ url_for('timelog_today', date=previous_date, work_function=selected_function) }}" class="btn btn-outline-secondary btn-sm">← Previous</a>
+    <a href="{{ url_for('timelog_today', user_email=user_email, date=previous_date) if is_user_specific else url_for('timelog_today', date=previous_date, work_function=selected_function) }}" class="btn btn-outline-secondary btn-sm">← Previous</a>
     {% if next_date %}
-      <a href="{{ url_for('timelog_today', date=next_date, work_function=selected_function) }}" class="btn btn-outline-secondary btn-sm">Next →</a>
+      <a href="{{ url_for('timelog_today', user_email=user_email, date=next_date) if is_user_specific else url_for('timelog_today', date=next_date, work_function=selected_function) }}" class="btn btn-outline-secondary btn-sm">Next →</a>
     {% endif %}
   </div>
 </div>
+
 
 {% if not is_user_specific %}
 <form method="POST" class="row g-3 mb-3 align-items-end">
@@ -38,24 +39,22 @@
   <tbody>
     {% set ns = namespace(total_logged=0, total_expected=0) %}
     {% for row in summary_data %}
-    {% set ns.total_logged = ns.total_logged + row.total_hours %}
-    {% set ns.total_expected = ns.total_expected + row.expected %}
+    {% set ns.total_logged = ns.total_logged + (row.numeric_hours | float) %}
+    {% set ns.total_expected = ns.total_expected + 8 %}
     <tr class="summary-row" data-user="{{ row.user | lower }}">
       <td class="text-start">
         <a href="#collapse-{{ loop.index }}" class="summary-link text-decoration-none fw-medium" data-bs-toggle="collapse" data-target="#collapse-{{ loop.index }}">{{ row.user }}</a>
       </td>
-      <td>
-        <a href="#collapse-{{ loop.index }}" class="summary-link text-decoration-none" data-bs-toggle="collapse" data-target="#collapse-{{ loop.index }}" style="color: {{ 'green' if row.status == 'good' else 'red' }};">
-          {{ row.total_hours | round_half }}
-        </a>
+      <td style="color: {{ 'green' if row.status == 'good' else ('gray' if row.status == 'onleave' else 'red') }};">
+        {{ row.total_hours }}
       </td>
-      <td>{{ row.expected | round_half }}</td>
+      <td>8</td>
     </tr>
     {% endfor %}
     <tr class="fw-bold table-secondary">
       <td class="text-end">TOTAL</td>
       <td>{{ ns.total_logged | round_half }}</td>
-      <td>{{ ns.total_expected | round_half }}</td>
+      <td>{{ ns.total_expected }}</td>
     </tr>
   </tbody>
 </table>
@@ -70,7 +69,7 @@
   <div class="accordion-item user-accordion" data-user="{{ row.user | lower }}">
     <h2 class="accordion-header" id="heading-{{ loop.index }}">
       <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-{{ loop.index }}">
-        {{ row.user }} ({{ row.total_hours | round_half }} hrs)
+        {{ row.user }} ({{ row.total_hours }})
       </button>
     </h2>
     <div id="collapse-{{ loop.index }}" class="accordion-collapse collapse" aria-labelledby="heading-{{ loop.index }}">
@@ -80,7 +79,6 @@
           {% set date = item.started if item.started else 'Unknown' %}
           {% set _ = logs_by_date.setdefault(date, []).append(item) %}
         {% endfor %}
-
         {% for log_date, items in logs_by_date.items() | sort %}
         <h6 class="text-muted mt-3">{{ log_date }}</h6>
         <table class="table table-sm table-striped">
@@ -105,7 +103,7 @@
 {% endfor %}
 </div>
 
-<!-- Jira Modal -->
+<!-- Modal -->
 <div class="modal fade" id="jiraModal" tabindex="-1" aria-labelledby="jiraModalLabel" aria-hidden="true">
   <div class="modal-dialog modal-xl modal-dialog-scrollable" style="height:90%;">
     <div class="modal-content" style="height:100%;">

@@ -741,6 +741,9 @@ def timelog_today():
         current_date = datetime.today().date()
 
     today_str = current_date.strftime('%Y-%m-%d')
+    display_date_str = current_date.strftime('%d') + "th "+current_date.strftime('%B %Y')  # e.g., '15 April 2025'
+  # e.g., '15 April 2025'
+
     assignee_ids = [u.jira_account_id for u in filtered_users]
 
     jql = f"""
@@ -758,7 +761,7 @@ def timelog_today():
 
     response = requests.get(url, headers=headers, params=params, auth=auth)
     if not response.ok:
-        return render_template("timelog.html", summary_data=[], detailed_data={}, start=today_str, end=today_str, work_functions=work_functions, selected_function=selected_function, previous_date=None, next_date=None, is_today_view=True, disable_date_inputs=True)
+        return render_template("timelog.html", summary_data=[], detailed_data={}, start=today_str, end=today_str, work_functions=work_functions, selected_function=selected_function, previous_date=None, next_date=None, is_today_view=True, disable_date_inputs=True, display_date_str=display_date_str)
 
     issues = response.json().get("issues", [])
 
@@ -813,7 +816,9 @@ def timelog_today():
                            previous_date=previous_date,
                            next_date=next_date,
                            is_today_view=True,
-                           disable_date_inputs=True)
+                           disable_date_inputs=True,
+                           display_date_str=display_date_str)
+
 
 
 

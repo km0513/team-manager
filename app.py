@@ -721,16 +721,23 @@ def timelog():
 
 
 @app.route('/timelog-today', methods=['GET', 'POST'])
-def timelog_today():
+@app.route('/timelog-today/<user_email>', methods=['GET'])
+def timelog_today(user_email=None):
     users = User.query.all()
     work_functions = sorted(set([u.designation for u in users if u.designation]))
+
+    is_user_specific = user_email is not None
 
     selected_function = request.form.get('work_function') if request.method == 'POST' else request.args.get('work_function', 'All')
     filtered_users = [u for u in users if u.jira_account_id and (selected_function == 'All' or u.designation == selected_function)]
 
+    if is_user_specific:
+        filtered_users = [u for u in filtered_users if u.email == user_email]
+
     summary_data = []
     detailed_data = defaultdict(list)
     user_map = {u.jira_account_id: u.name for u in filtered_users}
+    user_email_map = {u.jira_account_id: u.email for u in filtered_users}
     user_order = [u.name for u in filtered_users]
     ordered_detailed_data = {name: [] for name in user_order}
 
@@ -741,8 +748,7 @@ def timelog_today():
         current_date = datetime.today().date()
 
     today_str = current_date.strftime('%Y-%m-%d')
-    display_date_str = current_date.strftime('%d') + "th "+current_date.strftime('%B %Y')  # e.g., '15 April 2025'
-  # e.g., '15 April 2025'
+    display_date_str = current_date.strftime('%-d %B %Y') if os.name != 'nt' else current_date.strftime('%#d %B %Y')
 
     assignee_ids = [u.jira_account_id for u in filtered_users]
 
@@ -761,7 +767,7 @@ def timelog_today():
 
     response = requests.get(url, headers=headers, params=params, auth=auth)
     if not response.ok:
-        return render_template("timelog.html", summary_data=[], detailed_data={}, start=today_str, end=today_str, work_functions=work_functions, selected_function=selected_function, previous_date=None, next_date=None, is_today_view=True, disable_date_inputs=True, display_date_str=display_date_str)
+        return render_template("timelog_today.html", summary_data=[], detailed_data={}, start=today_str, end=today_str, work_functions=work_functions, selected_function=selected_function, previous_date=None, next_date=None, is_today_view=True, disable_date_inputs=True, display_date_str=display_date_str, is_user_specific=is_user_specific, user_email=user_email)
 
     issues = response.json().get("issues", [])
 
@@ -794,12 +800,14 @@ def timelog_today():
     for name in user_order:
         entries = ordered_detailed_data.get(name, [])
         total_hours = round(sum(item["hours"] for item in entries), 2)
+        email = next((u.email for u in filtered_users if u.name == name), '')
+        user_link = url_for('timelog_today', user_email=email)
         summary_data.append({
             "user": name,
             "total_hours": total_hours,
             "expected": 8,
             "status": "good" if total_hours >= 8 else "low",
-            "link": "#",
+            "link": user_link,
             "anchor": name.replace(' ', '_').replace('.', '').lower()
         })
 
@@ -817,10 +825,9 @@ def timelog_today():
                            next_date=next_date,
                            is_today_view=True,
                            disable_date_inputs=True,
-                           display_date_str=display_date_str)
-
-
-
+                           display_date_str=display_date_str,
+                           is_user_specific=is_user_specific,
+                           user_email=user_email)
 
 
 

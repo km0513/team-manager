@@ -3,42 +3,54 @@
 <h2>User Management</h2>
 
 <form method="POST" class="mb-3">
-    <input type="text" name="name" placeholder="Name" class="form-control mb-2" required>
-    <input type="email" name="email" placeholder="Email" class="form-control mb-2" required>
-    <select name="designation" class="form-select mb-2" required>
-        <option value="">Select Designation</option>
-        <option value="QA">QA</option>
-        <option value="Development">Development</option>
-        <option value="Product Management">Product Management</option>
-        <option value="UI/UX">UI/UX</option>
-    </select>
-    <button type="submit" class="btn btn-success">Add User</button>
+  <input type="text" name="name" placeholder="Name" class="form-control mb-2" required>
+  <input type="email" name="email" placeholder="Email" class="form-control mb-2" required>
+  <select name="designation" class="form-select mb-2" required>
+    <option value="">Select Designation</option>
+    <option value="QA">QA</option>
+    <option value="Development">Development</option>
+    <option value="Product Management">Product Management</option>
+    <option value="UI/UX">UI/UX</option>
+  </select>
+  <button type="submit" class="btn btn-success">Add User</button>
 </form>
+
 <form method="POST" action="/import-users" enctype="multipart/form-data" class="mb-3">
-    <label for="excel_file" class="form-label">Import from Excel</label>
-    <input type="file" name="excel_file" accept=".xlsx" class="form-control mb-2" required>
-    <button type="submit" class="btn btn-primary">Import Users</button>
+  <label for="excel_file" class="form-label">Import from Excel</label>
+  <input type="file" name="excel_file" accept=".xlsx" class="form-control mb-2" required>
+  <button type="submit" class="btn btn-primary">Import Users</button>
 </form>
 
 <h4>Existing Users</h4>
-
 <a href="/update-jira-id" class="btn btn-success mb-3">Jira ID Mapping</a>
-<table class="table table-bordered">
+
+<table class="table table-bordered align-middle">
+  <thead class="table-light">
     <tr>
-        <th>ID</th><th>Name</th><th>Email</th><th>Designation</th><th>Actions</th>
+      <th>ID</th>
+      <th>Name</th>
+      <th>Email</th>
+      <th>Designation</th>
+      <th>Actions</th>
     </tr>
+  </thead>
+  <tbody>
     {% for user in users %}
     <tr>
-        <td>{{ user.id }}</td>
-        <td>{{ user.name }}</td>
-        <td>{{ user.email }}</td>
-        <td>{{ user.designation }}</td>
-        <td>
-            <a href="/users/edit/{{ user.id }}" class="btn btn-warning btn-sm">Edit</a>
-            <a href="/users/delete/{{ user.id }}" class="btn btn-danger btn-sm" onclick="return confirm('Are you sure you want to delete {{ user.name }}?')">Delete</a>
-        </td>
+      <td>{{ user.id }}</td>
+      <td>{{ user.name }}</td>
+      <td>{{ user.email }}</td>
+      <td>{{ user.designation }}</td>
+      <td>
+        <div class="d-flex flex-wrap gap-1">
+          <a href="/users/edit/{{ user.id }}" class="btn btn-warning btn-sm">Edit</a>
+          <a href="/users/delete/{{ user.id }}" class="btn btn-danger btn-sm" onclick="return confirm('Are you sure you want to delete {{ user.name }}?')">Delete</a>
+          <a href="{{ url_for('timelog_today', user_email=user.email) }}" target="_blank" class="btn btn-info btn-sm">🔗 View Today's Timelog</a>
+        </div>
+      </td>
     </tr>
     {% endfor %}
+  </tbody>
 </table>
 
 {% if pagination %}
@@ -50,7 +62,7 @@
     {% for p in pagination.iter_pages() %}
       {% if p %}
         <li class="page-item {% if p == pagination.page %}active{% endif %}">
-            <a class="page-link" href="{{ url_for('users', page=p) }}">{{ p }}</a>
+          <a class="page-link" href="{{ url_for('users', page=p) }}">{{ p }}</a>
         </li>
       {% endif %}
     {% endfor %}
@@ -61,4 +73,14 @@
 </nav>
 {% endif %}
 
+<script>
+function copyToClipboard(text, button) {
+  navigator.clipboard.writeText(text).then(() => {
+    button.innerText = '✅ Copied!';
+    setTimeout(() => {
+      button.innerText = '📋 Copy Timelog Link';
+    }, 1500);
+  });
+}
+</script>
 {% endblock %}

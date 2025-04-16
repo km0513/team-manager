@@ -1,82 +1,125 @@
 {% extends 'base.html' %}
 {% block content %}
-<h2>User Management</h2>
+<style>
+  .user-mgmt-card {
+    background: #f8f9fa;
+    border-radius: 10px;
+    box-shadow: 0 1px 4px rgba(25,118,210,0.07);
+    padding: 22px 22px 18px 22px;
+    margin-bottom: 22px;
+    border: 1px solid #e3e8ee;
+  }
+  .user-mgmt-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: #1976d2;
+    margin-bottom: 10px;
+    letter-spacing: 0.2px;
+  }
+  .user-mgmt-form .form-control, .user-mgmt-form .form-select { font-size: 13px; padding: 6px 10px; }
+  .user-mgmt-form .btn { font-size: 13px; padding: 6px 18px; }
+  .user-mgmt-table th, .user-mgmt-table td { font-size: 13px; }
+  .user-mgmt-table th { background: #f1f3f4; position: sticky; top: 0; z-index: 2; }
+  .user-mgmt-table tr { vertical-align: middle; }
+  .user-mgmt-table tr:nth-child(even) { background: #f9fafb; }
+  .user-mgmt-actions .btn { font-size: 12px; padding: 4px 10px; }
+  .user-mgmt-actions .btn + .btn { margin-left: 4px; }
+  @media (max-width: 700px) {
+    .user-mgmt-card { padding: 12px 6px; }
+    .user-mgmt-title { font-size: 15px; }
+    .user-mgmt-table th, .user-mgmt-table td { font-size: 11px; }
+  }
+</style>
 
-<form method="POST" class="mb-3">
-  <input type="text" name="name" placeholder="Name" class="form-control mb-2" required>
-  <input type="email" name="email" placeholder="Email" class="form-control mb-2" required>
-  <select name="designation" class="form-select mb-2" required>
-    <option value="">Select Designation</option>
-    <option value="QA">QA</option>
-    <option value="Development">Development</option>
-    <option value="Product Management">Product Management</option>
-    <option value="UI/UX">UI/UX</option>
-  </select>
-  <button type="submit" class="btn btn-success">Add User</button>
-</form>
-
-<form method="POST" action="/import-users" enctype="multipart/form-data" class="mb-3">
-  <label for="excel_file" class="form-label">Import from Excel</label>
-  <input type="file" name="excel_file" accept=".xlsx" class="form-control mb-2" required>
-  <button type="submit" class="btn btn-primary">Import Users</button>
-</form>
-
-<h4>Existing Users</h4>
-<a href="/update-jira-id" class="btn btn-success mb-3">Jira ID Mapping</a>
-
-<div class="d-flex justify-content-between align-items-center">
-  <h5 class="mb-3">🔗 Timelog Links Table</h5>
-  <a href="{{ url_for('export_timelog_links') }}" class="btn btn-outline-success btn-sm">⬇️ Download CSV</a>
+<div class="user-mgmt-card mb-3">
+  <div class="user-mgmt-title mb-2"><i class="bi bi-person-plus-fill me-2"></i>Add User</div>
+  <form method="POST" class="user-mgmt-form row g-2 align-items-end">
+    <div class="col-md-3"><input type="text" name="name" placeholder="Name" class="form-control" required></div>
+    <div class="col-md-3"><input type="email" name="email" placeholder="Email" class="form-control" required></div>
+    <div class="col-md-3">
+      <select name="designation" class="form-select" required>
+        <option value="">Select Designation</option>
+        <option value="QA">QA</option>
+        <option value="Development">Development</option>
+        <option value="Product Management">Product Management</option>
+        <option value="UI/UX">UI/UX</option>
+      </select>
+    </div>
+    <div class="col-md-2"><button type="submit" class="btn btn-success w-100"><i class="bi bi-person-plus me-1"></i>Add</button></div>
+  </form>
 </div>
 
-<table class="table table-bordered align-middle">
-  <thead class="table-light">
-    <tr>
-      <th>ID</th>
-      <th>Name</th>
-      <th>Email</th>
-      <th>Designation</th>
-      <th>Actions</th>
-    </tr>
-  </thead>
-  <tbody>
-    {% for user in users %}
-    <tr>
-      <td>{{ user.id }}</td>
-      <td>{{ user.name }}</td>
-      <td>{{ user.email }}</td>
-      <td>{{ user.designation }}</td>
-      <td>
-        <div class="d-flex flex-wrap gap-1">
-          <a href="/users/edit/{{ user.id }}" class="btn btn-warning btn-sm">Edit</a>
-          <a href="/users/delete/{{ user.id }}" class="btn btn-danger btn-sm" onclick="return confirm('Are you sure you want to delete {{ user.name }}?')">Delete</a>
-          <a href="{{ url_for('timelog_today', user_email=user.email) }}" target="_blank" class="btn btn-info btn-sm">🔗 View Today's Timelog</a>
-        </div>
-      </td>
-    </tr>
-    {% endfor %}
-  </tbody>
-</table>
+<div class="user-mgmt-card mb-3">
+  <div class="user-mgmt-title mb-2"><i class="bi bi-file-earmark-spreadsheet-fill me-2"></i>Import Users from Excel</div>
+  <form method="POST" action="/import-users" enctype="multipart/form-data" class="user-mgmt-form row g-2 align-items-end">
+    <div class="col-md-6 col-8">
+      <input type="file" name="excel_file" accept=".xlsx" class="form-control" required>
+    </div>
+    <div class="col-md-2 col-4">
+      <button type="submit" class="btn btn-primary w-100"><i class="bi bi-upload me-1"></i>Import</button>
+    </div>
+  </form>
+</div>
 
-{% if pagination %}
-<nav>
-  <ul class="pagination">
-    {% if pagination.has_prev %}
-    <li class="page-item"><a class="page-link" href="{{ url_for('users', page=pagination.prev_num) }}">Previous</a></li>
-    {% endif %}
-    {% for p in pagination.iter_pages() %}
-      {% if p %}
-        <li class="page-item {% if p == pagination.page %}active{% endif %}">
-          <a class="page-link" href="{{ url_for('users', page=p) }}">{{ p }}</a>
-        </li>
+<div class="user-mgmt-card mb-3">
+  <div class="d-flex justify-content-between align-items-center mb-2">
+    <div class="user-mgmt-title mb-0"><i class="bi bi-people-fill me-2"></i>Existing Users</div>
+    <a href="/update-jira-id" class="btn btn-outline-success btn-sm"><i class="bi bi-link-45deg me-1"></i>Jira ID Mapping</a>
+  </div>
+  <div class="d-flex justify-content-between align-items-center mb-2">
+    <div class="fw-semibold" style="font-size:14px;"><i class="bi bi-link-45deg me-1"></i>Timelog Links Table</div>
+    <a href="{{ url_for('export_timelog_links') }}" class="btn btn-outline-success btn-sm"><i class="bi bi-download me-1"></i>Download CSV</a>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-bordered align-middle user-mgmt-table mb-0">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Name</th>
+          <th>Email</th>
+          <th>Designation</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for user in users %}
+        <tr>
+          <td>{{ user.id }}</td>
+          <td>{{ user.name }}</td>
+          <td>{{ user.email }}</td>
+          <td>{{ user.designation }}</td>
+          <td>
+            <div class="user-mgmt-actions d-flex flex-wrap gap-1">
+              <a href="/users/edit/{{ user.id }}" class="btn btn-warning btn-sm"><i class="bi bi-pencil-square"></i></a>
+              <a href="/users/delete/{{ user.id }}" class="btn btn-danger btn-sm" onclick="return confirm('Are you sure you want to delete {{ user.name }}?')"><i class="bi bi-trash"></i></a>
+              <a href="{{ url_for('timelog_today', user_email=user.email) }}" target="_blank" class="btn btn-info btn-sm"><i class="bi bi-clock-history"></i></a>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if pagination %}
+  <nav>
+    <ul class="pagination mt-2">
+      {% if pagination.has_prev %}
+      <li class="page-item"><a class="page-link" href="{{ url_for('users', page=pagination.prev_num) }}">Previous</a></li>
       {% endif %}
-    {% endfor %}
-    {% if pagination.has_next %}
-    <li class="page-item"><a class="page-link" href="{{ url_for('users', page=pagination.next_num) }}">Next</a></li>
-    {% endif %}
-  </ul>
-</nav>
-{% endif %}
+      {% for p in pagination.iter_pages() %}
+        {% if p %}
+          <li class="page-item {% if p == pagination.page %}active{% endif %}">
+            <a class="page-link" href="{{ url_for('users', page=p) }}">{{ p }}</a>
+          </li>
+        {% endif %}
+      {% endfor %}
+      {% if pagination.has_next %}
+      <li class="page-item"><a class="page-link" href="{{ url_for('users', page=pagination.next_num) }}">Next</a></li>
+      {% endif %}
+    </ul>
+  </nav>
+  {% endif %}
+</div>
 
 <script>
 function copyToClipboard(text, button) {

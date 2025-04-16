@@ -1,15 +1,14 @@
 {% extends 'base.html' %}
 {% block content %}
-<h2>Holiday Calendar - {{ year }}</h2>
+<h2 class="mb-3" style="font-size:18px; color:#1976d2;"><i class="bi bi-gift-fill me-2"></i>Holiday Calendar - {{ year }}</h2>
 
-
-<div class="d-flex flex-wrap gap-2 mb-3">
-    <a href="/holiday-calendar?year={{ year - 1 }}" class="btn btn-secondary">◀ Prev Year</a>
-    <a href="/holiday-calendar?year={{ year + 1 }}" class="btn btn-secondary">Next Year ▶</a>
-    <a href="/leave-calendar" class="btn btn-outline-primary ms-auto">← Back to Leave Calendar</a>
+<div class="d-flex flex-wrap gap-2 mb-3 align-items-center">
+    <a href="/holiday-calendar?year={{ year - 1 }}" class="btn btn-outline-info app-btn-sm">◀ Prev Year</a>
+    <a href="/holiday-calendar?year={{ year + 1 }}" class="btn btn-outline-info app-btn-sm">Next Year ▶</a>
+    <a href="/leave-calendar" class="btn btn-outline-primary app-btn-sm ms-auto">← Back to Leave Calendar</a>
 </div>
-<a href="/holidays?year={{ year }}" class="btn btn-info text-white">Add Holidays</a>
-<table class="table table-bordered">
+<a href="/holidays?year={{ year }}" class="btn btn-outline-success app-btn-sm mb-2">Add Holidays</a>
+<table class="table table-bordered app-table">
     <thead>
         <tr>
             <th style="width: 200px;">Date</th>

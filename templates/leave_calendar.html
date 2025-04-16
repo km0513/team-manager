@@ -3,17 +3,16 @@
 <h2>Leave Calendar - {{ dates[0].strftime('%B %Y') }}</h2>
 
 <div class="d-flex flex-wrap gap-2 mb-3">
-    <a href="/leave-calendar?year={{ prev_year }}&month={{ prev_month }}" class="btn btn-secondary">◀ Prev</a>
-    <a href="/leave-calendar?year={{ next_year }}&month={{ next_month }}" class="btn btn-secondary">Next ▶</a>
-    <a href="/leave-calendar-export?year={{ year }}&month={{ month }}" class="btn btn-success">Export CSV</a>
-
-
-    <select id="userFilter" class="form-select" style="width: 200px;">
+    <a href="/leave-calendar?year={{ prev_year }}&month={{ prev_month }}" class="btn btn-outline-info app-btn-sm">◀ Prev</a>
+    <a href="/leave-calendar?year={{ next_year }}&month={{ next_month }}" class="btn btn-outline-info app-btn-sm">Next ▶</a>
+    <a href="/leave-calendar-export?year={{ year }}&month={{ month }}" class="btn btn-outline-success app-btn-sm">Export CSV</a>
+    <select id="userFilter" class="form-select app-btn-sm" style="width: 180px;">
         <option value="all">Show All Users</option>
         {% for user in users %}
             <option value="{{ user.id }}">{{ user.name }}</option>
         {% endfor %}
     </select>
+    <a href="/holiday-calendar?year={{ year }}" class="btn btn-outline-warning app-btn-sm">Holiday Calendar <i class="bi bi-calendar3 ms-1"></i></a>
 </div>
 
 <div class="mb-3 d-flex gap-2 align-items-center flex-wrap">
@@ -21,16 +20,12 @@
     <span class="badge bg-danger">L = Full Day Leave</span>
     <span class="badge bg-warning text-dark">1/2 = Half Day</span>
     <span class="badge bg-primary">H = Holiday</span>
-    <a href="/holiday-calendar?year={{ year }}" class="btn btn-primary">Holiday Calendar 📅</a>
 </div>
-
-
 
 <style>
     #main-content, #main-content table, #main-content th, #main-content td, #main-content label, #main-content .btn {
-        font-size: 0.75rem !important;
+        font-size: 0.85rem !important;
     }
-
     .btn-outline-present {
         color: green;
         border-color: green;
@@ -39,7 +34,6 @@
         background-color: green;
         color: white;
     }
-
     .btn-outline-halfday {
         color: #ff9900;
         border-color: #ff9900;
@@ -48,30 +42,25 @@
         background-color: #ff9900;
         color: white;
     }
-
     .table thead th {
         position: sticky;
         top: 0;
         background-color: #f8f9fa;
         z-index: 3;
     }
-
     .sticky-col {
         position: sticky;
         left: 0;
         background-color: white;
         z-index: 4;
     }
-
     td:hover {
         background-color: #f1f1f1;
     }
-
     .calendar-scroll-wrapper {
         overflow-x: auto;
         max-width: 100%;
     }
-
     th[data-today="true"] {
         background-color: #ffe58f !important;
     }
@@ -104,13 +93,13 @@
                         {% set leave_type = leaves.get((user.id, day.day)) %}
                         <div class="btn-group btn-group-sm" role="group">
                             <input type="radio" class="btn-check" name="leave_{{ user.id }}_{{ day.day }}" id="present_{{ user.id }}_{{ day.day }}" value="" {% if leave_type is none %}checked{% endif %}>
-                            <label class="btn btn-outline-present" for="present_{{ user.id }}_{{ day.day }}" title="Present">P</label>
+                            <label class="btn btn-outline-present app-btn-sm" for="present_{{ user.id }}_{{ day.day }}" title="Present">P</label>
 
                             <input type="radio" class="btn-check" name="leave_{{ user.id }}_{{ day.day }}" id="fd_{{ user.id }}_{{ day.day }}" value="FD" {% if leave_type == 'FD' %}checked{% endif %}>
-                            <label class="btn btn-outline-danger" for="fd_{{ user.id }}_{{ day.day }}" title="Full Day Leave">L</label>
+                            <label class="btn btn-outline-danger app-btn-sm" for="fd_{{ user.id }}_{{ day.day }}" title="Full Day Leave">L</label>
 
                             <input type="radio" class="btn-check" name="leave_{{ user.id }}_{{ day.day }}" id="hd_{{ user.id }}_{{ day.day }}" value="HD" {% if leave_type == 'HD' %}checked{% endif %}>
-                            <label class="btn btn-outline-halfday" for="hd_{{ user.id }}_{{ day.day }}" title="Half Day Leave">1/2</label>
+                            <label class="btn btn-outline-halfday app-btn-sm" for="hd_{{ user.id }}_{{ day.day }}" title="Half Day Leave">1/2</label>
                         </div>
                     {% endif %}
                 </td>
@@ -123,7 +112,7 @@
  
 </form>
 </div>
-<button type="submit" class="btn btn-primary mt-3">Save</button>
+<button type="submit" class="btn btn-info app-btn mt-3">Save</button>
 <script>
 document.getElementById('userFilter').addEventListener('change', function () {
     const selectedId = this.value;

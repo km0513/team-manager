@@ -764,7 +764,18 @@ def timelog():
                     "anchor": name.replace(' ', '_').replace('.', '').lower()
                 })
 
-    return render_template("timelog.html", summary_data=summary_data, detailed_data=ordered_detailed_data, start=start, end=end, work_functions=work_functions, selected_function=selected_function)
+    current_date = datetime.now().strftime('%Y-%m-%d')
+    
+    return render_template(
+        "timelog.html",
+        summary_data=summary_data,
+        detailed_data=ordered_detailed_data,
+        start=start,
+        end=end,
+        work_functions=work_functions,
+        selected_function=selected_function,
+        current_date=current_date
+    )
 
 
 @app.route('/timelog-today', methods=['GET', 'POST'])

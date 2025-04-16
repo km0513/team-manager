@@ -1,6 +1,19 @@
 {% extends 'base.html' %}
 {% block content %}
 
+<style>
+  #main-content, #main-content table, #main-content th, #main-content td, #main-content label, #main-content .btn {
+    font-size: 0.85rem !important;
+  }
+  .accordion-button, .btn, .form-control, .form-select {
+    font-size: 0.85rem !important;
+  }
+  .btn, .btn-sm {
+    padding: 0.25rem 0.5rem !important;
+    border-radius: 0.25rem !important;
+  }
+</style>
+
 <div class="d-flex justify-content-between align-items-center mb-3">
   <h3>📅 Timelog for {{ display_date_str }}</h3>
   <div>

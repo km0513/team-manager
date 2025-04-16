@@ -6,21 +6,20 @@
   <h2 id="top" class="mb-3" style="font-size:18px; color:#1976d2;"><i class="bi bi-clock-history me-2"></i>Jira Timelog Summary</h2>
   </div>
 
-
 <form method="POST" class="container my-4">
   <div class="row g-3 mb-3 align-items-end">
     <div class="col-md-3">
       <label for="start" class="form-label">Start Date:</label>
-      <input type="date" class="form-control app-btn-sm" id="start" name="start" value="{{ start or '' }}">
+      <input type="date" class="form-control app-btn-sm" id="start" name="start" value="{{ start or '' }}" max="{{ current_date }}">
     </div>
 
     <div class="col-md-3">
       <label for="end" class="form-label">End Date:</label>
-      <input type="date" class="form-control app-btn-sm" id="end" name="end" value="{{ end or '' }}">
+      <input type="date" class="form-control app-btn-sm" id="end" name="end" value="{{ end or '' }}" max="{{ current_date }}">
     </div>
 
     <div class="col-md-3">
-      <label for="functionFilter" class="form-label">Filter by Function:</label>
+      <label for="functionFilter" class="form-label">Function:</label>
       <select class="form-select app-btn-sm" id="functionFilter" name="work_function">
         <option value="All" {% if selected_function == 'All' %}selected{% endif %}>All Functions</option>
         {% for func in work_functions | unique %}
@@ -29,13 +28,14 @@
       </select>
     </div>
 
+    <div class="col-md-3 d-grid mt-2">
+      <button class="btn btn-outline-info app-btn-sm" type="submit">Fetch Logs</button>
+    </div>
+  </div>
+  <div class="row mt-2">
     <div class="col-md-3">
       <label for="userSearch" class="form-label">Search User:</label>
       <input type="text" id="userSearch" class="form-control app-btn-sm" placeholder="Type to filter users...">
-    </div>
-
-    <div class="col-md-3 d-grid mt-2">
-      <button class="btn btn-outline-info app-btn-sm" type="submit">Fetch Logs</button>
     </div>
   </div>
 </form>
@@ -55,7 +55,7 @@
     {% for row in summary_data %}
     {% set ns.total_logged = ns.total_logged + row.total_hours %}
     {% set ns.total_expected = ns.total_expected + row.expected %}
-    <tr class="summary-row" data-user="{{ row.user | lower }}">
+    <tr class="summary-row" data-user="{{ row.user | lower }}" data-function="{{ row.function }}">
       <td class="text-start">
         <a href="#collapse-{{ loop.index }}" class="summary-link text-decoration-none fw-medium" data-bs-toggle="collapse" data-target="#collapse-{{ loop.index }}">{{ row.user }}</a>
       </td>
@@ -82,7 +82,7 @@
 
 <div class="accordion" id="timelogAccordion">
 {% for row in summary_data %}
-  <div class="accordion-item user-accordion" data-user="{{ row.user | lower }}">
+  <div class="accordion-item user-accordion" data-user="{{ row.user | lower }}" data-function="{{ row.function }}">
     <h2 class="accordion-header" id="heading-{{ loop.index }}">
       <button class="accordion-button collapsed app-btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-{{ loop.index }}">
         {{ row.user }} ({{ row.total_hours | round_half }} hrs)
@@ -169,13 +169,26 @@ document.getElementById('zoomSlider').addEventListener('input', function () {
   const scale = this.value / 100;
   document.getElementById('jiraFrame').style.transform = `scale(${scale})`;
 });
-document.getElementById('userSearch').addEventListener('input', function() {
-  const filter = this.value.toLowerCase();
-  document.querySelectorAll('.summary-row, .user-accordion').forEach(row => {
-    const user = row.getAttribute('data-user');
-    row.style.display = user.includes(filter) ? '' : 'none';
-  });
+
+document.addEventListener('DOMContentLoaded', function() {
+  const userSelect = document.getElementById('userSearch');
+  const functionSelect = document.getElementById('functionFilter');
+  function filterRows() {
+    const selectedUsers = Array.from(userSelect.selectedOptions).map(opt => opt.value.toLowerCase());
+    const selectedFunction = functionSelect.value;
+    document.querySelectorAll('.summary-row, .user-accordion').forEach(row => {
+      const user = row.getAttribute('data-user');
+      const func = row.getAttribute('data-function');
+      let show = true;
+      if (selectedUsers.length && !selectedUsers.includes(user)) show = false;
+      if (selectedFunction !== 'All' && func !== selectedFunction) show = false;
+      row.style.display = show ? '' : 'none';
+    });
+  }
+  userSelect.addEventListener('change', filterRows);
+  functionSelect.addEventListener('change', filterRows);
 });
+
 document.querySelectorAll('.summary-link').forEach(link => {
   link.addEventListener('click', function(e) {
     e.preventDefault();
@@ -186,6 +199,14 @@ document.querySelectorAll('.summary-link').forEach(link => {
     setTimeout(() => {
       section.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, 300);
+  });
+});
+
+document.getElementById('userSearch').addEventListener('input', function() {
+  const filter = this.value.toLowerCase();
+  document.querySelectorAll('.summary-row, .user-accordion').forEach(row => {
+    const user = row.getAttribute('data-user');
+    row.style.display = user && user.includes(filter) ? '' : 'none';
   });
 });
 

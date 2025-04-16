@@ -37,7 +37,7 @@ app.register_blueprint(testcase_bp)
 
 
 load_dotenv()  # This loads the .env file
-print("🔑 OpenAI Key begins with:", os.getenv("OPENAI_API_KEY")[:8])
+print(" OpenAI Key begins with:", os.getenv("OPENAI_API_KEY")[:8])
 from openai import OpenAI
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///database.db'
@@ -181,7 +181,7 @@ def filter_sprints_this_month(sprints):
         except Exception as e:
             print("Skipping sprint due to date parsing error:", e)
 
-    print("📆 Filtered Events for Current Month:", filtered_events)
+    print(" Filtered Events for Current Month:", filtered_events)
     return filtered_events
 
 
@@ -191,10 +191,10 @@ def fetch_jira_sprints(board_id):
 
     if response.ok:
         sprints = response.json().get('values', [])
-        print("✅ Fetched Sprints:", sprints)
+        print(" Fetched Sprints:", sprints)
         return sprints
     else:
-        print("❌ Jira Sprint Fetch Failed:", response.status_code, response.text)
+        print(" Jira Sprint Fetch Failed:", response.status_code, response.text)
         return []
 
 
@@ -236,15 +236,29 @@ def dashboard():
         .filter(Leave.start_date == today)
         .all()
     )
-
     user_names = [u.name for u in users_on_leave_today]
     total_users = db.session.query(User).count()
+
+    # Calculate available capacity per function
+    function_capacity = {}
+    standard_hours = 8
+    for user in User.query.all():
+        # Check if user is on leave today
+        leave = Leave.query.filter_by(user_id=user.id, start_date=today).first()
+        available_hours = 0 if leave else standard_hours
+        func = user.designation or 'Unknown'
+        function_capacity.setdefault(func, 0)
+        function_capacity[func] += available_hours
+
+    # Sort by function name for display
+    function_capacity = dict(sorted(function_capacity.items()))
 
     return render_template(
         'dashboard.html',
         users_on_leave=user_names,
         today=today,
-        total_users=total_users
+        total_users=total_users,
+        function_capacity=function_capacity
     )
 
 
@@ -261,7 +275,7 @@ def users():
         designation = request.form['designation']
 
         if User.query.filter_by(email=email).first():
-            return "⚠️ User with this email already exists."
+            return " User with this email already exists."
 
         jira_account_id = fetch_jira_account_id(email)
         user = User(name=name, email=email, designation=designation, jira_account_id=jira_account_id)
@@ -731,7 +745,7 @@ def timelog():
                     Leave.start_date <= end_date.date()
                 ).all()
 
-                leave_map = {(l.start_date, l.leave_type) for l in leave_days}
+                leave_map = {(leave.start_date, leave.leave_type) for leave in leave_days}
                 leave_sum = sum([1 if l_type == 'FD' else 0.5 for (l_date, l_type) in leave_map if l_date in [d.date() for d in all_working_days]])
                 available_days = max(0, len(all_working_days) - leave_sum)
                 expected = available_days * 8
@@ -947,7 +961,7 @@ def HelperQA_AI():
                     with open(filepath, "rb") as f:
                         image_b64 = base64.b64encode(f.read()).decode()
                 else:
-                    feedback_html = f"❌ Failed to capture screenshot. Status code: {response.status_code}"
+                    feedback_html = f" Failed to capture screenshot. Status code: {response.status_code}"
 
         elif input_type == "upload":
             image = request.files.get('screenshot')
@@ -1001,7 +1015,7 @@ def HelperQA_AI():
                 feedback_html = md_convert(cleaned)
 
             except Exception as e:
-                feedback_html = f"❌ Error during AI analysis: {str(e)}"
+                feedback_html = f" Error during AI analysis: {str(e)}"
 
     return render_template("HelperQA-AI.html", image_url=image_url, page_url=page_url, feedback=feedback_html)
 
@@ -1010,4 +1024,3 @@ if __name__ == '__main__':
     with app.app_context():
         db.create_all()
     app.run(host='0.0.0.0', port=5000, debug=True)
-

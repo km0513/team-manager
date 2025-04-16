@@ -1,24 +1,110 @@
 {% extends 'base.html' %}
 {% block content %}
 
-<div class="mb-4">
-  <p><strong>Total Employees:</strong> {{ total_users }}</p>
+<style>
+  .dashboard-section { background: #f8f9fa; border-radius: 8px; padding: 18px 20px 14px 20px; margin-bottom: 18px; box-shadow: 0 1px 3px rgba(0,0,0,0.03); }
+  .dashboard-label { font-size: 13px; color: #555; letter-spacing: 0.5px; }
+  .dashboard-value { font-size: 20px; font-weight: 600; color: #1a237e; }
+  .dashboard-link { color: #1976d2; text-decoration: none; transition: color 0.2s; }
+  .dashboard-link:hover { color: #0d47a1; text-decoration: underline; }
+  .dashboard-table th, .dashboard-table td { font-size: 13px; padding: 5px 8px; }
+  .dashboard-table th { background: #f1f3f4; }
+  .dashboard-table { background: #fff; border-radius: 6px; overflow: hidden; }
+  .dashboard-section-title { font-size: 14px; font-weight: 500; color: #333; margin-bottom: 8px; }
 
- <p><strong>On leave today ({{ today }}):</strong></p>
-{% if users_on_leave %}
-    <ul>
-        {% for user in users_on_leave %}
-            <li>{{ user }}</li>
-        {% endfor %}
-    </ul>
-{% else %}
-    <p>No one is on leave today 🎉</p>
-{% endif %}
+  .dashboard-stats-row {
+    display: flex; flex-wrap: wrap; gap: 18px; margin-bottom: 18px;
+  }
+  .dashboard-stat-card {
+    flex: 1 1 220px;
+    background: #fff;
+    border-radius: 10px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+    padding: 18px 20px 14px 20px;
+    display: flex;
+    align-items: center;
+    min-width: 180px;
+    transition: box-shadow 0.15s, border-color 0.15s;
+    border: 1px solid #f1f3f4;
+    cursor: pointer;
+    text-decoration: none;
+  }
+  .dashboard-stat-card:hover { box-shadow: 0 2px 8px rgba(25,118,210,0.09); border-color: #e3e8ee; }
+  .dashboard-stat-icon {
+    font-size: 28px;
+    margin-right: 16px;
+    border-radius: 50%;
+    width: 38px;
+    height: 38px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .dashboard-stat-users { background: #e3f2fd; color: #1976d2; }
+  .dashboard-stat-leave { background: #fff3e0; color: #ff9800; }
+  .dashboard-stat-label { font-size: 13px; color: #555; letter-spacing: 0.5px; margin-bottom: 2px; }
+  .dashboard-stat-value { font-size: 20px; font-weight: 700; color: #1a237e; }
+  @media (max-width: 600px) {
+    .dashboard-stats-row { flex-direction: column; gap: 12px; }
+    .dashboard-stat-card { min-width: 0; padding: 14px 12px; }
+    .dashboard-stat-icon { font-size: 22px; width: 32px; height: 32px; margin-right: 10px; }
+    .dashboard-stat-label { font-size: 12px; }
+    .dashboard-stat-value { font-size: 16px; }
+  }
+</style>
+
+<div class="dashboard-stats-row">
+  <a href="/users" class="dashboard-stat-card dashboard-link" style="border-left: 4px solid #1976d2;">
+    <div class="dashboard-stat-icon dashboard-stat-users">
+      <i class="bi bi-people-fill"></i>
+    </div>
+    <div>
+      <div class="dashboard-stat-label">Total Employees</div>
+      <div class="dashboard-stat-value">{{ total_users }}</div>
+    </div>
+  </a>
+  <a href="/leave-calendar" class="dashboard-stat-card dashboard-link" style="border-left: 4px solid #ff9800;">
+    <div class="dashboard-stat-icon dashboard-stat-leave">
+      <i class="bi bi-calendar2-x-fill"></i>
+    </div>
+    <div>
+      <div class="dashboard-stat-label">On leave today ({{ today }})</div>
+      <div class="dashboard-stat-value" style="font-size:15px; color:#ff9800;">
+        {% if users_on_leave %}
+          {{ users_on_leave|join(', ') }}
+        {% else %}
+          <span class="text-muted" style="font-size:13px;">No one is on leave 🎉</span>
+        {% endif %}
+      </div>
+    </div>
+  </a>
 </div>
 
-
-
-
-
+<div class="dashboard-section">
+  <div class="d-flex align-items-center justify-content-between mb-2">
+    <span class="dashboard-section-title">
+      <a href="/sprint-capacity?start={{ today.strftime('%Y-%m-%d') }}&end={{ today.strftime('%Y-%m-%d') }}" class="dashboard-link">
+        Total Available Capacity (Hours) by Function for {{ today.strftime('%d %b %Y') }}
+      </a>
+    </span>
+    <span class="dashboard-label">(Standard: 8 hrs/user)</span>
+  </div>
+  <table class="table table-bordered table-sm dashboard-table text-center mb-0" style="max-width:420px">
+    <thead>
+      <tr>
+        <th>Function</th>
+        <th>Available Capacity</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for func, cap in function_capacity.items() %}
+      <tr>
+        <td>{{ func }}</td>
+        <td style="font-size:15px; font-weight:600; color:#1565c0;">{{ cap }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
 
 {% endblock %}

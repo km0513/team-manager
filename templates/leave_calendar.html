@@ -48,7 +48,7 @@
           {% for day in dates %}
           <td class="px-2 py-1 {% if day.weekday() >= 5 %}bg-red-50{% endif %} {% if day.date() == current_date.date() %}bg-yellow-200 border-yellow-400 border-2 shadow text-black{% endif %}">
             {% if day.date() in holidays %}
-              <span class="inline-block px-2 py-1 rounded bg-blue-100 text-blue-700 font-bold" title="Holiday">H</span>
+              <span class="inline-block px-2 py-1 rounded bg-blue-100 text-blue-700 font-bold" title="{{ holidays[day.date()] }}">H</span>
             {% elif day.weekday() < 5 %}
               {% set leave_type = leaves.get((user.id, day.day)) %}
               <div class="flex justify-center gap-1">

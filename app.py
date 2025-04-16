@@ -453,10 +453,11 @@ def leave_calendar():
         week_key = f"{date.isocalendar()[0]}-W{date.isocalendar()[1]}"
         weeks.setdefault(week_key, []).append(date)
 
-    holiday_dates = {h.date for h in Holiday.query.filter(
-    Holiday.date >= datetime(year, month, 1).date(),
-    Holiday.date <= datetime(year, month, month_days).date()
-).all()}
+    # FIX: Provide a dictionary of date: description for holidays
+    holiday_dict = {h.date: h.description for h in Holiday.query.filter(
+        Holiday.date >= datetime(year, month, 1).date(),
+        Holiday.date <= datetime(year, month, month_days).date()
+    ).all()}
 
     return render_template('leave_calendar.html',
                            users=users,
@@ -469,7 +470,8 @@ def leave_calendar():
                            next_month=next_month,
                            prev_year=prev_year,
                            next_year=next_year,
-                           weeks=weeks,holidays=holiday_dates)
+                           weeks=weeks,
+                           holidays=holiday_dict)
 
 @app.route('/holiday-calendar', methods=['GET'])
 def holiday_calendar():

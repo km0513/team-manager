@@ -462,6 +462,40 @@ def holiday_calendar():
 
     return render_template('holiday_calendar.html', holidays=holidays, dates=dates, year=year)
 
+import csv
+from flask import Response
+
+
+
+from flask import Response
+from io import StringIO
+import csv
+
+@app.route('/leave-calendar-export')
+def export_leaves():
+    leaves = db.session.query(
+        User.name,
+        User.email,
+        Leave.start_date,
+        Leave.leave_type
+    ).join(Leave, User.id == Leave.user_id).order_by(Leave.start_date.desc()).all()
+
+    output = StringIO()
+    writer = csv.writer(output)
+    writer.writerow(['Name', 'Email', 'Leave Date', 'Leave Type'])
+
+    for name, email, start_date, leave_type in leaves:
+        if leave_type not in ['FD', 'HD', 'Half', 'Full']:  # ensure leave_type is valid
+            continue
+        writer.writerow([name, email, start_date.strftime('%d-%m-%Y'), leave_type])
+
+    output.seek(0)
+    return Response(
+        output,
+        mimetype='text/csv',
+        headers={"Content-Disposition": "attachment;filename=leave_records.csv"}
+    )
+
 
 
 @app.route('/capacity', methods=['GET'])

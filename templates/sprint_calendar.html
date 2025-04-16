@@ -1,5 +1,10 @@
 {% extends 'base.html' %}
 {% block content %}
+<!-- Alpine.js CDN for interactivity (if needed) -->
+<script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+<style>
+  [x-cloak] { display: none !important; }
+</style>
 <div class="container mt-4">
   <h3><i class="bi bi-calendar-event"></i> Jira Sprint Calendar</h3>
   <p><strong>{{ current_month }}</strong></p>
@@ -28,7 +33,7 @@
     </tbody>
   </table>
   {% else %}
-    <p class="text-muted">No sprints found for the selected month.</p>
+    <p class="text-muted" x-cloak>No sprints found for the selected month.</p>
   {% endif %}
 </div>
 {% endblock %}

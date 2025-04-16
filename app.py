@@ -413,6 +413,7 @@ def leave_calendar():
     # Handle saving leave data
     if request.method == 'POST':
         for user in users:
+            # Remove all leaves for this user in the selected month
             Leave.query.filter(
                 Leave.user_id == user.id,
                 Leave.start_date >= datetime(year, month, 1),
@@ -422,7 +423,13 @@ def leave_calendar():
             for day in dates:
                 leave_type = request.form.get(f'leave_{user.id}_{day.day}')
                 if leave_type and leave_type in ["FD", "HD"]:
-                    db.session.add(Leave(user_id=user.id, start_date=day, leave_type=leave_type))
+                    # Check if a leave already exists for this user on this day
+                    existing_leave = Leave.query.filter_by(user_id=user.id, start_date=day).first()
+                    if not existing_leave:
+                        db.session.add(Leave(user_id=user.id, start_date=day, leave_type=leave_type))
+                    else:
+                        # Update the leave type if needed (optional, or skip to prevent duplicates)
+                        existing_leave.leave_type = leave_type
 
         db.session.commit()
         return redirect(f'/leave-calendar?year={year}&month={month}')
@@ -487,19 +494,20 @@ import csv
 
 @app.route('/leave-calendar-export')
 def export_leaves():
-    leaves = db.session.query(
-        User.name,
-        User.email,
-        Leave.start_date,
-        Leave.leave_type
-    ).join(Leave, User.id == Leave.user_id).order_by(Leave.start_date.desc()).all()
+    # Export all users who are on leave (forget learner filter)
+    leaves = (
+        db.session.query(User.name, User.email, Leave.start_date, Leave.leave_type)
+        .join(Leave, User.id == Leave.user_id)
+        .order_by(Leave.start_date.desc())
+        .all()
+    )
 
     output = StringIO()
     writer = csv.writer(output)
     writer.writerow(['Name', 'Email', 'Leave Date', 'Leave Type'])
 
     for name, email, start_date, leave_type in leaves:
-        if leave_type not in ['FD', 'HD', 'Half', 'Full']:  # ensure leave_type is valid
+        if leave_type not in ['FD', 'HD', 'Half', 'Full']:
             continue
         writer.writerow([name, email, start_date.strftime('%d-%m-%Y'), leave_type])
 

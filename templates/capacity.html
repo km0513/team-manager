@@ -1,51 +1,57 @@
 {% extends 'base.html' %}
 {% block content %}
-<h2 class="mb-3" style="font-size:18px; color:#1976d2;"><i class="bi bi-bar-chart-fill me-2"></i>Capacity Overview - {{ month }}/{{ year }}</h2>
+<!-- Tailwind CSS refactor, remove Bootstrap -->
+<h2 class="mb-6 text-xl font-bold text-blue-700 flex items-center gap-2">
+  <svg xmlns="http://www.w3.org/2000/svg" class="inline w-6 h-6 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 17v2a2 2 0 002 2h14a2 2 0 002-2v-2M16 11V7a4 4 0 10-8 0v4M5 17h14" /></svg>
+  Capacity Overview - {{ month }}/{{ year }}
+</h2>
 
-<form method="get" class="mb-3 d-flex gap-2 align-items-center">
-    <select name="month" class="form-select app-btn-sm" style="width:100px;">
-        {% for m in range(1, 13) %}
-            <option value="{{m}}" {% if m == month %}selected{% endif %}>{{ m }}</option>
-        {% endfor %}
-    </select>
-    <select name="year" class="form-select app-btn-sm" style="width:100px;">
-        {% for y in range(2022, 2030) %}
-            <option value="{{y}}" {% if y == year %}selected{% endif %}>{{ y }}</option>
-        {% endfor %}
-    </select>
-    <select name="function" class="form-select app-btn-sm" style="width:200px;">
-        <option value="All" {% if selected_function == 'All' %}selected{% endif %}>All Functions</option>
-        {% for func in functions %}
-            <option value="{{ func }}" {% if func == selected_function %}selected{% endif %}>{{ func }}</option>
-        {% endfor %}
-    </select>
-    <button type="submit" class="btn btn-outline-info app-btn-sm">Show</button>
-    <a href="/sprint-capacity" class="btn btn-outline-success app-btn-sm">Sprint Capacity</a>
+<form method="get" class="mb-6 flex flex-wrap gap-4 items-end">
+  <select name="month" class="block w-28 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 text-sm">
+    {% for m in range(1, 13) %}
+      <option value="{{m}}" {% if m == month %}selected{% endif %}>{{ m }}</option>
+    {% endfor %}
+  </select>
+  <select name="year" class="block w-28 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 text-sm">
+    {% for y in range(2022, 2030) %}
+      <option value="{{y}}" {% if y == year %}selected{% endif %}>{{ y }}</option>
+    {% endfor %}
+  </select>
+  <select name="function" class="block w-52 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 text-sm">
+    <option value="All" {% if selected_function == 'All' %}selected{% endif %}>All Functions</option>
+    {% for func in functions %}
+      <option value="{{ func }}" {% if func == selected_function %}selected{% endif %}>{{ func }}</option>
+    {% endfor %}
+  </select>
+  <button type="submit" class="px-4 py-2 bg-blue-500 hover:bg-blue-700 text-white text-xs font-semibold rounded shadow">Show</button>
+  <a href="/sprint-capacity" class="px-4 py-2 bg-green-500 hover:bg-green-700 text-white text-xs font-semibold rounded shadow">Sprint Capacity</a>
 </form>
 
-<table class="table table-bordered text-center app-table">
-    <thead>
-        <tr>
-            <th>User</th>
-            <th>Total Working Days</th>
-            <th>Leaves (FD + HD)</th>
-            <th>Available Capacity (Hours)</th>
-        </tr>
+<div class="overflow-x-auto">
+  <table class="min-w-[500px] w-full bg-white rounded-lg border border-gray-200 text-xs text-center">
+    <thead class="bg-gray-100 text-gray-700">
+      <tr>
+        <th class="py-2 px-3 font-semibold">User</th>
+        <th class="py-2 px-3 font-semibold">Total Working Days</th>
+        <th class="py-2 px-3 font-semibold">Leaves (FD + HD)</th>
+        <th class="py-2 px-3 font-semibold">Available Capacity (Hours)</th>
+      </tr>
     </thead>
     <tbody>
-        {% for entry in capacity_data %}
-        <tr>
-            <td class="text-start">{{ entry.user.name }}</td>
-            <td>{{ entry.total_days }}</td>
-            <td>{{ entry.leaves }}</td>
-            <td>{{ entry.capacity_hours }}</td>
-        </tr>
-        {% endfor %}
-        <tr class="fw-bold table-light">
-            <td colspan="2" class="text-end">TOTAL</td>
-            <td>{{ total_leaves }}</td>
-            <td>{{ total_capacity }}</td>
-        </tr>
+      {% for entry in capacity_data %}
+      <tr class="border-t border-gray-100">
+        <td class="py-2 px-3 text-left">{{ entry.user.name }}</td>
+        <td class="py-2 px-3">{{ entry.total_days }}</td>
+        <td class="py-2 px-3">{{ entry.leaves }}</td>
+        <td class="py-2 px-3">{{ entry.capacity_hours }}</td>
+      </tr>
+      {% endfor %}
+      <tr class="border-t border-gray-100 font-bold bg-gray-50">
+        <td colspan="2" class="py-2 px-3 text-end">TOTAL</td>
+        <td class="py-2 px-3">{{ total_leaves }}</td>
+        <td class="py-2 px-3">{{ total_capacity }}</td>
+      </tr>
     </tbody>
-</table>
+  </table>
+</div>
 {% endblock %}

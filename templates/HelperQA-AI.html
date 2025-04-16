@@ -1,21 +1,21 @@
 {% extends 'base.html' %}
 {% block content %}
-<div class="container mt-4">
-  <h3 class="mb-4">HelperQA-AI</h3>
-<div class="alert alert-info small" role="alert">
-  <strong>HelperQA-AI Guide:</strong> This tool helps QA teams by analyzing UI layouts or generating structured test cases.
-  <ul class="mb-1 mt-1">
-    <li><strong>📷 Upload Screenshot</strong>: Performs UI analysis like layout issues or suggestions.</li>
-    <li><strong>🌐 Web Page URL</strong>: Captures and analyzes live web page layout.</li>
-    <li><strong>🧪 Test Case Generator</strong>: Provide Jira ID, paste story, or upload document to get test cases.</li>
-  </ul>
-  The result will appear below with options to expand requirements or view Jira directly in-app.
-</div>
+<div class="max-w-4xl mx-auto px-4 py-6">
+  <h3 class="mb-6 text-2xl font-bold text-blue-700">HelperQA-AI</h3>
+  <div class="mb-6 p-4 rounded-lg bg-blue-50 border border-blue-200 text-blue-900 text-sm">
+    <strong class="block mb-2 text-blue-800">HelperQA-AI Guide:</strong>
+    <ul class="mb-2 list-disc list-inside">
+      <li><strong>📷 Upload Screenshot</strong>: Performs UI analysis like layout issues or suggestions.</li>
+      <li><strong>🌐 Web Page URL</strong>: Captures and analyzes live web page layout.</li>
+      <li><strong>🧪 Test Case Generator</strong>: Provide Jira ID, paste story, or upload document to get test cases.</li>
+    </ul>
+    <span class="block">The result will appear below with options to expand requirements or view Jira directly in-app.</span>
+  </div>
 
-  <form method="POST" enctype="multipart/form-data" id="feedbackForm">
-    <div class="mb-3">
-      <label for="inputType" class="form-label">Choose Input Type</label>
-      <select class="form-select" id="inputType" name="input_type" required>
+  <form method="POST" enctype="multipart/form-data" id="feedbackForm" class="space-y-4">
+    <div>
+      <label for="inputType" class="block text-xs font-medium text-gray-600 mb-1">Choose Input Type</label>
+      <select class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 text-sm" id="inputType" name="input_type" required>
         <option value="">-- Select --</option>
         <option value="upload">📷 Upload Screenshot</option>
         <option value="url">🌐 Enter Web Page URL</option>
@@ -24,46 +24,46 @@
     </div>
 
     <!-- Screenshot Upload -->
-    <div class="mb-3" id="uploadGroup" style="display: none;">
-      <label class="form-label">Upload Image</label>
-      <input type="file" name="screenshot" class="form-control" accept="image/*">
+    <div class="hidden" id="uploadGroup">
+      <label class="block text-xs font-medium text-gray-600 mb-1">Upload Image</label>
+      <input type="file" name="screenshot" class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 text-sm" accept="image/*">
     </div>
 
     <!-- URL Input -->
-    <div class="mb-3" id="urlGroup" style="display: none;">
-      <label class="form-label">Enter Page URL</label>
-      <input type="url" name="page_url" class="form-control" placeholder="https://example.com">
+    <div class="hidden" id="urlGroup">
+      <label class="block text-xs font-medium text-gray-600 mb-1">Enter Page URL</label>
+      <input type="url" name="page_url" class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 text-sm" placeholder="https://example.com">
     </div>
 
     <!-- Test Case Generator Section -->
-    <div id="testcaseGroup" style="display: none;" class="mt-3">
-      <label class="form-label">Enter Jira ID or Paste Story Description</label>
-      <input type="text" name="jira_id" class="form-control mb-2" placeholder="Optional: JIRA-1234">
-      <textarea name="story_text" class="form-control mb-2" rows="4" placeholder="Or paste the story/epic/bug here..."></textarea>
-      <label class="form-label">Or Upload a Document</label>
-      <input type="file" name="story_doc" class="form-control" accept=".txt,.pdf,.doc,.docx">
+    <div id="testcaseGroup" class="hidden mt-2">
+      <label class="block text-xs font-medium text-gray-600 mb-1">Enter Jira ID or Paste Story Description</label>
+      <input type="text" name="jira_id" class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 text-sm mb-2" placeholder="Optional: JIRA-1234">
+      <textarea name="story_text" class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 text-sm mb-2" rows="4" placeholder="Or paste the story/epic/bug here..."></textarea>
+      <label class="block text-xs font-medium text-gray-600 mb-1">Or Upload a Document</label>
+      <input type="file" name="story_doc" class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 text-sm" accept=".txt,.pdf,.doc,.docx">
     </div>
 
     <!-- Button Groups -->
-    <div class="d-flex gap-2 mt-3" id="btnGroup" style="display: none;">
+    <div class="flex gap-2 mt-3 hidden" id="btnGroup">
       <input type="hidden" name="ai_mode" id="aiMode" value="review">
-      <button type="submit" id="analyzeBtn" class="btn btn-primary">🔍 Analyze UI</button>
-      <button type="submit" id="testcaseBtn" class="btn btn-outline-info">🧪 Generate Test Cases</button>
+      <button type="submit" id="analyzeBtn" class="px-4 py-2 bg-blue-600 hover:bg-blue-800 text-white text-xs font-semibold rounded shadow">🔍 Analyze UI</button>
+      <button type="submit" id="testcaseBtn" class="px-4 py-2 bg-cyan-100 hover:bg-cyan-200 text-cyan-900 border border-cyan-400 text-xs font-semibold rounded shadow">🧪 Generate Test Cases</button>
     </div>
   </form>
 
   {% if image_url %}
-  <div class="row mt-5">
-    <div class="col-md-6">
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
+    <div>
       {% if page_url %}
-      <h5>Analyzed URL</h5>
-      <code>{{ page_url }}</code>
+      <h5 class="text-base font-semibold mb-1">Analyzed URL</h5>
+      <code class="block mb-2 text-xs text-gray-600 bg-gray-100 rounded px-2 py-1">{{ page_url }}</code>
       {% endif %}
-      <img src="{{ image_url }}" class="img-fluid rounded shadow border" alt="Screenshot">
+      <img src="{{ image_url }}" class="w-full rounded-lg shadow border border-gray-200" alt="Screenshot">
     </div>
-    <div class="col-md-6">
-      <h5>Analysis / Testcases</h5>
-      <div class="p-3 bg-light border rounded markdown-body" style="min-height: 200px;">
+    <div>
+      <h5 class="text-base font-semibold mb-1">Analysis / Testcases</h5>
+      <div class="p-4 bg-gray-50 border border-gray-200 rounded-lg min-h-[200px] prose prose-sm max-w-none">
         {{ feedback | safe if feedback else "No analysis found." }}
       </div>
     </div>
@@ -85,26 +85,26 @@
   inputType.addEventListener("change", function () {
     const type = this.value;
 
-    // Visibility toggles
-    uploadGroup.style.display = type === "upload" ? "block" : "none";
-    urlGroup.style.display = type === "url" ? "block" : "none";
-    testcaseGroup.style.display = type === "testcase_story" ? "block" : "none";
+    // Visibility toggles (Tailwind: use hidden/block)
+    uploadGroup.classList.toggle("hidden", type !== "upload");
+    urlGroup.classList.toggle("hidden", type !== "url");
+    testcaseGroup.classList.toggle("hidden", type !== "testcase_story");
 
     // Button logic
     if (type === "upload" || type === "url") {
-      btnGroup.style.display = "flex";
+      btnGroup.classList.remove("hidden");
       analyzeBtn.style.display = "inline-block";
       testcaseBtn.style.display = "inline-block";
       feedbackForm.action = "/HelperQA-AI";
       aiMode.value = "review";
     } else if (type === "testcase_story") {
-      btnGroup.style.display = "flex";
+      btnGroup.classList.remove("hidden");
       analyzeBtn.style.display = "none";
       testcaseBtn.style.display = "inline-block";
       feedbackForm.action = "/generate-testcases";
       aiMode.value = "testcases";
     } else {
-      btnGroup.style.display = "none";
+      btnGroup.classList.add("hidden");
     }
 
     // Required fields

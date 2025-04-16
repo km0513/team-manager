@@ -1,0 +1,227 @@
+/* upGrad-inspired theme for your Flask app */
+
+body {
+  font-family: 'Roboto', 'Open Sans', Arial, sans-serif;
+  background: #fafbfc;
+  color: #222;
+}
+
+.navbar, .app-navbar {
+  background: #d32f2f !important;
+  border-bottom: none;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+}
+
+.navbar .navbar-brand, .navbar .nav-link, .app-navbar .navbar-brand, .app-navbar .nav-link {
+  color: #fff !important;
+  font-weight: 600;
+  font-size: 1rem;
+  letter-spacing: 0.5px;
+  transition: color 0.2s;
+}
+
+.navbar .nav-link.active, .app-navbar .nav-link.active {
+  background: #fff;
+  color: #d32f2f !important;
+  border-radius: 18px;
+  padding: 4px 14px;
+}
+
+.navbar .nav-link:hover, .app-navbar .nav-link:hover {
+  color: #ffeaea !important;
+}
+
+.navbar .btn, .app-navbar .btn {
+  background: #fff;
+  color: #d32f2f;
+  border-radius: 18px;
+  font-weight: 700;
+  margin-left: 12px;
+  box-shadow: none;
+  border: none;
+  transition: background 0.2s, color 0.2s;
+  font-size: 0.95rem;
+  padding: 7px 18px;
+}
+
+.navbar .btn:hover, .app-navbar .btn:hover {
+  background: #fdeaea;
+  color: #a31515;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  color: #d32f2f;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.btn, .app-btn-sm, .btn-outline-info {
+  border-radius: 24px;
+  font-weight: 600;
+  padding: 7px 18px;
+  font-size: 0.98rem;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  border: none;
+  background: #d32f2f;
+  color: #fff;
+  transition: background 0.2s, color 0.2s;
+}
+.btn:hover, .app-btn-sm:hover, .btn-outline-info:hover {
+  background: #a31515;
+  color: #fff;
+}
+
+.form-label {
+  font-weight: 600;
+  color: #d32f2f;
+  font-size: 0.97rem;
+}
+
+.form-control, .form-select {
+  border-radius: 12px;
+  border: 1px solid #e0e0e0;
+  background: #fff;
+  font-size: 0.97rem;
+  padding: 7px 12px;
+  color: #222;
+  box-shadow: none;
+}
+
+.form-select {
+  appearance: auto;
+  -webkit-appearance: menulist;
+  background-image: url("data:image/svg+xml;charset=UTF-8,<svg width='16' height='16' fill='gray' viewBox='0 0 16 16'><path d='M4 6l4 4 4-4'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  background-size: 1.2em;
+}
+
+.table {
+  background: #fff;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.03);
+  font-size: 0.97rem;
+}
+.table th {
+  background: #d32f2f;
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.98rem;
+}
+.table td {
+  background: #fff;
+  color: #222;
+}
+
+.accordion-item {
+  border-radius: 16px !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  margin-bottom: 12px;
+  border: 1px solid #e0e0e0;
+}
+.accordion-button {
+  border-radius: 16px !important;
+  background: #fff;
+  color: #222;
+  font-weight: 600;
+  font-size: 0.98rem;
+}
+.accordion-button:not(.collapsed) {
+  background: #fdeaea;
+  color: #a31515;
+}
+
+.card, .panel, .summary-row, .user-accordion {
+  border-radius: 16px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  color: #222;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  background: #fdeaea;
+}
+::-webkit-scrollbar-thumb {
+  background: #d32f2f;
+  border-radius: 8px;
+}
+
+.app-table th, .app-table td {
+  vertical-align: middle;
+}
+
+/* Extra spacing for filter form */
+.filter-form .form-label {
+  margin-bottom: 4px;
+}
+.filter-form .form-control, .filter-form .form-select {
+  margin-bottom: 12px;
+}
+
+/* Responsive tweaks */
+@media (max-width: 768px) {
+  .btn, .app-btn-sm {
+    width: 100%;
+    padding: 12px;
+    font-size: 1rem;
+  }
+  .form-control, .form-select {
+    font-size: 0.95rem;
+  }
+}
+
+/* --- Leave Calendar Status Badges --- */
+.badge, .leave-status, .leave-badge, .calendar-status, .calendar-badge, .btn-leave, .btn-status {
+  color: #fff !important;
+  font-weight: 700;
+  font-size: 0.95rem;
+  letter-spacing: 0.5px;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.08);
+}
+
+/* Specific overrides for green, red, yellow, blue backgrounds */
+.badge.bg-success, .leave-status.bg-success, .calendar-status.bg-success, .btn-leave.bg-success {
+  background: #2e7d32 !important;
+  color: #fff !important;
+}
+.badge.bg-danger, .leave-status.bg-danger, .calendar-status.bg-danger, .btn-leave.bg-danger {
+  background: #d32f2f !important;
+  color: #fff !important;
+}
+.badge.bg-warning, .leave-status.bg-warning, .calendar-status.bg-warning, .btn-leave.bg-warning {
+  background: #fbc02d !important;
+  color: #fff !important;
+}
+.badge.bg-info, .leave-status.bg-info, .calendar-status.bg-info, .btn-leave.bg-info {
+  background: #1976d2 !important;
+  color: #fff !important;
+}
+
+/* Remove border if present */
+.badge, .leave-status, .calendar-status, .btn-leave {
+  border: none !important;
+}
+
+/* --- LEAVE CALENDAR: Restore Original Colors --- */
+/* Remove upGrad theme overrides for leave calendar table backgrounds */
+.leave-calendar-table, .leave-calendar-table th, .leave-calendar-table td {
+  background: initial !important;
+  color: initial !important;
+}
+
+/* --- Freeze Left User Pane (First Column) --- */
+.leave-calendar-table th.user-col, .leave-calendar-table td.user-col {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: #fff !important;
+  box-shadow: 2px 0 6px -2px rgba(0,0,0,0.08);
+}
+
+/* If user column has a specific class, adjust as needed */
+th.user-col, td.user-col {
+  min-width: 120px;
+}

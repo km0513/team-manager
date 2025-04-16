@@ -1,33 +1,47 @@
 {% extends 'base.html' %}
 {% block content %}
-<h2 class="mb-3" style="font-size:18px; color:#1976d2;"><i class="bi bi-gift-fill me-2"></i>Holiday Calendar - {{ year }}</h2>
+<!-- Alpine.js CDN for interactivity (if needed) -->
+<script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+<style>
+  [x-cloak] { display: none !important; }
+</style>
+<h2 class="mb-6 text-xl font-bold text-pink-700 flex items-center gap-2">
+  <svg xmlns="http://www.w3.org/2000/svg" class="inline w-6 h-6 text-pink-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 1.343-3 3s1.343 3 3 3 3-1.343 3-3-1.343-3-3-3zm0 0V6m0 10v-2m6-6h2m-2 6h2M6 6H4m2 6H4" /></svg>
+  Holiday Calendar - {{ year }}
+</h2>
 
-<div class="d-flex flex-wrap gap-2 mb-3 align-items-center">
-    <a href="/holiday-calendar?year={{ year - 1 }}" class="btn btn-outline-info app-btn-sm">◀ Prev Year</a>
-    <a href="/holiday-calendar?year={{ year + 1 }}" class="btn btn-outline-info app-btn-sm">Next Year ▶</a>
-    <a href="/leave-calendar" class="btn btn-outline-primary app-btn-sm ms-auto">← Back to Leave Calendar</a>
+<div class="flex flex-wrap gap-2 mb-4 items-center max-w-3xl mx-auto">
+  <a href="/holiday-calendar?year={{ year - 1 }}" class="px-3 py-1 bg-blue-100 hover:bg-blue-200 text-blue-800 text-xs font-semibold rounded shadow">◀ Prev Year</a>
+  <a href="/holiday-calendar?year={{ year + 1 }}" class="px-3 py-1 bg-blue-100 hover:bg-blue-200 text-blue-800 text-xs font-semibold rounded shadow">Next Year ▶</a>
+  <a href="/holidays?year={{ year }}" class="px-3 py-1 bg-green-100 hover:bg-green-200 text-green-800 text-xs font-semibold rounded shadow">Add Holidays</a>
+  <div class="flex-1"></div>
+  <a href="/leave-calendar" class="px-3 py-1 bg-purple-100 hover:bg-purple-200 text-purple-800 text-xs font-semibold rounded shadow">← Back to Leave Calendar</a>
 </div>
-<a href="/holidays?year={{ year }}" class="btn btn-outline-success app-btn-sm mb-2">Add Holidays</a>
-<table class="table table-bordered app-table">
-    <thead>
+
+<div class="max-w-3xl mx-auto bg-white rounded-xl shadow border border-gray-200 p-0">
+  <div class="overflow-x-auto">
+    <table class="w-full text-sm text-center">
+      <thead class="bg-gray-100 text-gray-700">
         <tr>
-            <th style="width: 200px;">Date</th>
-            <th>Description</th>
+          <th class="py-2 px-4 font-semibold w-56 text-left">Date</th>
+          <th class="py-2 px-4 font-semibold text-left">Description</th>
         </tr>
-    </thead>
-    <tbody>
+      </thead>
+      <tbody>
         {% if holidays %}
-            {% for holiday in holidays %}
-                <tr>
-                    <td>{{ holiday.date.strftime('%d %B, %Y') }}</td>
-                    <td>{{ holiday.description }}</td>
-                </tr>
-            {% endfor %}
-        {% else %}
-            <tr>
-                <td colspan="2" class="text-center text-muted">No holidays added for this year.</td>
+          {% for holiday in holidays %}
+            <tr class="border-t border-gray-100 hover:bg-gray-50">
+              <td class="py-2 px-4 text-left whitespace-nowrap">{{ holiday.date.strftime('%d %B, %Y') }}</td>
+              <td class="py-2 px-4 text-left">{{ holiday.description }}</td>
             </tr>
+          {% endfor %}
+        {% else %}
+          <tr>
+            <td colspan="2" class="py-4 text-center text-gray-400">No holidays added for this year.</td>
+          </tr>
         {% endif %}
-    </tbody>
-</table>
+      </tbody>
+    </table>
+  </div>
+</div>
 {% endblock %}

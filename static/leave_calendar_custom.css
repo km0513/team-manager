@@ -1,0 +1,96 @@
+/* Custom CSS for Leave Calendar - restores original look and disables upGrad theme effects */
+
+/* Table font size and layout */
+#main-content, #main-content table, #main-content th, #main-content td, #main-content label, #main-content .btn {
+    font-size: 0.85rem !important;
+}
+
+/* Sticky user column */
+.sticky-col {
+    position: sticky;
+    left: 0;
+    background-color: white;
+    z-index: 4;
+}
+
+/* Table head sticky */
+.table thead th {
+    position: sticky;
+    top: 0;
+    background-color: #f8f9fa;
+    z-index: 3;
+}
+
+/* Hover effect */
+td:hover {
+    background-color: #f1f1f1;
+}
+
+/* Calendar scroll wrapper */
+.calendar-scroll-wrapper {
+    overflow-x: auto;
+    max-width: 100%;
+}
+
+/* Highlight today */
+th[data-today="true"] {
+    background-color: #ffe58f !important;
+}
+
+/* Present button */
+.btn-outline-present {
+    color: green;
+    border-color: green;
+}
+.btn-outline-present:hover, .btn-check:checked + .btn-outline-present {
+    background-color: green;
+    color: white;
+}
+
+/* Half day button */
+.btn-outline-halfday {
+    color: #ff9900;
+    border-color: #ff9900;
+}
+.btn-outline-halfday:hover, .btn-check:checked + .btn-outline-halfday {
+    background-color: #ff9900;
+    color: white;
+}
+
+/* Full day leave button */
+.btn-outline-danger {
+    color: #dc3545;
+    border-color: #dc3545;
+}
+.btn-outline-danger:hover, .btn-check:checked + .btn-outline-danger {
+    background-color: #dc3545;
+    color: white;
+}
+
+/* Warning button (half day) */
+.btn-outline-warning {
+    color: #ffc107;
+    border-color: #ffc107;
+}
+.btn-outline-warning:hover, .btn-check:checked + .btn-outline-warning {
+    background-color: #ffc107;
+    color: white;
+}
+
+/* Restore badge styles */
+.badge.bg-success {
+    background: #28a745 !important;
+    color: #fff !important;
+}
+.badge.bg-danger {
+    background: #dc3545 !important;
+    color: #fff !important;
+}
+.badge.bg-warning {
+    background: #ffc107 !important;
+    color: #212529 !important;
+}
+.badge.bg-primary {
+    background: #007bff !important;
+    color: #fff !important;
+}

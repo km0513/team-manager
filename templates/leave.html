@@ -1,27 +1,31 @@
 {% extends 'base.html' %}
 {% block content %}
-<h2>Apply Leave</h2>
-<form method="POST">
-    <div class="mb-3">
-        <label>User</label>
-        <select name="user_id" class="form-control">
-            {% for user in users %}
-                <option value="{{ user.id }}">{{ user.name }}</option>
-            {% endfor %}
-        </select>
-    </div>
-    <div class="mb-3">
-        <label>Start Date</label>
-        <input type="date" name="start_date" class="form-control">
-    </div>
-    <div class="mb-3">
-        <label>End Date</label>
-        <input type="date" name="end_date" class="form-control">
-    </div>
-    <div class="mb-3">
-        <label>Leave Type</label>
-        <input type="text" name="leave_type" class="form-control">
-    </div>
-    <button type="submit" class="btn btn-primary">Submit</button>
+<h2 class="mb-6 text-xl font-bold text-green-700 flex items-center gap-2">
+  <svg xmlns="http://www.w3.org/2000/svg" class="inline w-6 h-6 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a5 5 0 00-10 0v2a2 2 0 00-2 2v7a2 2 0 002 2h10a2 2 0 002-2v-7a2 2 0 00-2-2z" /></svg>
+  Apply Leave
+</h2>
+<form method="POST" class="max-w-lg mx-auto bg-white rounded-xl shadow border border-gray-200 p-6 flex flex-col gap-4">
+  <div>
+    <label class="block mb-1 font-medium text-gray-700">User</label>
+    <select name="user_id" class="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-green-400" required>
+      <option value="" disabled selected>Select user</option>
+      {% for user in users %}
+        <option value="{{ user.id }}">{{ user.name }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div>
+    <label class="block mb-1 font-medium text-gray-700">Start Date</label>
+    <input type="date" name="start_date" class="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-green-400" required>
+  </div>
+  <div>
+    <label class="block mb-1 font-medium text-gray-700">End Date</label>
+    <input type="date" name="end_date" class="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-green-400" required>
+  </div>
+  <div>
+    <label class="block mb-1 font-medium text-gray-700">Leave Type</label>
+    <input type="text" name="leave_type" class="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-green-400" placeholder="e.g. Sick Leave, Casual Leave" required>
+  </div>
+  <button type="submit" class="mt-2 bg-green-600 hover:bg-green-700 text-white font-semibold px-6 py-2 rounded shadow transition">Submit</button>
 </form>
 {% endblock %}

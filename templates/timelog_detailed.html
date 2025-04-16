@@ -1,5 +1,11 @@
 {% extends 'base.html' %}
 {% block content %}
+<!-- Alpine.js CDN for interactivity (if needed) -->
+<script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+<style>
+  [x-cloak] { display: none !important; }
+</style>
+
 <h2>Jira Timelog Detailed Summary</h2>
 
 <form method="POST" class="mb-3 d-flex gap-2 align-items-center">
@@ -52,7 +58,9 @@
         </table>
     {% endfor %}
 {% else %}
+<div x-cloak>
 <p>Please select a date range to view Jira worklogs.</p>
+</div>
 {% endif %}
 
 {% endblock %}

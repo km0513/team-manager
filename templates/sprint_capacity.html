@@ -1,54 +1,64 @@
 {% extends 'base.html' %}
 {% block content %}
-<h2 class="mb-4">Sprint Capacity Calculator</h2>
+<!-- Alpine.js CDN for interactivity (if needed) -->
+<script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+<style>
+  [x-cloak] { display: none !important; }
+</style>
+<h2 class="mb-6 text-xl font-bold text-yellow-700 flex items-center gap-2">
+  <svg xmlns="http://www.w3.org/2000/svg" class="inline w-6 h-6 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 17v2a2 2 0 002 2h14a2 2 0 002-2v-2M16 11V7a4 4 0 10-8 0v4M5 17h14" /></svg>
+  Sprint Capacity Calculator
+</h2>
 
-<form method="POST" class="row g-2 align-items-end mb-4">
-    <div class="col-md-3">
-        <label class="form-label">Start Date</label>
-        <input type="date" name="start" class="form-control" value="{{ start.strftime('%Y-%m-%d') if start else '' }}" required>
-    </div>
-    <div class="col-md-3">
-        <label class="form-label">End Date</label>
-        <input type="date" name="end" class="form-control" value="{{ end.strftime('%Y-%m-%d') if end else '' }}" required>
-    </div>
-    <div class="col-md-3">
-        <label class="form-label">Function</label>
-        <select name="function" class="form-select">
-            <option value="All" {% if selected_function == 'All' %}selected{% endif %}>All Functions</option>
-            {% for func in functions %}
-                <option value="{{ func }}" {% if func == selected_function %}selected{% endif %}>{{ func }}</option>
-            {% endfor %}
-        </select>
-    </div>
-    <div class="col-md-3 d-grid">
-        <button type="submit" class="btn btn-warning">Calculate</button>
-    </div>
+<form method="POST" class="mb-6 flex flex-wrap gap-4 items-end">
+  <div>
+    <label class="block text-xs font-medium text-gray-600 mb-1">Start Date</label>
+    <input type="date" name="start" class="block w-36 rounded-md border-gray-300 shadow-sm focus:border-yellow-500 focus:ring focus:ring-yellow-200 focus:ring-opacity-50 text-sm" value="{{ start.strftime('%Y-%m-%d') if start else '' }}" required>
+  </div>
+  <div>
+    <label class="block text-xs font-medium text-gray-600 mb-1">End Date</label>
+    <input type="date" name="end" class="block w-36 rounded-md border-gray-300 shadow-sm focus:border-yellow-500 focus:ring focus:ring-yellow-200 focus:ring-opacity-50 text-sm" value="{{ end.strftime('%Y-%m-%d') if end else '' }}" required>
+  </div>
+  <div>
+    <label class="block text-xs font-medium text-gray-600 mb-1">Function</label>
+    <select name="function" class="block w-48 rounded-md border-gray-300 shadow-sm focus:border-yellow-500 focus:ring focus:ring-yellow-200 focus:ring-opacity-50 text-sm">
+      <option value="All" {% if selected_function == 'All' %}selected{% endif %}>All Functions</option>
+      {% for func in functions %}
+        <option value="{{ func }}" {% if func == selected_function %}selected{% endif %}>{{ func }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div>
+    <button type="submit" class="px-4 py-2 bg-yellow-500 hover:bg-yellow-700 text-white text-xs font-semibold rounded shadow">Calculate</button>
+  </div>
 </form>
 
 {% if sprint_data %}
-<table class="table table-bordered text-center">
-    <thead class="table-light">
-        <tr>
-            <th>User</th>
-            <th>Total Working Days</th>
-            <th>Leaves (FD + HD)</th>
-            <th>Available Capacity (Hours)</th>
-        </tr>
+<div x-cloak class="overflow-x-auto">
+  <table class="min-w-[500px] w-full bg-white rounded-lg border border-gray-200 text-xs text-center">
+    <thead class="bg-yellow-100 text-yellow-800">
+      <tr>
+        <th class="py-2 px-3 font-semibold">User</th>
+        <th class="py-2 px-3 font-semibold">Total Working Days</th>
+        <th class="py-2 px-3 font-semibold">Leaves (FD + HD)</th>
+        <th class="py-2 px-3 font-semibold">Available Capacity (Hours)</th>
+      </tr>
     </thead>
     <tbody>
-        {% for entry in sprint_data %}
-        <tr>
-            <td class="text-start">{{ entry.user.name }}</td>
-            <td>{{ entry.total_days }}</td>
-            <td>{{ entry.leaves }}</td>
-            <td>{{ entry.capacity_hours }}</td>
-        </tr>
-        {% endfor %}
-        <tr class="fw-bold">
-            <td colspan="3" class="text-end">TOTAL</td>
-            <td>{{ total_capacity }}</td>
-        </tr>
+      {% for entry in sprint_data %}
+      <tr class="border-t border-gray-100">
+        <td class="py-2 px-3 text-left">{{ entry.user.name }}</td>
+        <td class="py-2 px-3">{{ entry.total_days }}</td>
+        <td class="py-2 px-3">{{ entry.leaves }}</td>
+        <td class="py-2 px-3">{{ entry.capacity_hours }}</td>
+      </tr>
+      {% endfor %}
+      <tr class="border-t border-gray-100 font-bold bg-yellow-50">
+        <td colspan="3" class="py-2 px-3 text-end">TOTAL</td>
+        <td class="py-2 px-3">{{ total_capacity }}</td>
+      </tr>
     </tbody>
-</table>
+  </table>
+</div>
 {% endif %}
 {% endblock %}

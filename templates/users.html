@@ -1,98 +1,94 @@
 {% extends 'base.html' %}
 {% block content %}
+<!-- Alpine.js CDN for interactivity (if needed) -->
+<script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
 <style>
-  .user-mgmt-card {
-    background: #f8f9fa;
-    border-radius: 10px;
-    box-shadow: 0 1px 4px rgba(25,118,210,0.07);
-    padding: 22px 22px 18px 22px;
-    margin-bottom: 22px;
-    border: 1px solid #e3e8ee;
-  }
-  .user-mgmt-title {
-    font-size: 18px;
-    font-weight: 600;
-    color: #1976d2;
-    margin-bottom: 10px;
-    letter-spacing: 0.2px;
-  }
-  .user-mgmt-form .form-control, .user-mgmt-form .form-select { font-size: 13px; padding: 6px 10px; }
-  .user-mgmt-form .btn { font-size: 13px; padding: 6px 18px; }
-  .user-mgmt-table th, .user-mgmt-table td { font-size: 13px; }
-  .user-mgmt-table th { background: #f1f3f4; position: sticky; top: 0; z-index: 2; }
-  .user-mgmt-table tr { vertical-align: middle; }
-  .user-mgmt-table tr:nth-child(even) { background: #f9fafb; }
-  .user-mgmt-actions .btn { font-size: 12px; padding: 4px 10px; }
-  .user-mgmt-actions .btn + .btn { margin-left: 4px; }
-  @media (max-width: 700px) {
-    .user-mgmt-card { padding: 12px 6px; }
-    .user-mgmt-title { font-size: 15px; }
-    .user-mgmt-table th, .user-mgmt-table td { font-size: 11px; }
-  }
+  [x-cloak] { display: none !important; }
 </style>
 
-<div class="user-mgmt-card mb-3">
-  <div class="user-mgmt-title mb-2"><i class="bi bi-person-plus-fill me-2"></i>Add User</div>
-  <form method="POST" class="user-mgmt-form row g-2 align-items-end">
-    <div class="col-md-3"><input type="text" name="name" placeholder="Name" class="form-control" required></div>
-    <div class="col-md-3"><input type="email" name="email" placeholder="Email" class="form-control" required></div>
-    <div class="col-md-3">
-      <select name="designation" class="form-select" required>
-        <option value="">Select Designation</option>
-        <option value="QA">QA</option>
-        <option value="Development">Development</option>
-        <option value="Product Management">Product Management</option>
-        <option value="UI/UX">UI/UX</option>
-      </select>
-    </div>
-    <div class="col-md-2"><button type="submit" class="btn btn-success w-100"><i class="bi bi-person-plus me-1"></i>Add</button></div>
+<!-- Tailwind refactor: Remove custom styles -->
+
+<!-- Add User Card -->
+<div class="bg-gray-50 rounded-xl shadow p-6 mb-6 border border-gray-200">
+  <div class="text-lg font-semibold text-blue-700 mb-4 flex items-center">
+    <i class="bi bi-person-plus-fill mr-2"></i> Add User
+  </div>
+  <form method="POST" class="flex flex-col md:flex-row md:space-x-4 space-y-3 md:space-y-0 items-end">
+    <input type="text" name="name" placeholder="Name" class="flex-1 rounded border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-400" required>
+    <input type="email" name="email" placeholder="Email" class="flex-1 rounded border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-400" required>
+    <select name="designation" class="flex-1 rounded border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-400" required>
+      <option value="">Select Designation</option>
+      <option value="QA">QA</option>
+      <option value="Development">Development</option>
+      <option value="Product Management">Product Management</option>
+      <option value="UI/UX">UI/UX</option>
+    </select>
+    <button type="submit" class="bg-green-600 hover:bg-green-700 text-white font-semibold px-4 py-2 rounded w-full md:w-auto flex items-center justify-center transition">
+      <i class="bi bi-person-plus mr-1"></i> Add
+    </button>
   </form>
 </div>
 
-<div class="user-mgmt-card mb-3">
-  <div class="user-mgmt-title mb-2"><i class="bi bi-file-earmark-spreadsheet-fill me-2"></i>Import Users from Excel</div>
-  <form method="POST" action="/import-users" enctype="multipart/form-data" class="user-mgmt-form row g-2 align-items-end">
-    <div class="col-md-6 col-8">
-      <input type="file" name="excel_file" accept=".xlsx" class="form-control" required>
-    </div>
-    <div class="col-md-2 col-4">
-      <button type="submit" class="btn btn-primary w-100"><i class="bi bi-upload me-1"></i>Import</button>
-    </div>
+<!-- Import Users Card -->
+<div class="bg-gray-50 rounded-xl shadow p-6 mb-6 border border-gray-200">
+  <div class="text-lg font-semibold text-blue-700 mb-4 flex items-center">
+    <i class="bi bi-file-earmark-spreadsheet-fill mr-2"></i> Import Users from Excel
+  </div>
+  <form method="POST" action="/import-users" enctype="multipart/form-data" class="flex flex-col md:flex-row md:space-x-4 space-y-3 md:space-y-0 items-end">
+    <input type="file" name="excel_file" accept=".xlsx" class="flex-1 rounded border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-400" required>
+    <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-2 rounded w-full md:w-auto flex items-center justify-center transition">
+      <i class="bi bi-upload mr-1"></i> Import
+    </button>
   </form>
 </div>
 
-<div class="user-mgmt-card mb-3">
-  <div class="d-flex justify-content-between align-items-center mb-2">
-    <div class="user-mgmt-title mb-0"><i class="bi bi-people-fill me-2"></i>Existing Users</div>
-    <a href="/update-jira-id" class="btn btn-outline-success btn-sm"><i class="bi bi-link-45deg me-1"></i>Jira ID Mapping</a>
+<!-- Existing Users Card -->
+<div class="bg-gray-50 rounded-xl shadow p-6 mb-6 border border-gray-200">
+  <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-4 gap-2">
+    <div class="text-lg font-semibold text-blue-700 flex items-center">
+      <i class="bi bi-people-fill mr-2"></i> Existing Users
+    </div>
+    <a href="/update-jira-id" class="border border-green-500 text-green-700 hover:bg-green-50 font-semibold px-3 py-1.5 rounded text-sm flex items-center transition">
+      <i class="bi bi-link-45deg mr-1"></i> Jira ID Mapping
+    </a>
   </div>
-  <div class="d-flex justify-content-between align-items-center mb-2">
-    <div class="fw-semibold" style="font-size:14px;"><i class="bi bi-link-45deg me-1"></i>Timelog Links Table</div>
-    <a href="{{ url_for('export_timelog_links') }}" class="btn btn-outline-success btn-sm"><i class="bi bi-download me-1"></i>Download CSV</a>
+  <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-4 gap-2">
+    <div class="font-medium text-gray-700 text-sm flex items-center">
+      <i class="bi bi-link-45deg mr-1"></i> Timelog Links Table
+    </div>
+    <a href="{{ url_for('export_timelog_links') }}" class="border border-green-500 text-green-700 hover:bg-green-50 font-semibold px-3 py-1.5 rounded text-sm flex items-center transition">
+      <i class="bi bi-download mr-1"></i> Download CSV
+    </a>
   </div>
-  <div class="table-responsive">
-    <table class="table table-bordered align-middle user-mgmt-table mb-0">
-      <thead>
+  <div class="overflow-x-auto">
+    <table class="min-w-full bg-white rounded-lg border border-gray-200 text-sm">
+      <thead class="bg-gray-100 text-gray-700">
         <tr>
-          <th>ID</th>
-          <th>Name</th>
-          <th>Email</th>
-          <th>Designation</th>
-          <th>Actions</th>
+          <th class="py-2 px-3 font-semibold text-left">ID</th>
+          <th class="py-2 px-3 font-semibold text-left">Name</th>
+          <th class="py-2 px-3 font-semibold text-left">Email</th>
+          <th class="py-2 px-3 font-semibold text-left">Designation</th>
+          <th class="py-2 px-3 font-semibold text-left">Actions</th>
         </tr>
       </thead>
       <tbody>
         {% for user in users %}
-        <tr>
-          <td>{{ user.id }}</td>
-          <td>{{ user.name }}</td>
-          <td>{{ user.email }}</td>
-          <td>{{ user.designation }}</td>
-          <td>
-            <div class="user-mgmt-actions d-flex flex-wrap gap-1">
-              <a href="/users/edit/{{ user.id }}" class="btn btn-warning btn-sm"><i class="bi bi-pencil-square"></i></a>
-              <a href="/users/delete/{{ user.id }}" class="btn btn-danger btn-sm" onclick="return confirm('Are you sure you want to delete {{ user.name }}?')"><i class="bi bi-trash"></i></a>
-              <a href="{{ url_for('timelog_today', user_email=user.email) }}" target="_blank" class="btn btn-info btn-sm"><i class="bi bi-clock-history"></i></a>
+        <tr class="border-t border-gray-100 hover:bg-blue-50">
+          <td class="py-2 px-3">{{ user.id }}</td>
+          <td class="py-2 px-3">{{ user.name }}</td>
+          <td class="py-2 px-3">{{ user.email }}</td>
+          <td class="py-2 px-3">{{ user.designation }}</td>
+          <td class="py-2 px-3">
+            <div class="flex flex-wrap gap-2">
+              <a href="/users/edit/{{ user.id }}" class="bg-yellow-400 hover:bg-yellow-500 text-white px-2 py-1 rounded text-xs flex items-center transition" title="Edit User">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536M9 13h3l8-8a2 2 0 00-2.828-2.828l-8 8v3z" /></svg>Edit
+              </a>
+              <a href="/users/delete/{{ user.id }}" class="bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded text-xs flex items-center transition" onclick="return confirm('Are you sure you want to delete {{ user.name }}?')" title="Delete User">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>Delete
+              </a>
+              <a href="{{ url_for('timelog_today', user_email=user.email) }}" target="_blank" class="bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 rounded text-xs flex items-center transition" title="View Today's Timelog">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6 1a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>Timelog
+              </a>
             </div>
           </td>
         </tr>
@@ -101,20 +97,18 @@
     </table>
   </div>
   {% if pagination %}
-  <nav>
-    <ul class="pagination mt-2">
+  <nav class="mt-4">
+    <ul class="flex flex-wrap gap-2">
       {% if pagination.has_prev %}
-      <li class="page-item"><a class="page-link" href="{{ url_for('users', page=pagination.prev_num) }}">Previous</a></li>
+      <li><a class="px-3 py-1 rounded border border-gray-300 bg-white hover:bg-blue-50 text-gray-700" href="{{ url_for('users', page=pagination.prev_num) }}">Previous</a></li>
       {% endif %}
       {% for p in pagination.iter_pages() %}
         {% if p %}
-          <li class="page-item {% if p == pagination.page %}active{% endif %}">
-            <a class="page-link" href="{{ url_for('users', page=p) }}">{{ p }}</a>
-          </li>
+          <li><a class="px-3 py-1 rounded border border-gray-300 bg-white hover:bg-blue-100 transition {{ 'bg-blue-500 text-white' if p == pagination.page else '' }}" href="{{ url_for('users', page=p) }}">{{ p }}</a></li>
         {% endif %}
       {% endfor %}
       {% if pagination.has_next %}
-      <li class="page-item"><a class="page-link" href="{{ url_for('users', page=pagination.next_num) }}">Next</a></li>
+      <li><a class="px-3 py-1 rounded border border-gray-300 bg-white hover:bg-blue-50 text-gray-700" href="{{ url_for('users', page=pagination.next_num) }}">Next</a></li>
       {% endif %}
     </ul>
   </nav>

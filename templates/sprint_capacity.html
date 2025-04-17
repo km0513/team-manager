@@ -3,25 +3,32 @@
 <!-- Alpine.js CDN for interactivity (if needed) -->
 <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
 <style>
+  body { background-color: #FFF6EB; }
+  .bg-upgradLight { background-color: #FFF6EB; }
+  .text-upgradRed { color: #FF3737; }
+  .text-upgradYellow { color: #F7DC6F; }
+  .text-upgradPurple { color: #7A288A; }
+  .text-upgradTeal { color: #0097A7; }
+  .text-upgradAccent { color: #FFC107; }
+  .border-upgradAccent { border-color: #FFC107; }
   [x-cloak] { display: none !important; }
 </style>
-<h2 class="mb-6 text-xl font-bold text-yellow-700 flex items-center gap-2">
-  <svg xmlns="http://www.w3.org/2000/svg" class="inline w-6 h-6 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 17v2a2 2 0 002 2h14a2 2 0 002-2v-2M16 11V7a4 4 0 10-8 0v4M5 17h14" /></svg>
+<h2 class="mb-6 text-xl font-bold text-upgradYellow flex items-center gap-2">
+  <svg xmlns="http://www.w3.org/2000/svg" class="inline w-6 h-6 text-upgradYellow" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 17v2a2 2 0 002 2h14a2 2 0 002-2v-2M16 11V7a4 4 0 10-8 0v4M5 17h14" /></svg>
   Sprint Capacity Calculator
 </h2>
-
-<form method="POST" class="mb-6 flex flex-wrap gap-4 items-end">
+<form method="GET" class="mb-6 flex flex-wrap gap-4 items-end">
   <div>
-    <label class="block text-xs font-medium text-gray-600 mb-1">Start Date</label>
-    <input type="date" name="start" class="block w-36 rounded-md border-gray-300 shadow-sm focus:border-yellow-500 focus:ring focus:ring-yellow-200 focus:ring-opacity-50 text-sm" value="{{ start.strftime('%Y-%m-%d') if start else '' }}" required>
+    <label class="block text-xs font-bold text-upgradRed mb-1">Start Date</label>
+    <input type="date" name="start" class="block w-36 rounded-md border-upgradAccent shadow-sm focus:border-upgradRed focus:ring focus:ring-upgradYellow focus:ring-opacity-50 text-sm" value="{{ start.strftime('%Y-%m-%d') if start else '' }}" required>
   </div>
   <div>
-    <label class="block text-xs font-medium text-gray-600 mb-1">End Date</label>
-    <input type="date" name="end" class="block w-36 rounded-md border-gray-300 shadow-sm focus:border-yellow-500 focus:ring focus:ring-yellow-200 focus:ring-opacity-50 text-sm" value="{{ end.strftime('%Y-%m-%d') if end else '' }}" required>
+    <label class="block text-xs font-bold text-upgradRed mb-1">End Date</label>
+    <input type="date" name="end" class="block w-36 rounded-md border-upgradAccent shadow-sm focus:border-upgradRed focus:ring focus:ring-upgradYellow focus:ring-opacity-50 text-sm" value="{{ end.strftime('%Y-%m-%d') if end else '' }}" required>
   </div>
   <div>
-    <label class="block text-xs font-medium text-gray-600 mb-1">Function</label>
-    <select name="function" class="block w-48 rounded-md border-gray-300 shadow-sm focus:border-yellow-500 focus:ring focus:ring-yellow-200 focus:ring-opacity-50 text-sm">
+    <label class="block text-xs font-bold text-upgradRed mb-1">Function</label>
+    <select name="function" class="block w-48 rounded-md border-upgradAccent shadow-sm focus:border-upgradRed focus:ring focus:ring-upgradYellow focus:ring-opacity-50 text-sm">
       <option value="All" {% if selected_function == 'All' %}selected{% endif %}>All Functions</option>
       {% for func in functions %}
         <option value="{{ func }}" {% if func == selected_function %}selected{% endif %}>{{ func }}</option>
@@ -29,36 +36,38 @@
     </select>
   </div>
   <div>
-    <button type="submit" class="px-4 py-2 bg-yellow-500 hover:bg-yellow-700 text-white text-xs font-semibold rounded shadow">Calculate</button>
+    <button type="submit" class="px-4 py-2 bg-upgradYellow hover:bg-upgradAccent text-upgradRed text-xs font-bold rounded shadow">Calculate</button>
   </div>
 </form>
-
-{% if sprint_data %}
-<div x-cloak class="overflow-x-auto">
-  <table class="min-w-[500px] w-full bg-white rounded-lg border border-gray-200 text-xs text-center">
-    <thead class="bg-yellow-100 text-yellow-800">
+<div class="overflow-x-auto mt-8">
+  <table class="min-w-[500px] w-full bg-white rounded-lg border border-upgradAccent text-xs text-center">
+    <thead class="bg-upgradYellow text-upgradRed">
       <tr>
-        <th class="py-2 px-3 font-semibold">User</th>
-        <th class="py-2 px-3 font-semibold">Total Working Days</th>
-        <th class="py-2 px-3 font-semibold">Leaves (FD + HD)</th>
-        <th class="py-2 px-3 font-semibold">Available Capacity (Hours)</th>
+        <th class="py-2 px-3 font-bold">User</th>
+        <th class="py-2 px-3 font-bold">Total Working Days</th>
+        <th class="py-2 px-3 font-bold">Leaves (FD + HD)</th>
+        <th class="py-2 px-3 font-bold">Available Capacity (Hours)</th>
       </tr>
     </thead>
     <tbody>
-      {% for entry in sprint_data %}
-      <tr class="border-t border-gray-100">
-        <td class="py-2 px-3 text-left">{{ entry.user.name }}</td>
+      {% for entry in my_sprint_data %}
+      <tr>
+        <td class="py-2 px-3 text-left">{{ entry.user_name }}</td>
         <td class="py-2 px-3">{{ entry.total_days }}</td>
         <td class="py-2 px-3">{{ entry.leaves }}</td>
         <td class="py-2 px-3">{{ entry.capacity_hours }}</td>
       </tr>
       {% endfor %}
-      <tr class="border-t border-gray-100 font-bold bg-yellow-50">
+      <tr class="border-t border-upgradAccent font-bold bg-upgradLight">
         <td colspan="3" class="py-2 px-3 text-end">TOTAL</td>
         <td class="py-2 px-3">{{ total_capacity }}</td>
       </tr>
+      {% if my_sprint_data|length == 0 %}
+      <tr>
+        <td colspan="4" class="text-upgradRed font-bold py-4">No data available for the selected range or function.</td>
+      </tr>
+      {% endif %}
     </tbody>
   </table>
 </div>
-{% endif %}
 {% endblock %}

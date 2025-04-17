@@ -607,26 +607,23 @@ def sprint_capacity():
                 Leave.start_date <= end.date()
             ).all()
 
-            leave_map = {(leave.start_date, leave.leave_type) for leave in leaves}
-            leave_sum = sum([1 if l_type == 'FD' else 0.5 for (l_date, l_type) in leave_map if l_date in [d.date() for d in working_days]])
-
+            leave_sum = sum([1 if l.leave_type == 'FD' else 0.5 for l in leaves])
+            leave_sum = min(leave_sum, len(working_days))
             available_hours = max(0, (len(working_days) - leave_sum) * 8)
+
             sprint_data.append({
-                'user': user,
+                'user_name': user.name,
                 'total_days': len(working_days),
                 'leaves': leave_sum,
                 'capacity_hours': available_hours
             })
             total_capacity += available_hours
 
+    print("SPRINT DATA:", sprint_data)  # Debug print
     functions = sorted(set(u.designation for u in users if u.designation))
-    return render_template("sprint_capacity.html", users=users, sprint_data=sprint_data,
+    return render_template("sprint_capacity.html", users=users, my_sprint_data=sprint_data,
                            total_capacity=total_capacity, start=start, end=end,
                            functions=functions, selected_function=selected_function)
-
-
-
-
 
 @app.route('/sprint-capacity-export', methods=['POST'])
 def sprint_capacity_export():

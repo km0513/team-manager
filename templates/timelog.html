@@ -13,22 +13,25 @@
     <form method="POST" class="flex flex-wrap gap-4 items-end">
       <div>
         <label for="start" class="block text-xs font-bold text-upgradRed mb-1">Start Date</label>
-        <input type="date" class="block w-40 rounded-md border-upgradAccent shadow-sm focus:border-upgradRed focus:ring focus:ring-upgradYellow focus:ring-opacity-50 text-sm" id="start" name="start" value="{{ start or '' }}" max="{{ current_date }}">
+        <input type="date" class="block w-40 rounded-lg border border-upgradAccent bg-white px-3 py-2 text-sm shadow-sm focus:border-upgradRed focus:ring-2 focus:ring-upgradYellow focus:outline-none transition-all duration-150" id="start" name="start" value="{{ start or '' }}" max="{{ current_date }}">
       </div>
       <div>
         <label for="end" class="block text-xs font-bold text-upgradRed mb-1">End Date</label>
-        <input type="date" class="block w-40 rounded-md border-upgradAccent shadow-sm focus:border-upgradRed focus:ring focus:ring-upgradYellow focus:ring-opacity-50 text-sm" id="end" name="end" value="{{ end or '' }}" max="{{ current_date }}">
+        <input type="date" class="block w-40 rounded-lg border border-upgradAccent bg-white px-3 py-2 text-sm shadow-sm focus:border-upgradRed focus:ring-2 focus:ring-upgradYellow focus:outline-none transition-all duration-150" id="end" name="end" value="{{ end or '' }}" max="{{ current_date }}">
       </div>
-      <div>
-        <label for="functionFilter" class="block text-xs font-bold text-upgradRed mb-1">Function</label>
-        <select class="block w-40 rounded-md border-upgradAccent shadow-sm focus:border-upgradRed focus:ring focus:ring-upgradYellow focus:ring-opacity-50 text-sm" id="functionFilter" name="work_function">
+      <div class="relative w-40">
+        <select class="block w-full rounded-lg border border-upgradAccent bg-white px-3 py-2 text-sm shadow-sm focus:border-upgradRed focus:ring-2 focus:ring-upgradYellow focus:outline-none transition-all duration-150 appearance-none pr-8" id="functionFilter" name="work_function">
           <option value="All" {% if selected_function == 'All' %}selected{% endif %}>All Functions</option>
           {% for func in work_functions | unique %}
             <option value="{{ func }}" {% if func == selected_function %}selected{% endif %}>{{ func }}</option>
           {% endfor %}
         </select>
+        <span class="pointer-events-none absolute right-3 top-1/2 transform -translate-y-1/2 text-upgradAccent">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+        </span>
       </div>
-      <button type="submit" class="inline-flex items-center px-4 py-2 bg-upgradYellow hover:bg-upgradAccent text-upgradRed text-xs font-bold rounded shadow focus:outline-none transition">Fetch Logs</button>
+      <button type="submit" class="bg-upgradYellow hover:bg-upgradAccent text-upgradRed font-bold px-4 py-2 rounded mr-4">Fetch Logs</button>
+      <button type="button" onclick="window.location.href='{{ url_for('timelog_today') }}'" class="bg-upgradPurple hover:bg-upgradTeal text-white font-bold px-4 py-2 rounded float-right ml-auto" style="margin-left:auto;display:inline-block;">Today's Timelog</button>
     </form>
   </div>
 
@@ -49,7 +52,7 @@
     </div>
     <div class="overflow-x-auto">
       <table class="min-w-[500px] w-full bg-white rounded-lg border border-upgradAccent text-xs text-center">
-        <thead class="bg-upgradYellow text-upgradRed">
+        <thead class="bg-upgradPurple text-white">
           <tr>
             <th class="py-2 px-3 font-bold">User</th>
             <th class="py-2 px-3 font-bold">Logged Hours</th>
@@ -59,15 +62,17 @@
         <tbody>
           {% set ns = namespace(total_logged=0, total_expected=0) %}
           {% for row in summary_data %}
+          {% if not onlyReds or (row.total_hours is number and row.expected is number and row.total_hours < row.expected) %}
           {% set ns.total_logged = ns.total_logged + row.total_hours %}
           {% set ns.total_expected = ns.total_expected + row.expected %}
-          <tr class="border-t border-upgradAccent" x-show="userVisible('{{ row.user|lower }}') && (!onlyReds || ({{ row.total_hours }} < {{ row.expected }}))">
-            <td class="py-2 px-3 text-left font-bold">
-              <a href="#user-{{ loop.index }}" class="text-upgradPurple hover:underline font-bold {% if row.total_hours < row.expected %}text-upgradRed{% endif %}" @click.prevent="expandAndScrollToUser('user-{{ loop.index }}', {{ loop.index }})">{{ row.user }}</a>
+          <tr class="border-t border-upgradAccent">
+            <td class="py-2 px-3 text-left font-bold text-upgradPurple">
+              <a href="#user-{{ loop.index }}" class="hover:underline font-bold {% if row.total_hours is number and row.expected is number and row.total_hours < row.expected %}text-upgradRed{% endif %}" @click.prevent="expandAndScrollToUser('user-{{ loop.index }}', {{ loop.index }})">{{ row.user }}</a>
             </td>
-            <td class="py-2 px-3 font-bold {% if row.total_hours < row.expected %}text-upgradRed{% else %}text-upgradTeal{% endif %}">{{ row.total_hours | round_half }}</td>
-            <td class="py-2 px-3">{{ row.expected | round_half }}</td>
+            <td class="py-2 px-3 font-bold {% if row.total_hours is number and row.expected is number and row.total_hours < row.expected %}text-upgradRed{% else %}text-upgradTeal{% endif %}">{{ row.total_hours | round_half }}</td>
+            <td class="py-2 px-3 text-black">{{ row.expected | round_half }}</td>
           </tr>
+          {% endif %}
           {% endfor %}
           <tr class="border-t border-upgradAccent font-bold bg-upgradLight">
             <td class="py-2 px-3 text-end">TOTAL</td>
@@ -88,13 +93,11 @@
   </div>
   {% endif %}
 
-  <!-- Individual User Timelogs -->
-  {% if summary_data %}
-  <div class="space-y-2">
+  <div class="space-y-6 mt-6">
     {% for row in summary_data %}
-    <div :id="'user-{{ loop.index }}'" class="bg-white rounded shadow-sm p-2 border border-upgradAccent" x-data="userLogCard(false, {{ loop.index }})" x-ref="'userCard' + {{ loop.index }}" x-show="userVisible('{{ row.user|lower }}') && (!onlyReds || ({{ row.total_hours }} < {{ row.expected }}))" @expand-all.window="open = true" @collapse-all.window="open = false" @expand-user-{{ loop.index }}.window="open = true">
-      <div class="flex justify-end mb-0.5">
-        <button @click="backToTop()" class="text-xs text-upgradRed hover:text-upgradPurple bg-upgradPink rounded px-1.5 py-0.5 border border-upgradAccent">Back to Top</button>
+    <div :id="'user-{{ loop.index }}'" class="bg-white rounded-xl shadow p-6" x-data="userLogCard(false, {{ loop.index }})" x-ref="'userCard' + {{ loop.index }}" x-show="userVisible('{{ row.user|lower }}') && (!onlyReds || ({{ row.total_hours }} < {{ row.expected }}))" @expand-all.window="open = true" @collapse-all.window="open = false" @expand-user-{{ loop.index }}.window="open = true">
+      <div class="flex justify-end mb-2">
+        <button @click="backToTop()" class="text-xs text-upgradRed hover:text-upgradPurple bg-upgradPink rounded px-2 py-1 border border-upgradAccent">Back to Top</button>
       </div>
       <button type="button" class="w-full flex justify-between items-center text-left text-upgradPurple hover:text-upgradRed font-bold text-xs focus:outline-none py-1" @click="open = !open">
         <span class="flex items-center gap-2">
@@ -103,32 +106,38 @@
         </span>
         <svg :class="{'rotate-180': open}" class="w-3 h-3 ml-2 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
       </button>
-      <div x-show="open" x-transition x-cloak class="mt-1 border-t pt-1">
+      <div x-show="open" x-transition x-cloak class="mt-4 border-t pt-4">
         {% set logs_by_date = {} %}
         {% for item in detailed_data[row.user] %}
           {% set date = item.started if item.started else 'Unknown' %}
           {% set _ = logs_by_date.setdefault(date, []).append(item) %}
         {% endfor %}
         {% for log_date, items in logs_by_date.items() | sort %}
-        <div class="mb-1">
-          <h6 class="text-xs text-gray-500 font-semibold mb-0.5">{{ log_date }}</h6>
+        <div class="mb-4">
+          <h6 class="text-xs text-gray-500 font-semibold mb-2">{{ log_date }}</h6>
           <div class="overflow-x-auto">
-            <table class="min-w-[250px] w-full bg-white rounded border border-upgradAccent text-xs text-center mb-0.5">
-              <thead class="bg-upgradYellow text-upgradRed">
+            <table class="min-w-[500px] w-full bg-white rounded-lg border border-gray-200 text-xs text-center mb-2">
+              <thead class="bg-gray-100 text-gray-700">
                 <tr>
-                  <th class="py-0.5 px-1 font-bold">Issue</th>
-                  <th class="py-0.5 px-1 font-bold">Parent Summary</th>
-                  <th class="py-0.5 px-1 font-bold">Task Summary</th>
-                  <th class="py-0.5 px-1 font-bold">Hours</th>
+                  <th class="py-2 px-3 font-semibold">Issue</th>
+                  <th class="py-2 px-3 font-semibold">Parent Summary</th>
+                  <th class="py-2 px-3 font-semibold">Task Summary</th>
+                  <th class="py-2 px-3 font-semibold">Hours</th>
                 </tr>
               </thead>
               <tbody>
                 {% for item in items %}
-                <tr>
-                  <td class="py-0.5 px-1">{{ item.issue }}</td>
-                  <td class="py-0.5 px-1">{{ item.parent_summary }}</td>
-                  <td class="py-0.5 px-1">{{ item.task_summary }}</td>
-                  <td class="py-0.5 px-1">{{ item.hours }}</td>
+                <tr class="border-t border-gray-100">
+                  <td>
+                    {% if item.issue_key and item.link %}
+                      <a href="#" class="text-upgradPurple hover:underline font-bold" @click.prevent="openJiraModal('{{ item.link }}')">{{ item.issue_key }}</a>
+                    {% else %}
+                      {{ item.issue_key or item.issue or '' }}
+                    {% endif %}
+                  </td>
+                  <td>{{ item.parent_summary }}</td>
+                  <td>{{ item.summary or item.task_summary }}</td>
+                  <td>{{ item.hours }}</td>
                 </tr>
                 {% endfor %}
               </tbody>
@@ -140,7 +149,6 @@
     </div>
     {% endfor %}
   </div>
-  {% endif %}
 
   <!-- Jira Modal -->
   <div x-show="showModal" style="background: rgba(0,0,0,0.5)" class="fixed inset-0 flex items-center justify-center z-50" x-transition x-cloak>

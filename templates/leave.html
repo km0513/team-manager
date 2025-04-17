@@ -6,35 +6,41 @@
 </h2>
 <form method="POST" class="max-w-lg mx-auto bg-white rounded-xl shadow border border-gray-200 p-6 flex flex-col gap-4">
   <!-- Step 1: Select User and Dates -->
-  <div>
+  <div class="mb-3 relative">
     <label class="block mb-1 font-medium text-gray-700">User</label>
-    <select name="user_id" class="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-green-400" required>
+    <select name="user_id" class="block w-full rounded-lg border border-upgradAccent bg-white px-3 py-2 text-sm shadow-sm focus:border-upgradRed focus:ring-2 focus:ring-upgradYellow focus:outline-none transition-all duration-150 appearance-none pr-8" required>
       <option value="" disabled selected>Select user</option>
       {% for user in users %}
         <option value="{{ user.id }}">{{ user.name }}</option>
       {% endfor %}
     </select>
+    <span class="pointer-events-none absolute right-3 top-1/2 transform -translate-y-1/2 text-upgradAccent">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+    </span>
   </div>
   <div class="flex gap-4">
-    <div class="flex-1">
+    <div class="mb-3">
       <label class="block mb-1 font-medium text-gray-700">Start Date</label>
-      <input type="date" name="start_date" class="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-green-400" required>
+      <input type="date" name="start_date" class="block w-full rounded-lg border border-upgradAccent bg-white px-3 py-2 text-sm shadow-sm focus:border-upgradRed focus:ring-2 focus:ring-upgradYellow focus:outline-none transition-all duration-150" required>
     </div>
-    <div class="flex-1">
+    <div class="mb-3">
       <label class="block mb-1 font-medium text-gray-700">End Date</label>
-      <input type="date" name="end_date" class="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-green-400" required>
+      <input type="date" name="end_date" class="block w-full rounded-lg border border-upgradAccent bg-white px-3 py-2 text-sm shadow-sm focus:border-upgradRed focus:ring-2 focus:ring-upgradYellow focus:outline-none transition-all duration-150" required>
     </div>
   </div>
   <!-- Step 2: Select Leave Type -->
-  <div>
+  <div class="mb-3 relative">
     <label class="block mb-1 font-medium text-gray-700">Leave Type</label>
-    <select name="leave_type" class="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-green-400" required>
+    <select name="leave_type" class="block w-full rounded-lg border border-upgradAccent bg-white px-3 py-2 text-sm shadow-sm focus:border-upgradRed focus:ring-2 focus:ring-upgradYellow focus:outline-none transition-all duration-150 appearance-none pr-8" required>
       <option value="" disabled selected>Select leave type</option>
       <option value="Sick Leave">Sick Leave</option>
       <option value="Casual Leave">Casual Leave</option>
       <option value="Earned Leave">Earned Leave</option>
       <option value="Other">Other</option>
     </select>
+    <span class="pointer-events-none absolute right-3 top-1/2 transform -translate-y-1/2 text-upgradAccent">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+    </span>
   </div>
   <!-- Step 3: Submit -->
   <button type="submit" class="mt-2 bg-green-600 hover:bg-green-700 text-white font-semibold px-6 py-2 rounded shadow transition">Submit</button>

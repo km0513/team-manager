@@ -1,8 +1,29 @@
-<!-- ... existing form fields ... -->
-<div class="mb-4">
-  <label>
-    <input type="checkbox" name="use_lxp_context" value="yes">
-    Use LXP related context
-  </label>
+{% extends 'base.html' %}
+{% block content %}
+<div class="max-w-xl mx-auto bg-upgradLight rounded-xl shadow p-8 mt-10 border border-upgradAccent">
+  <h2 class="text-2xl font-bold text-upgradRed mb-6 text-center">Generate Test Cases</h2>
+  {% if not session.get('logged_in') %}
+    <form method="POST" action="/generate-testcases-auth" class="flex flex-col gap-4 mb-6">
+      <input type="email" name="email" placeholder="Enter your email to continue" required class="rounded border border-upgradRed px-3 py-2 text-sm focus:ring-2 focus:ring-upgradYellow">
+      <button type="submit" class="bg-upgradRed hover:bg-upgradAccent text-white font-bold px-4 py-2 rounded transition">Continue</button>
+    </form>
+    {% if email_checked and not user_exists %}
+      <div class="text-upgradRed font-semibold mb-4">No user found with that email.</div>
+    {% endif %}
+  {% endif %}
+  {% if session.get('logged_in') or user_exists %}
+    <form method="POST" enctype="multipart/form-data" class="flex flex-col gap-4" action="/generate-testcases">
+      <input type="text" name="jira_id" placeholder="Jira ID (optional)" class="rounded border border-upgradRed px-3 py-2 text-sm focus:ring-2 focus:ring-upgradYellow">
+      <textarea name="story_text" rows="5" placeholder="Paste user story or feature description here..." class="rounded border border-upgradRed px-3 py-2 text-sm focus:ring-2 focus:ring-upgradYellow"></textarea>
+      <input type="file" name="story_doc" accept=".txt,.docx" class="rounded border border-upgradRed px-3 py-2 text-sm focus:ring-2 focus:ring-upgradYellow">
+      <div class="mb-4">
+        <label>
+          <input type="checkbox" name="use_lxp_context" value="yes">
+          Use LXP related context
+        </label>
+      </div>
+      <button type="submit" class="bg-upgradRed hover:bg-upgradAccent text-white font-bold px-4 py-2 rounded transition">Generate Test Cases</button>
+    </form>
+  {% endif %}
 </div>
-<!-- ... rest of the form ... -->
+{% endblock %}

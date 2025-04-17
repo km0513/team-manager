@@ -1,9 +1,9 @@
 {% extends 'base.html' %}
 {% block content %}
 <div class="max-w-4xl mx-auto px-4 py-6">
-  <h3 class="mb-6 text-2xl font-bold text-upgradRed">HelperQA-AI</h3>
+  <h3 class="mb-6 text-2xl font-bold text-upgradRed">AI-Utility-Helper</h3>
   <div class="mb-6 p-4 rounded-lg bg-upgradYellow border border-upgradAccent text-upgradRed text-sm">
-    <strong class="block mb-2 text-upgradRed">HelperQA-AI Guide:</strong>
+    <strong class="block mb-2 text-upgradRed">AI-Utility-Helper Guide:</strong>
     <ul class="mb-2 list-disc list-inside">
       <li><strong>📷 Upload Screenshot</strong>: Performs UI analysis like layout issues or suggestions.</li>
       <li><strong>🌐 Web Page URL</strong>: Captures and analyzes live web page layout.</li>
@@ -12,51 +12,80 @@
     <span class="block">The result will appear below with options to expand requirements or view Jira directly in-app.</span>
   </div>
 
-  <form method="POST" enctype="multipart/form-data" id="feedbackForm" class="space-y-4">
-    <div>
-      <label for="inputType" class="block text-xs font-medium text-upgradRed mb-1">Choose Input Type</label>
-      <select class="block w-full rounded-md border-upgradAccent shadow-sm focus:border-upgradRed focus:ring focus:ring-upgradYellow focus:ring-opacity-50 text-sm" id="inputType" name="input_type" required>
-        <option value="">-- Select --</option>
-        <option value="upload">📷 Upload Screenshot</option>
-        <option value="url">🌐 Enter Web Page URL</option>
-        <option value="testcase_story">✍️ Test Case Generator (Story/Epic/Bug)</option>
-      </select>
+  {% if not session.get('logged_in') and user %}
+    <div class="mb-4 bg-white rounded-lg shadow p-4 border border-upgradAccent">
+      <h3 class="font-bold text-upgradRed mb-2">Welcome {{ user.name }}!</h3>
+      <p><b>Email:</b> {{ user.email }}</p>
+      <p><b>Designation:</b> {{ user.designation }}</p>
+      <div class="mt-2 text-upgradGreen font-semibold">You may now use AI-Utility-Helper below.</div>
     </div>
+  {% endif %}
 
-    <!-- Screenshot Upload -->
-    <div class="hidden" id="uploadGroup">
-      <label class="block text-xs font-medium text-upgradRed mb-1">Upload Image</label>
-      <input type="file" name="screenshot" class="block w-full rounded-md border-upgradAccent shadow-sm focus:border-upgradRed focus:ring focus:ring-upgradYellow focus:ring-opacity-50 text-sm" accept="image/*">
+  {% if not session.get('logged_in') and not user %}
+    <div class="bg-upgradLight rounded-xl shadow p-6 mb-4 border border-upgradAccent max-w-md mx-auto">
+      <h2 class="text-xl font-bold text-upgradRed mb-4 text-center">AI-Utility-Helper</h2>
+      <form method="GET" action="/HelperQA-AI" class="flex flex-col gap-4 mb-4">
+        <input type="email" name="email" placeholder="Enter your email" required class="block w-full rounded-lg border border-upgradAccent bg-white px-3 py-2 text-sm shadow-sm focus:border-upgradRed focus:ring-2 focus:ring-upgradYellow focus:outline-none transition-all duration-150">
+        <button type="submit" class="bg-upgradRed hover:bg-upgradAccent text-white font-bold px-4 py-2 rounded transition">Continue</button>
+      </form>
+      {% if email_checked %}
+        <div class="mt-2 text-upgradRed font-semibold">No user found with that email.</div>
+      {% endif %}
     </div>
+  {% endif %}
 
-    <!-- URL Input -->
-    <div class="hidden" id="urlGroup">
-      <label class="block text-xs font-medium text-upgradRed mb-1">Enter Page URL</label>
-      <input type="url" name="page_url" class="block w-full rounded-md border-upgradAccent shadow-sm focus:border-upgradRed focus:ring focus:ring-upgradYellow focus:ring-opacity-50 text-sm" placeholder="https://example.com">
-    </div>
-
-    <!-- Test Case Generator Section -->
-    <div id="testcaseGroup" class="hidden mt-2">
-      <label class="block text-xs font-medium text-upgradRed mb-1">Enter Jira ID or Paste Story Description</label>
-      <input type="text" name="jira_id" class="block w-full rounded-md border-upgradAccent shadow-sm focus:border-upgradRed focus:ring focus:ring-upgradYellow focus:ring-opacity-50 text-sm mb-2" placeholder="Optional: JIRA-1234">
-      <textarea name="story_text" class="block w-full rounded-md border-upgradAccent shadow-sm focus:border-upgradRed focus:ring focus:ring-upgradYellow focus:ring-opacity-50 text-sm mb-2" rows="4" placeholder="Or paste the story/epic/bug here..."></textarea>
-      <label class="block text-xs font-medium text-upgradRed mb-1">Or Upload a Document</label>
-      <input type="file" name="story_doc" class="block w-full rounded-md border-upgradAccent shadow-sm focus:border-upgradRed focus:ring focus:ring-upgradYellow focus:ring-opacity-50 text-sm" accept=".txt,.pdf,.doc,.docx">
-      <div class="mt-2">
-        <label class="inline-flex items-center">
-          <input type="checkbox" name="use_lxp_context" value="yes" class="mr-2">
-          <span class="text-xs font-bold text-upgradRed">Use LXP related context</span>
-        </label>
+  {% if session.get('logged_in') or user %}
+    <form method="POST" enctype="multipart/form-data" id="feedbackForm" class="space-y-4">
+      <div>
+        <label for="inputType" class="block text-xs font-medium text-upgradRed mb-1">Choose Input Type</label>
+        <div class="relative">
+          <select class="block w-full rounded-lg border border-upgradAccent bg-white px-3 py-2 text-sm shadow-sm focus:border-upgradRed focus:ring-2 focus:ring-upgradYellow focus:outline-none transition-all duration-150 appearance-none pr-8" id="inputType" name="input_type" required>
+            <option value="">-- Select --</option>
+            <option value="upload">📷 Upload Screenshot</option>
+            <option value="url">🌐 Enter Web Page URL</option>
+            <option value="testcase_story">✍️ Test Case Generator (Story/Epic/Bug)</option>
+          </select>
+          <span class="pointer-events-none absolute right-3 top-1/2 transform -translate-y-1/2 text-upgradAccent">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+          </span>
+        </div>
       </div>
-    </div>
 
-    <!-- Button Groups -->
-    <div class="flex gap-2 mt-3 hidden" id="btnGroup">
-      <input type="hidden" name="ai_mode" id="aiMode" value="review">
-      <button type="submit" id="analyzeBtn" class="px-4 py-2 bg-upgradRed hover:bg-upgradAccent text-white text-xs font-semibold rounded shadow">🔍 Analyze UI</button>
-      <button type="submit" id="testcaseBtn" class="px-4 py-2 bg-upgradYellow hover:bg-upgradAccent text-upgradRed border border-upgradAccent text-xs font-semibold rounded shadow">🧪 Generate Test Cases</button>
-    </div>
-  </form>
+      <!-- Screenshot Upload -->
+      <div class="hidden" id="uploadGroup">
+        <label class="block text-xs font-medium text-upgradRed mb-1">Upload Image</label>
+        <input type="file" name="screenshot" class="block w-full rounded-lg border border-upgradAccent bg-white px-3 py-2 text-sm shadow-sm focus:border-upgradRed focus:ring-2 focus:ring-upgradYellow focus:outline-none transition-all duration-150" accept="image/*">
+      </div>
+
+      <!-- URL Input -->
+      <div class="hidden" id="urlGroup">
+        <label class="block text-xs font-medium text-upgradRed mb-1">Enter Page URL</label>
+        <input type="url" name="page_url" class="block w-full rounded-lg border border-upgradAccent bg-white px-3 py-2 text-sm shadow-sm focus:border-upgradRed focus:ring-2 focus:ring-upgradYellow focus:outline-none transition-all duration-150" placeholder="https://example.com">
+      </div>
+
+      <!-- Test Case Generator Section -->
+      <div id="testcaseGroup" class="hidden mt-2">
+        <label class="block text-xs font-medium text-upgradRed mb-1">Enter Jira ID or Paste Story Description</label>
+        <input type="text" name="jira_id" class="block w-full rounded-lg border border-upgradAccent bg-white px-3 py-2 text-sm shadow-sm focus:border-upgradRed focus:ring-2 focus:ring-upgradYellow focus:outline-none transition-all duration-150 mb-2" placeholder="Optional: JIRA-1234">
+        <textarea name="story_text" class="block w-full rounded-lg border border-upgradAccent bg-white px-3 py-2 text-sm shadow-sm focus:border-upgradRed focus:ring-2 focus:ring-upgradYellow focus:outline-none transition-all duration-150" rows="4" placeholder="Or paste the story/epic/bug here..."></textarea>
+        <label class="block text-xs font-medium text-upgradRed mb-1">Or Upload a Document</label>
+        <input type="file" name="story_doc" class="block w-full rounded-lg border border-upgradAccent bg-white px-3 py-2 text-sm shadow-sm focus:border-upgradRed focus:ring-2 focus:ring-upgradYellow focus:outline-none transition-all duration-150" accept=".txt,.pdf,.doc,.docx">
+        <div class="mt-2">
+          <label class="inline-flex items-center">
+            <input type="checkbox" name="use_lxp_context" value="yes" class="mr-2">
+            <span class="text-xs font-bold text-upgradRed">Use LXP related context</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Button Groups -->
+      <div class="flex gap-2 mt-3 hidden" id="btnGroup">
+        <input type="hidden" name="ai_mode" id="aiMode" value="review">
+        <button type="submit" id="analyzeBtn" class="px-4 py-2 bg-upgradRed hover:bg-upgradAccent text-white text-xs font-semibold rounded shadow">🔍 Analyze UI</button>
+        <button type="submit" id="testcaseBtn" class="px-4 py-2 bg-upgradYellow hover:bg-upgradAccent text-upgradRed border border-upgradAccent text-xs font-semibold rounded shadow">🧪 Generate Test Cases</button>
+      </div>
+    </form>
+  {% endif %}
 
   {% if image_url %}
   <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">

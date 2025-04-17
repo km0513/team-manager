@@ -7,25 +7,28 @@
 </style>
 <h2>Add Time Entry</h2>
 <form method="POST">
-    <div class="mb-3">
+    <div class="mb-3 relative">
         <label>User</label>
-        <select name="user_id" class="form-control">
+        <select name="user_id" class="block w-full rounded-lg border border-upgradAccent bg-white px-3 py-2 text-sm shadow-sm focus:border-upgradRed focus:ring-2 focus:ring-upgradYellow focus:outline-none transition-all duration-150 appearance-none pr-8">
             {% for user in users %}
                 <option value="{{ user.id }}">{{ user.name }}</option>
             {% endfor %}
         </select>
+        <span class="pointer-events-none absolute right-3 top-1/2 transform -translate-y-1/2 text-upgradAccent">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+        </span>
     </div>
     <div class="mb-3">
         <label>Date</label>
-        <input type="date" name="date" class="form-control">
+        <input type="date" name="date" class="block w-full rounded-lg border border-upgradAccent bg-white px-3 py-2 text-sm shadow-sm focus:border-upgradRed focus:ring-2 focus:ring-upgradYellow focus:outline-none transition-all duration-150">
     </div>
     <div class="mb-3">
         <label>Hours Worked</label>
-        <input type="number" step="0.1" name="hours_worked" class="form-control">
+        <input type="number" step="0.1" name="hours_worked" class="block w-full rounded-lg border border-upgradAccent bg-white px-3 py-2 text-sm shadow-sm focus:border-upgradRed focus:ring-2 focus:ring-upgradYellow focus:outline-none transition-all duration-150">
     </div>
     <div class="mb-3">
         <label>Description</label>
-        <input type="text" name="description" class="form-control">
+        <input type="text" name="description" class="block w-full rounded-lg border border-upgradAccent bg-white px-3 py-2 text-sm shadow-sm focus:border-upgradRed focus:ring-2 focus:ring-upgradYellow focus:outline-none transition-all duration-150">
     </div>
     <button type="submit" class="btn btn-primary">Submit</button>
 </form>

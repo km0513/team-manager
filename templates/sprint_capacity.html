@@ -27,20 +27,22 @@
 <form method="GET" class="mb-6 flex flex-wrap gap-4 items-end">
   <div>
     <label class="block text-xs font-bold text-upgradRed mb-1">Start Date</label>
-    <input type="date" name="start" class="block w-36 rounded-md border-upgradAccent shadow-sm focus:border-upgradRed focus:ring focus:ring-upgradYellow focus:ring-opacity-50 text-sm" value="{{ start.strftime('%Y-%m-%d') if start else '' }}" required>
+    <input type="date" name="start" class="block w-36 rounded-lg border border-upgradAccent bg-white px-3 py-2 text-sm shadow-sm focus:border-upgradRed focus:ring-2 focus:ring-upgradYellow focus:outline-none transition-all duration-150" value="{{ start.strftime('%Y-%m-%d') if start else '' }}" required>
   </div>
   <div>
     <label class="block text-xs font-bold text-upgradRed mb-1">End Date</label>
-    <input type="date" name="end" class="block w-36 rounded-md border-upgradAccent shadow-sm focus:border-upgradRed focus:ring focus:ring-upgradYellow focus:ring-opacity-50 text-sm" value="{{ end.strftime('%Y-%m-%d') if end else '' }}" required>
+    <input type="date" name="end" class="block w-36 rounded-lg border border-upgradAccent bg-white px-3 py-2 text-sm shadow-sm focus:border-upgradRed focus:ring-2 focus:ring-upgradYellow focus:outline-none transition-all duration-150" value="{{ end.strftime('%Y-%m-%d') if end else '' }}" required>
   </div>
-  <div>
-    <label class="block text-xs font-bold text-upgradRed mb-1">Function</label>
-    <select name="function" class="block w-48 rounded-md border-upgradAccent shadow-sm focus:border-upgradRed focus:ring focus:ring-upgradYellow focus:ring-opacity-50 text-sm">
+  <div class="relative">
+    <select name="function" class="block w-full rounded-lg border border-upgradAccent bg-white px-3 py-2 text-sm shadow-sm focus:border-upgradRed focus:ring-2 focus:ring-upgradYellow focus:outline-none transition-all duration-150 appearance-none pr-8">
       <option value="All" {% if selected_function == 'All' %}selected{% endif %}>All Functions</option>
       {% for func in functions %}
         <option value="{{ func }}" {% if func == selected_function %}selected{% endif %}>{{ func }}</option>
       {% endfor %}
     </select>
+    <span class="pointer-events-none absolute right-3 top-1/2 transform -translate-y-1/2 text-upgradAccent">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+    </span>
   </div>
   <div>
     <button type="submit" class="px-4 py-2 bg-upgradYellow hover:bg-upgradAccent text-upgradRed text-xs font-bold rounded shadow">Calculate</button>
@@ -48,7 +50,7 @@
 </form>
 <div class="overflow-x-auto mt-8">
   <table class="min-w-[500px] w-full bg-white rounded-lg border border-upgradAccent text-xs text-center">
-    <thead class="bg-upgradYellow text-upgradRed">
+    <thead class="bg-upgradPurple text-white">
       <tr>
         <th class="py-2 px-3 font-bold">User</th>
         <th class="py-2 px-3 font-bold">Total Working Days</th>
@@ -59,12 +61,10 @@
     <tbody>
       {% for entry in my_sprint_data %}
       <tr>
-        <td class="py-2 px-3 text-left font-bold">
-          <span class="text-upgradPurple">{{ entry.user_name }}</span>
-        </td>
-        <td class="py-2 px-3">{{ entry.total_days }}</td>
-        <td class="py-2 px-3">{{ entry.leaves }}</td>
-        <td class="py-2 px-3">{{ entry.capacity_hours }}</td>
+        <td class="py-2 px-3 text-left font-bold text-upgradPurple">{{ entry.user_name }}</td>
+        <td class="py-2 px-3 text-black">{{ entry.total_days }}</td>
+        <td class="py-2 px-3 text-black">{{ entry.leaves }}</td>
+        <td class="py-2 px-3 text-black">{{ entry.capacity_hours }}</td>
       </tr>
       {% endfor %}
       <tr class="border-t border-upgradAccent font-bold bg-upgradLight">

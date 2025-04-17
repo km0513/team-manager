@@ -1,0 +1,147 @@
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Timelog (Modal)</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- upGrad theme Tailwind config -->
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            upgradRed: '#B71C1C',
+            upgradYellow: '#FFD600',
+            upgradPurple: '#4A148C',
+            upgradTeal: '#00695C',
+            upgradLight: '#FFF3E0',
+            upgradAccent: '#FFAB00',
+            upgradPink: '#FFCDD2',
+          },
+        },
+      },
+    }
+  </script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/5.2.0/github-markdown-light.min.css" />
+  <style>
+    table, th, td {
+      font-size: 11px;
+      padding: 4px 8px !important;
+    }
+    .form-control, .form-select { font-size: 11px; padding: 3px 6px; }
+    .btn { font-size: 11px; padding: 3px 8px; }
+    h2 { font-size: 17px; margin-bottom: 8px; }
+    h4 { font-size: 14px; margin-top: 15px; }
+    tr:nth-child(even) { background-color: #fdfdfd; }
+    tr:hover { background-color: #f1f1f1; }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+  <style>
+    [x-cloak] { display: none !important; }
+  </style>
+</head>
+<body class="bg-upgradLight min-h-screen overflow-x-hidden">
+  <!-- Minimal Timelog Today for Modal -->
+  <!-- No base.html, just the content block from timelog_today.html -->
+  <div class="max-w-5xl mx-auto px-2 bg-white rounded-xl shadow p-6 my-8 border border-upgradAccent" x-data="timelogPage()">
+    <div class="flex justify-between items-center mb-3">
+      <h3 class="text-xl font-bold">📅 Timelog for {{ display_date_str }}</h3>
+      <div class="flex gap-2">
+        {# --- Fix: Manually construct Prev/Next links to preserve modal=1 and not append to date --- #}
+        <a href="{{ url_for('timelog_today', user_email=user_email, date=previous_date) }}?modal=1" class="px-3 py-1 bg-[#FBE9E7] hover:bg-[#FFCCBC] text-[#B71C1C] text-xs font-bold rounded shadow">← Prev</a>
+        {% if next_date %}
+        <a href="{{ url_for('timelog_today', user_email=user_email, date=next_date) }}?modal=1" class="px-3 py-1 bg-[#FBE9E7] hover:bg-[#FFCCBC] text-[#B71C1C] text-xs font-bold rounded shadow">Next →</a>
+        {% endif %}
+      </div>
+    </div>
+
+    {% if not is_user_specific %}
+    <div class="bg-white rounded-xl shadow p-6 mb-8 border border-upgradAccent">
+      <div class="flex flex-wrap gap-4 items-end mb-4">
+        <form method="POST" class="flex flex-wrap gap-4 items-end">
+          <div>
+            <label for="functionFilter" class="block text-xs font-bold text-upgradRed mb-1">Function</label>
+            <select class="block w-40 rounded-md border-upgradAccent shadow-sm focus:border-upgradRed focus:ring focus:ring-upgradYellow focus:ring-opacity-50 text-sm" id="functionFilter" name="work_function">
+              <option value="All" {% if selected_function == 'All' %}selected{% endif %}>All Functions</option>
+              {% for wf in work_functions %}
+                <option value="{{ wf }}" {% if selected_function == wf %}selected{% endif %}>{{ wf }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-upgradRed mb-1">Search User:</label>
+            <input type="text" id="userSearch" x-model="userFilter" class="block w-40 rounded-md border-upgradAccent shadow-sm focus:border-upgradRed focus:ring focus:ring-upgradYellow focus:ring-opacity-50 text-sm" placeholder="Type to filter users...">
+          </div>
+          <div class="flex items-center mt-2">
+            <input type="checkbox" id="onlyReds" x-model="onlyReds" class="mr-2">
+            <label for="onlyReds" class="text-xs font-bold text-upgradRed">Only Reds</label>
+          </div>
+        </form>
+      </div>
+    </div>
+    {% endif %}
+
+    {% if summary_data %}
+      <div id="summary-table" class="bg-white rounded-xl shadow p-6 mb-4">
+        <h2 class="mb-4 text-lg font-bold text-blue-800">Summary</h2>
+        <div class="overflow-x-auto">
+          <table class="min-w-[500px] w-full bg-white rounded-lg border border-upgradAccent text-xs text-center">
+            <thead class="bg-upgradPurple text-white">
+              <tr>
+                <th class="py-2 px-3 font-bold">User</th>
+                <th class="py-2 px-3 font-bold">Total Logged Hours</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in summary_data %}
+              <tr class="border-t border-upgradAccent">
+                <td class="py-2 px-3">{{ row.user }}</td>
+                <td class="py-2 px-3 font-bold">{{ row.total_hours }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <h4 class="font-bold mb-2">Details</h4>
+      {% for user, logs in detailed_data.items() %}
+        <h5 class="font-semibold text-upgradPurple mt-4">{{ user }}</h5>
+        <div class="overflow-x-auto">
+          <table class="min-w-full table-auto border border-upgradAccent rounded mb-4 text-xs">
+            <thead class="bg-upgradPink text-upgradRed">
+              <tr>
+                <th class="py-1 px-2 font-bold">Issue</th>
+                <th class="py-1 px-2 font-bold">Summary</th>
+                <th class="py-1 px-2 font-bold">Parent</th>
+                <th class="py-1 px-2 font-bold">Hours</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for log in logs %}
+              <tr class="border-t border-upgradAccent">
+                <td class="py-1 px-2"><a href="{{ log.link }}" target="_blank" class="text-blue-700 hover:underline">{{ log.issue_key }}</a></td>
+                <td class="py-1 px-2">{{ log.summary }}</td>
+                <td class="py-1 px-2">{{ log.parent_summary }}</td>
+                <td class="py-1 px-2">{{ log.hours }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% endfor %}
+    {% else %}
+      <div x-cloak>
+        <p class="italic">No timelog data found for this date.</p>
+      </div>
+    {% endif %}
+  </div>
+  <script>
+  function timelogPage() {
+    return {
+      userFilter: '',
+      onlyReds: false
+    };
+  }
+  </script>
+</body>

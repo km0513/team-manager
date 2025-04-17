@@ -1,0 +1,21 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="max-w-md mx-auto mt-12 bg-upgradLight rounded-xl shadow p-6 border border-upgradAccent">
+  <h2 class="text-xl font-bold text-upgradRed mb-4 text-center">View Your Details & Timelogs</h2>
+  <form method="GET" action="/mytimelogs" class="flex flex-col gap-4">
+    <input type="email" name="email" placeholder="Enter your email" required class="rounded border border-upgradRed px-3 py-2 text-sm focus:ring-2 focus:ring-upgradYellow">
+    <button type="submit" class="bg-upgradTeal hover:bg-upgradPurple text-white font-bold px-4 py-2 rounded">View My Details</button>
+  </form>
+  {% if user %}
+  <div class="mt-8 bg-white rounded-lg shadow p-4">
+    <h3 class="font-bold text-upgradRed mb-2">Your Details</h3>
+    <p><b>Name:</b> {{ user.name }}</p>
+    <p><b>Email:</b> {{ user.email }}</p>
+    <p><b>Designation:</b> {{ user.designation }}</p>
+    <a href="{{ url_for('timelog_today', user_email=user.email) }}" class="mt-4 inline-block bg-upgradTeal hover:bg-upgradPurple text-white px-4 py-2 rounded text-xs font-bold transition">View Today's Timelog</a>
+  </div>
+  {% elif email_checked %}
+  <div class="mt-4 text-upgradRed font-semibold">No user found with that email.</div>
+  {% endif %}
+</div>
+{% endblock %}

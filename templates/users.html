@@ -1,142 +1,107 @@
 {% extends 'base.html' %}
 {% block content %}
-<!-- Alpine.js CDN for interactivity (if needed) -->
-<script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
-<style>
-  [x-cloak] { display: none !important; }
-  .bg-upgradLight { background-color: #F7F7F7; }
-  .bg-upgradRed { background-color: #FF3737; }
-  .bg-upgradYellow { background-color: #F7DC6F; }
-  .bg-upgradPurple { background-color: #7A288A; }
-  .bg-upgradTeal { background-color: #0097A7; }
-  .bg-upgradAccent { background-color: #FFC107; }
-  .bg-upgradPink { background-color: #FF69B4; }
-  .text-upgradRed { color: #FF3737; }
-  .text-upgradYellow { color: #F7DC6F; }
-  .text-upgradPurple { color: #7A288A; }
-  .text-upgradTeal { color: #0097A7; }
-  .text-upgradAccent { color: #FFC107; }
-  .border-upgradAccent { border-color: #FFC107; }
-  body { background-color: #FFF6EB; }
-</style>
-
-<!-- Add User Card -->
-<div class="bg-upgradLight rounded-xl shadow p-6 mb-6 border border-upgradAccent">
-  <div class="text-lg font-bold text-upgradRed mb-4 flex items-center">
-    <i class="bi bi-person-plus-fill mr-2"></i> Add User
-  </div>
-  <form method="POST" class="flex flex-col md:flex-row md:space-x-4 space-y-3 md:space-y-0 items-end">
-    <input type="text" name="name" placeholder="Name" class="flex-1 rounded border border-upgradRed px-3 py-2 text-sm focus:ring-2 focus:ring-upgradYellow" required>
-    <input type="email" name="email" placeholder="Email" class="flex-1 rounded border border-upgradRed px-3 py-2 text-sm focus:ring-2 focus:ring-upgradYellow" required>
-    <select name="designation" class="flex-1 rounded border border-upgradRed px-3 py-2 text-sm focus:ring-2 focus:ring-upgradYellow" required>
-      <option value="">Select Designation</option>
-      <option value="QA">QA</option>
-      <option value="Development">Development</option>
-      <option value="Product Management">Product Management</option>
-      <option value="UI/UX">UI/UX</option>
-    </select>
-    <button type="submit" class="bg-upgradRed hover:bg-upgradAccent text-white font-bold px-4 py-2 rounded w-full md:w-auto flex items-center justify-center transition">
-      <i class="bi bi-person-plus mr-1"></i> Add
-    </button>
-  </form>
-</div>
-
-<!-- Import Users Card -->
-<div class="bg-upgradLight rounded-xl shadow p-6 mb-6 border border-upgradAccent">
-  <div class="text-lg font-bold text-upgradRed mb-4 flex items-center">
-    <i class="bi bi-file-earmark-spreadsheet-fill mr-2"></i> Import Users from Excel
-  </div>
-  <form method="POST" action="/import-users" enctype="multipart/form-data" class="flex flex-col md:flex-row md:space-x-4 space-y-3 md:space-y-0 items-end">
-    <input type="file" name="excel_file" accept=".xlsx" class="flex-1 rounded border border-upgradRed px-3 py-2 text-sm focus:ring-2 focus:ring-upgradYellow" required>
-    <button type="submit" class="bg-upgradYellow hover:bg-upgradAccent text-upgradRed font-bold px-4 py-2 rounded w-full md:w-auto flex items-center justify-center transition">
-      <i class="bi bi-upload mr-1"></i> Import
-    </button>
-  </form>
-</div>
-
-<!-- Existing Users Card -->
-<div class="bg-upgradLight rounded-xl shadow p-6 mb-6 border border-upgradAccent">
-  <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-4 gap-2">
-    <div class="text-lg font-bold text-upgradRed flex items-center">
-      <i class="bi bi-people-fill mr-2"></i> Existing Users
+{% if session.get('logged_in') %}
+  <!-- Show all users table for admin -->
+  <div class="bg-upgradLight rounded-xl shadow p-6 mb-6 border border-upgradAccent">
+    <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-4 gap-2">
+      <div class="text-lg font-bold text-upgradRed flex items-center">
+        <i class="bi bi-people-fill mr-2"></i> Existing Users
+      </div>
+      <a href="/update-jira-id" class="border border-upgradTeal text-upgradTeal hover:bg-upgradLight font-bold px-3 py-1.5 rounded text-sm flex items-center transition">
+        <i class="bi bi-link-45deg mr-1"></i> Jira ID Mapping
+      </a>
     </div>
-    <a href="/update-jira-id" class="border border-upgradTeal text-upgradTeal hover:bg-upgradLight font-bold px-3 py-1.5 rounded text-sm flex items-center transition">
-      <i class="bi bi-link-45deg mr-1"></i> Jira ID Mapping
-    </a>
-  </div>
-  <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-4 gap-2">
-    <div class="font-bold text-upgradPurple text-sm flex items-center">
-      <i class="bi bi-link-45deg mr-1"></i> Timelog Links Table
+    <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-4 gap-2">
+      <div class="font-bold text-upgradPurple text-sm flex items-center">
+        <i class="bi bi-link-45deg mr-1"></i> Timelog Links Table
+      </div>
     </div>
-    <a href="{{ url_for('export_timelog_links') }}" class="border border-upgradTeal text-upgradTeal hover:bg-upgradLight font-bold px-3 py-1.5 rounded text-sm flex items-center transition">
-      <i class="bi bi-download mr-1"></i> Download CSV
-    </a>
-  </div>
-  <div class="overflow-x-auto">
-    <table class="min-w-full bg-white rounded-lg border border-upgradAccent text-sm">
-      <thead class="bg-upgradRed text-white">
-        <tr>
-          <th class="py-2 px-3 font-bold text-left">ID</th>
-          <th class="py-2 px-3 font-bold text-left">Name</th>
-          <th class="py-2 px-3 font-bold text-left">Email</th>
-          <th class="py-2 px-3 font-bold text-left">Designation</th>
-          <th class="py-2 px-3 font-bold text-left">Actions</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for user in users %}
-        <tr class="border-t border-upgradAccent hover:bg-upgradPink/30">
-          <td class="py-2 px-3">{{ user.id }}</td>
-          <td class="py-2 px-3">{{ user.name }}</td>
-          <td class="py-2 px-3">{{ user.email }}</td>
-          <td class="py-2 px-3">{{ user.designation }}</td>
-          <td class="py-2 px-3">
-            <div class="flex flex-wrap gap-2">
-              {# 
-              <a href="/users/edit/{{ user.id }}" class="bg-upgradYellow hover:bg-upgradAccent text-upgradRed px-2 py-1 rounded text-xs flex items-center font-bold transition" title="Edit User">
-                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536M9 13h3l8-8a2 2 0 00-2.828-2.828l-8 8v3z" /></svg>Edit
-              </a>
-              <a href="/users/delete/{{ user.id }}" class="bg-upgradRed hover:bg-upgradPurple text-white px-2 py-1 rounded text-xs flex items-center font-bold transition" onclick="return confirm('Are you sure you want to delete {{ user.name }}?')" title="Delete User">
-                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>Delete
-              </a>
-              #}
-              <a href="{{ url_for('timelog_today', user_email=user.email) }}" target="_blank" class="bg-upgradTeal hover:bg-upgradPurple text-white px-2 py-1 rounded text-xs flex items-center font-bold transition" title="View Today's Timelog">
-                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6 1a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>Timelog
-              </a>
-            </div>
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-  {% if pagination %}
-  <nav class="mt-4">
-    <ul class="flex flex-wrap gap-2">
-      {% if pagination.has_prev %}
-      <li><a class="px-3 py-1 rounded border border-upgradAccent bg-white hover:bg-upgradPink/30 text-upgradRed" href="{{ url_for('users', page=pagination.prev_num) }}">Previous</a></li>
-      {% endif %}
-      {% for p in pagination.iter_pages() %}
-        {% if p %}
-          <li><a class="px-3 py-1 rounded border border-upgradAccent bg-white hover:bg-upgradYellow/70 transition {{ 'bg-upgradRed text-white' if p == pagination.page else 'text-upgradRed' }}" href="{{ url_for('users', page=p) }}">{{ p }}</a></li>
+    <!-- Add User Form -->
+    <form method="POST" action="/users" class="flex flex-col md:flex-row md:items-end md:justify-start gap-2 mb-4 p-3 rounded border border-upgradAccent bg-white">
+      <div class="flex-1">
+        <label class="block text-upgradRed font-bold mb-1">Name</label>
+        <input type="text" name="name" class="rounded border border-upgradRed px-3 py-2 text-sm w-full" required>
+      </div>
+      <div class="flex-1">
+        <label class="block text-upgradRed font-bold mb-1">Email</label>
+        <input type="email" name="email" class="rounded border border-upgradRed px-3 py-2 text-sm w-full" required>
+      </div>
+      <div class="flex-1 relative">
+        <select name="designation" class="block w-full rounded-lg border border-upgradAccent bg-white px-3 py-2 text-sm shadow-sm focus:border-upgradRed focus:ring-2 focus:ring-upgradYellow focus:outline-none transition-all duration-150 appearance-none pr-8" required>
+          <option value="" disabled selected>Select Designation</option>
+          <option value="QA">QA</option>
+          <option value="Development">Development</option>
+          <option value="Product Management">Product Management</option>
+          <option value="UI/UX">UI/UX</option>
+        </select>
+        <span class="pointer-events-none absolute right-3 top-1/2 transform -translate-y-1/2 text-upgradAccent">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+        </span>
+      </div>
+      <div class="flex items-end">
+        <button type="submit" class="bg-upgradRed hover:bg-upgradAccent text-white font-bold px-4 py-2 rounded">Add</button>
+      </div>
+    </form>
+    <!-- Import Users from Excel -->
+    <form method="POST" action="/import-users" enctype="multipart/form-data" class="flex flex-col md:flex-row md:items-end md:justify-start gap-2 mb-4 p-3 rounded border border-upgradAccent bg-upgradYellow/30">
+      <div class="flex-1">
+        <label class="block text-upgradRed font-bold mb-1">Import Users from Excel</label>
+        <input type="file" name="file" class="rounded border border-upgradRed px-3 py-2 text-sm w-full" accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel" required>
+      </div>
+      <div class="flex items-end">
+        <button type="submit" class="bg-upgradYellow hover:bg-upgradAccent text-upgradRed font-bold px-4 py-2 rounded">Import</button>
+      </div>
+    </form>
+    <!-- Existing Users Table -->
+    <div class="overflow-x-auto">
+      <table class="min-w-[500px] w-full bg-white rounded-lg border border-upgradAccent text-xs text-center">
+        <thead class="bg-upgradPurple text-white">
+          <tr>
+            <th class="py-2 px-3 font-bold">ID</th>
+            <th class="py-2 px-3 font-bold">Name</th>
+            <th class="py-2 px-3 font-bold">Email</th>
+            <th class="py-2 px-3 font-bold">Designation</th>
+            <th class="py-2 px-3 font-bold">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for user in users %}
+          <tr class="border-t border-upgradAccent hover:bg-upgradPink/30">
+            <td class="py-2 px-3 text-black">{{ user.id }}</td>
+            <td class="py-2 px-3 text-upgradPurple font-bold">{{ user.name }}</td>
+            <td class="py-2 px-3 text-black">{{ user.email }}</td>
+            <td class="py-2 px-3 text-black">{{ user.designation }}</td>
+            <td class="py-2 px-3">
+              <div class="flex flex-wrap gap-2">
+                <a href="{{ url_for('timelog_today', user_email=user.email) }}" class="bg-upgradTeal hover:bg-upgradPurple text-white px-2 py-1 rounded text-xs flex items-center font-bold transition" title="View Today's Timelog">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6 1a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>Timelog
+                </a>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% if pagination %}
+    <nav class="mt-4">
+      <ul class="flex flex-wrap gap-2">
+        {% if pagination.has_prev %}
+        <li><a class="px-3 py-1 rounded border border-upgradAccent bg-white hover:bg-upgradPink/30 text-upgradRed" href="{{ url_for('users', page=pagination.prev_num) }}">Previous</a></li>
         {% endif %}
-      {% endfor %}
-      {% if pagination.has_next %}
-      <li><a class="px-3 py-1 rounded border border-upgradAccent bg-white hover:bg-upgradPink/30 text-upgradRed" href="{{ url_for('users', page=pagination.next_num) }}">Next</a></li>
-      {% endif %}
-    </ul>
-  </nav>
-  {% endif %}
-</div>
-
-<script>
-function copyToClipboard(text, button) {
-  navigator.clipboard.writeText(text).then(() => {
-    button.innerText = '✅ Copied!';
-    setTimeout(() => {
-      button.innerText = '📋 Copy Timelog Link';
-    }, 1500);
-  });
-}
-</script>
+        {% for p in pagination.iter_pages() %}
+          {% if p %}
+            <li>
+              <a class="px-3 py-1 rounded border border-upgradAccent {{ 'bg-upgradRed text-white' if p == pagination.page else 'bg-white text-upgradRed hover:bg-upgradYellow/70 transition' }}" href="{{ url_for('users', page=p) }}">{{ p }}</a>
+            </li>
+          {% endif %}
+        {% endfor %}
+        {% if pagination.has_next %}
+        <li><a class="px-3 py-1 rounded border border-upgradAccent bg-white hover:bg-upgradPink/30 text-upgradRed" href="{{ url_for('users', page=pagination.next_num) }}">Next</a></li>
+        {% endif %}
+      </ul>
+    </nav>
+    {% endif %}
+  </div>
+{% endif %}
 {% endblock %}

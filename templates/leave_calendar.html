@@ -17,8 +17,8 @@
 </h2>
 
 <div class="flex flex-wrap gap-2 mb-4 items-center">
-  <a href="/leave-calendar?year={{ prev_year }}&month={{ prev_month }}" class="px-3 py-1 bg-[#FBE9E7] hover:bg-[#FFCCBC] text-[#B71C1C] text-xs font-bold rounded shadow">◀ Prev</a>
-  <a href="/leave-calendar?year={{ next_year }}&month={{ next_month }}" class="px-3 py-1 bg-[#FBE9E7] hover:bg-[#FFCCBC] text-[#B71C1C] text-xs font-bold rounded shadow">Next ▶</a>
+  <a href="/leave-calendar?year={{ prev_year }}&month={{ prev_month }}" class="px-3 py-1 bg-[#FBE9E7] hover:bg-[#FFCCBC] text-[#B71C1C] text-xs font-bold rounded shadow">← Prev</a>
+  <a href="/leave-calendar?year={{ next_year }}&month={{ next_month }}" class="px-3 py-1 bg-[#FBE9E7] hover:bg-[#FFCCBC] text-[#B71C1C] text-xs font-bold rounded shadow">Next →</a>
   <a href="/leave-calendar-export?year={{ year }}&month={{ month }}" class="px-3 py-1 bg-[#FFD600] hover:bg-[#FFAB00] text-[#B71C1C] text-xs font-bold rounded shadow">Export CSV</a>
   <select id="userFilter" class="rounded border border-[#B71C1C] px-3 py-1 text-xs focus:ring-2 focus:ring-[#FFD600]" style="width: 180px;">
     <option value="all">Show All Users</option>
@@ -92,7 +92,7 @@
         <tr>
           <th class="sticky left-0 bg-[#B71C1C] z-10 py-2 px-3 font-extrabold text-left">User</th>
           {% for day in dates %}
-            <th class="py-2 px-2 font-bold {% if day.weekday() >= 5 %}bg-[#FFEBEE] text-[#B71C1C]{% endif %} {% if day.date() == current_date.date() %}today-header{% endif %}" {% if day.date() == current_date.date() %}id="today-col" style="background-color:#FFEBEE;color:#111;font-weight:bold;position:relative;"{% endif %}>
+            <th class="today-header border-l-2 border-[#FFAB91] {% if day.date() == current_date.date() %}today-header{% endif %} py-2 px-2 text-center" id="{% if day.date() == current_date.date() %}today-col{% endif %}">
               {% if day.date() == current_date.date() %}
                 <div class="flex flex-col items-center">
                   <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-[#B71C1C] mb-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
@@ -113,7 +113,7 @@
         <tr class="user-row border-t border-[#FFAB91]" data-user-id="{{ user.id }}">
           <td class="text-left sticky left-0 bg-white z-10 font-bold px-3 py-2">{{ user.name }}</td>
           {% for day in dates %}
-          <td class="px-2 py-1 {% if day.weekday() >= 5 %}bg-[#FFEBEE]{% endif %}"
+          <td class="px-2 py-1 border-l-2 border-[#FFAB91] {% if day.weekday() >= 5 %}bg-[#FFEBEE]{% endif %} {% if day.date() == current_date.date() %}today-cell{% endif %}"
               {% if day.date() == current_date.date() %}style="background-color:#FFEBEE;color:#111;font-weight:bold;"{% endif %}
               onmouseover="this.style.backgroundColor='#FFE082';this.style.color='#111';"
               onmouseout="if(this.hasAttribute('data-today')){this.style.backgroundColor='#FFEBEE';this.style.color='#111';}else{this.style.backgroundColor='';this.style.color='';}">

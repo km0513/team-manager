@@ -16,14 +16,17 @@
         <label>Email</label>
         <input type="email" name="email" class="form-control" value="{{ user.email }}" required>
     </div>
-    <div class="mb-3">
-        <label for="designation">Designation</label>
-        <select name="designation" id="designation" class="form-select" required>
+    <div class="mb-3 relative">
+        <label>Designation</label>
+        <select name="designation" class="block w-full rounded-lg border border-upgradAccent bg-white px-3 py-2 text-sm shadow-sm focus:border-upgradRed focus:ring-2 focus:ring-upgradYellow focus:outline-none transition-all duration-150 appearance-none pr-8">
             <option value="QA" {% if user.designation == 'QA' %}selected{% endif %}>QA</option>
             <option value="Development" {% if user.designation == 'Development' %}selected{% endif %}>Development</option>
             <option value="Product Management" {% if user.designation == 'Product Management' %}selected{% endif %}>Product Management</option>
             <option value="UI/UX" {% if user.designation == 'UI/UX' %}selected{% endif %}>UI/UX</option>
         </select>
+        <span class="pointer-events-none absolute right-3 top-1/2 transform -translate-y-1/2 text-upgradAccent">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+        </span>
     </div>
     <a href="/users" class="btn btn-success mb-11"><< Back</a>
     <button type="submit" class="btn btn-primary">Save Changes</button>

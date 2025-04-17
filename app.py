@@ -15,12 +15,10 @@ import re
 import os
 import json
 import base64
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 import calendar
 from datetime import date
-
-
-
+import pytz
 
 import requests
 from requests.auth import HTTPBasicAuth
@@ -207,7 +205,12 @@ def round_half(value):
 
 @app.before_request
 def require_login():
-    if 'logged_in' not in session and request.endpoint not in ['login', 'static','HelperQA_AI','generate_testcases','timelog_today']:
+    # Allow unauthenticated access to user management, HelperQA, and View Today's Timelog
+    if 'logged_in' not in session:
+        if request.blueprint == 'testcase_bp':
+            return None
+        if request.endpoint in ['login', 'static', 'HelperQA_AI', 'generate_testcases', 'timelog_today', 'users', 'export_users', 'export_timelog_links', 'mytimelogs']:
+            return None
         return redirect('/login')
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -264,106 +267,39 @@ def dashboard():
 
 
 
-@app.route('/users', methods=['GET', 'POST'])
+@app.route('/users', methods=['GET'])
 def users():
-    page = int(request.args.get('page', 1))
-    per_page = 10
+    if session.get('logged_in'):
+        page = int(request.args.get('page', 1))
+        per_page = 10
+        pagination = User.query.paginate(page=page, per_page=per_page)
+        users = pagination.items
+        # Always pass both users and pagination when logged in
+        return render_template('users.html', users=users, pagination=pagination, user=None, email_checked=False)
+    else:
+        email = request.args.get('email')
+        user = None
+        email_checked = False
+        if email:
+            user = User.query.filter_by(email=email.strip().lower()).first()
+            email_checked = True
+        # Always pass users and pagination as None when not logged in
+        return render_template('users.html', user=user, email_checked=email_checked, users=None, pagination=None)
 
-    if request.method == 'POST':
-        name = request.form['name']
-        email = request.form['email']
-        designation = request.form['designation']
+@app.route('/users', methods=['POST'])
+def users_post():
+    name = request.form['name']
+    email = request.form['email']
+    designation = request.form['designation']
 
-        if User.query.filter_by(email=email).first():
-            return " User with this email already exists."
+    if User.query.filter_by(email=email).first():
+        return " User with this email already exists."
 
-        jira_account_id = fetch_jira_account_id(email)
-        user = User(name=name, email=email, designation=designation, jira_account_id=jira_account_id)
-        db.session.add(user)
-        db.session.commit()
-        return redirect('/users')
-
-    pagination = User.query.paginate(page=page, per_page=per_page)
-    return render_template('users.html', users=pagination.items, pagination=pagination)
-
-
-
-
-
-
-
-from flask import send_file
-from io import BytesIO
-
-@app.route('/import-users', methods=['POST'])
-def import_users():
-    file = request.files.get('excel_file')
-    if not file or file.filename == '':
-        return "No file selected", 400
-
-    try:
-        df = pd.read_excel(file)
-        existing_emails = {u.email.lower() for u in User.query.all()}
-        skipped_rows = []
-
-        for index, row in df.iterrows():
-            name = str(row.get('Name')).strip()
-            email = str(row.get('Email')).strip().lower()
-            designation = str(row.get('Designation')).strip()
-
-            if not name or not email or not designation:
-                skipped_rows.append(f"Row {index + 2}: Missing required fields.")
-                continue
-
-            if email in existing_emails:
-                skipped_rows.append(f"Row {index + 2}: Duplicate email '{email}'")
-                continue
-
-            jira_account_id = fetch_jira_account_id(email)
-            if not jira_account_id:
-                skipped_rows.append(f"Row {index + 2}: Jira ID not found for '{email}'")
-                continue
-
-            user = User(name=name, email=email, designation=designation, jira_account_id=jira_account_id)
-            db.session.add(user)
-            existing_emails.add(email)
-
-        db.session.commit()
-
-        if skipped_rows:
-            # Create Excel with skipped rows
-            skipped_df = pd.DataFrame({'Issue': skipped_rows})
-            output = BytesIO()
-            filename = f"user_import_errors_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
-            with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                skipped_df.to_excel(writer, index=False, sheet_name='Skipped Users')
-            output.seek(0)
-            return send_file(output, download_name=filename, as_attachment=True)
-
-        return redirect('/users')
-
-    except Exception as e:
-        return str(e), 500
-
-
-
-@app.route('/export-timelog-links')
-def export_timelog_links():
-    users = User.query.all()
-    rows = []
-    for user in users:
-        rows.append({
-            'Name': user.name,
-            'Email': user.email,
-            'Designation': user.designation,
-            'Timelog Link': request.url_root.strip('/') + url_for('timelog_today', user_email=user.email)
-        })
-
-    df = pd.DataFrame(rows)
-    csv_path = 'static/timelog_links.csv'
-    df.to_csv(csv_path, index=False)
-    return send_file(csv_path, as_attachment=True, download_name='timelog_links.csv')
-
+    jira_account_id = fetch_jira_account_id(email)
+    user = User(name=name, email=email, designation=designation, jira_account_id=jira_account_id)
+    db.session.add(user)
+    db.session.commit()
+    return redirect('/users')
 
 @app.route('/users/edit/<int:user_id>', methods=['GET', 'POST'])
 def edit_user(user_id):
@@ -675,6 +611,11 @@ def timelog():
 
     work_functions = sorted(set([u.designation for u in users if u.designation]))
 
+    # Set current_date to local timezone (IST)
+    ist = pytz.timezone('Asia/Kolkata')
+    now = datetime.now(ist)
+    current_date = now.strftime('%Y-%m-%d')
+
     if request.method == 'POST':
         start = request.form.get('start')
         end = request.form.get('end')
@@ -708,6 +649,7 @@ def timelog():
                 return render_template("timelog.html", summary_data=[], detailed_data={}, start=start, end=end, work_functions=work_functions, selected_function=selected_function)
 
             issues = response.json().get("issues", [])
+
             user_map = {u.jira_account_id: u.name for u in filtered_users}
             user_order = [u.name for u in filtered_users]
             ordered_detailed_data = {name: [] for name in user_order}
@@ -771,8 +713,6 @@ def timelog():
                     "anchor": name.replace(' ', '_').replace('.', '').lower()
                 })
 
-    current_date = datetime.now().strftime('%Y-%m-%d')
-    
     return render_template(
         "timelog.html",
         summary_data=summary_data,
@@ -833,7 +773,35 @@ def timelog_today(user_email=None):
 
     response = requests.get(url, headers=headers, params=params, auth=auth)
     if not response.ok:
-        return render_template("timelog_today.html", summary_data=[], detailed_data={}, start=today_str, end=today_str, work_functions=work_functions, selected_function=selected_function, previous_date=None, next_date=None, is_today_view=True, disable_date_inputs=True, display_date_str=display_date_str, is_user_specific=is_user_specific, user_email=user_email)
+        if request.args.get('modal') == '1':
+            return render_template("timelog_today_modal.html",
+                                  summary_data=[],
+                                  detailed_data={},
+                                  start=today_str,
+                                  end=today_str,
+                                  work_functions=work_functions,
+                                  selected_function=selected_function,
+                                  previous_date=None,
+                                  next_date=None,
+                                  is_today_view=True,
+                                  disable_date_inputs=True,
+                                  display_date_str=display_date_str,
+                                  is_user_specific=is_user_specific,
+                                  user_email=user_email)
+        return render_template("timelog_today.html",
+                              summary_data=[],
+                              detailed_data={},
+                              start=today_str,
+                              end=today_str,
+                              work_functions=work_functions,
+                              selected_function=selected_function,
+                              previous_date=None,
+                              next_date=None,
+                              is_today_view=True,
+                              disable_date_inputs=True,
+                              display_date_str=display_date_str,
+                              is_user_specific=is_user_specific,
+                              user_email=user_email)
 
     issues = response.json().get("issues", [])
 
@@ -896,6 +864,21 @@ def timelog_today(user_email=None):
     previous_date = (current_date - timedelta(days=1)).strftime('%Y-%m-%d')
     next_date = (current_date + timedelta(days=1)).strftime('%Y-%m-%d') if current_date < date.today() else None
 
+    if request.args.get('modal') == '1':
+        return render_template("timelog_today_modal.html",
+                              summary_data=summary_data,
+                              detailed_data=ordered_detailed_data,
+                              start=today_str,
+                              end=today_str,
+                              work_functions=work_functions,
+                              selected_function=selected_function,
+                              previous_date=previous_date,
+                              next_date=next_date,
+                              is_today_view=True,
+                              disable_date_inputs=True,
+                              display_date_str=display_date_str,
+                              is_user_specific=is_user_specific,
+                              user_email=user_email)
     return render_template("timelog_today.html",
                            summary_data=summary_data,
                            detailed_data=ordered_detailed_data,
@@ -911,16 +894,25 @@ def timelog_today(user_email=None):
                            is_user_specific=is_user_specific,
                            user_email=user_email)
 
+@app.route('/generate-testcases-auth', methods=['POST'])
+def generate_testcases_auth():
+    email = request.form.get('email', '').strip().lower()
+    user = User.query.filter_by(email=email).first()
+    if user:
+        # Set a short-lived session key to allow access
+        session['testcase_user'] = user.email
+        return render_template('generate_testcases.html', user_exists=True)
+    else:
+        return render_template('generate_testcases.html', user_exists=False, email_checked=True)
 
-
-
-
-
-
-
-
-
-
+@app.route('/generate-testcases', methods=['GET', 'POST'])
+def generate_testcases():
+    if session.get('logged_in') or session.get('testcase_user'):
+        # Normal testcase generation logic here (reuse existing logic or import from blueprint)
+        # For now, just render the form
+        return render_template('generate_testcases.html', user_exists=True)
+    else:
+        return render_template('generate_testcases.html')
 
 @app.route('/update-jira-id', methods=['GET', 'POST'])
 def update_jira_id():
@@ -955,8 +947,28 @@ def HelperQA_AI():
     feedback_html = None
     image_url = None
     page_url = None
+    user = None
+    email_checked = None
 
-    if request.method == 'POST':
+    if not session.get('logged_in'):
+        if request.method == 'GET' and request.args.get('email'):
+            email = request.args.get('email', '').strip().lower()
+            user = User.query.filter_by(email=email).first()
+            email_checked = True
+        elif request.method == 'POST':
+            email = request.form.get('email', '').strip().lower()
+            user = User.query.filter_by(email=email).first()
+            email_checked = True
+            if not user:
+                return render_template("HelperQA-AI.html", image_url=None, page_url=None, feedback=None, user=None, email_checked=True)
+        else:
+            user = None
+            email_checked = False
+    else:
+        user = None
+        email_checked = False
+
+    if (session.get('logged_in') or user) and request.method == 'POST':
         input_type = request.form.get('input_type')
         ai_mode = request.form.get('ai_mode', 'review')  # default to review
         access_key = '8akGljPIc5sEfw'  # Replace with your ScreenshotOne key
@@ -1035,7 +1047,19 @@ def HelperQA_AI():
             except Exception as e:
                 feedback_html = f" Error during AI analysis: {str(e)}"
 
-    return render_template("HelperQA-AI.html", image_url=image_url, page_url=page_url, feedback=feedback_html)
+    return render_template("HelperQA-AI.html", image_url=image_url, page_url=page_url, feedback=feedback_html, user=user, email_checked=email_checked)
+
+
+@app.route('/mytimelogs', methods=['GET'])
+def mytimelogs():
+    # Remove login requirement: allow access regardless of login state
+    email = request.args.get('email')
+    user = None
+    email_checked = False
+    if email:
+        user = User.query.filter_by(email=email).first()
+        email_checked = True
+    return render_template('mytimelogs.html', user=user, email_checked=email_checked)
 
 
 if __name__ == '__main__':

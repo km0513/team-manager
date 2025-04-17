@@ -10,34 +10,37 @@
   <div class="flex justify-between items-center mb-3">
     <h3 class="text-xl font-bold">📅 Timelog for {{ display_date_str }}</h3>
     <div class="flex gap-2">
-      <a href="{{ url_for('timelog_today', user_email=user_email, date=previous_date) if is_user_specific else url_for('timelog_today', date=previous_date, work_function=selected_function) }}" class="px-3 py-1 bg-gray-200 hover:bg-gray-300 text-gray-800 text-xs font-semibold rounded shadow">← Previous</a>
+      <a href="{{ url_for('timelog_today', user_email=user_email, date=previous_date) if is_user_specific else url_for('timelog_today', date=previous_date, work_function=selected_function) }}" class="px-3 py-1 bg-[#FBE9E7] hover:bg-[#FFCCBC] text-[#B71C1C] text-xs font-bold rounded shadow">← Prev</a>
       {% if next_date %}
-      <a href="{{ url_for('timelog_today', user_email=user_email, date=next_date) if is_user_specific else url_for('timelog_today', date=next_date, work_function=selected_function) }}" class="px-3 py-1 bg-gray-200 hover:bg-gray-300 text-gray-800 text-xs font-semibold rounded shadow">Next →</a>
+      <a href="{{ url_for('timelog_today', user_email=user_email, date=next_date) if is_user_specific else url_for('timelog_today', date=next_date, work_function=selected_function) }}" class="px-3 py-1 bg-[#FBE9E7] hover:bg-[#FFCCBC] text-[#B71C1C] text-xs font-bold rounded shadow">Next →</a>
       {% endif %}
     </div>
   </div>
 
   {% if not is_user_specific %}
-  <div class="bg-white rounded-xl shadow p-6 mb-8">
-    <form method="POST" class="flex flex-wrap gap-4 items-end">
-      <div>
-        <label for="functionFilter" class="block text-xs font-medium text-gray-600 mb-1">Function:</label>
-        <select class="block w-40 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 text-sm" id="functionFilter" name="work_function" onchange="this.form.submit()">
-          <option value="All" {% if selected_function == 'All' %}selected{% endif %}>All</option>
-          {% for wf in work_functions %}
-            <option value="{{ wf }}" {% if selected_function == wf %}selected{% endif %}>{{ wf }}</option>
-          {% endfor %}
-        </select>
-      </div>
-      <div>
-        <label class="block text-xs font-medium text-gray-600 mb-1">Search User:</label>
-        <input type="text" id="userSearch" x-model="userFilter" class="block w-40 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 text-sm" placeholder="Type to filter users...">
-      </div>
-      <div class="flex items-center mt-2">
-        <input type="checkbox" id="onlyReds" x-model="onlyReds" class="mr-2">
-        <label for="onlyReds" class="text-xs font-bold text-upgradRed">Only Reds</label>
-      </div>
-    </form>
+  <div class="bg-white rounded-xl shadow p-6 mb-8 border border-upgradAccent">
+    <div class="flex flex-wrap gap-4 items-end mb-4">
+      <form method="POST" class="flex flex-wrap gap-4 items-end">
+        <div>
+          <label for="functionFilter" class="block text-xs font-bold text-upgradRed mb-1">Function</label>
+          <select class="block w-40 rounded-md border-upgradAccent shadow-sm focus:border-upgradRed focus:ring focus:ring-upgradYellow focus:ring-opacity-50 text-sm" id="functionFilter" name="work_function">
+            <option value="All" {% if selected_function == 'All' %}selected{% endif %}>All Functions</option>
+            {% for wf in work_functions %}
+              <option value="{{ wf }}" {% if selected_function == wf %}selected{% endif %}>{{ wf }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-upgradRed mb-1">Search User:</label>
+          <input type="text" id="userSearch" x-model="userFilter" class="block w-40 rounded-md border-upgradAccent shadow-sm focus:border-upgradRed focus:ring focus:ring-upgradYellow focus:ring-opacity-50 text-sm" placeholder="Type to filter users...">
+        </div>
+        <div class="flex items-center mt-2">
+          <input type="checkbox" id="onlyReds" x-model="onlyReds" class="mr-2">
+          <label for="onlyReds" class="text-xs font-bold text-upgradRed">Only Reds</label>
+        </div>
+      </form>
+      <a href="{{ url_for('timelog') }}" class="inline-flex items-center px-4 py-2 bg-upgradPurple hover:bg-upgradAccent text-white text-xs font-bold rounded shadow focus:outline-none transition ml-auto">Back to Timelog</a>
+    </div>
   </div>
   {% endif %}
 
@@ -45,12 +48,12 @@
   <div id="summary-table" class="bg-white rounded-xl shadow p-6 mb-4">
     <h2 class="mb-4 text-lg font-bold text-blue-800">Summary</h2>
     <div class="overflow-x-auto">
-      <table class="min-w-[500px] w-full bg-white rounded-lg border border-gray-200 text-xs text-center">
-        <thead class="bg-gray-100 text-gray-700">
+      <table class="min-w-[500px] w-full bg-white rounded-lg border border-upgradAccent text-xs text-center">
+        <thead class="bg-upgradPurple text-white">
           <tr>
-            <th class="py-2 px-3 font-semibold">User</th>
-            <th class="py-2 px-3 font-semibold">Logged</th>
-            <th class="py-2 px-3 font-semibold">Expected</th>
+            <th class="py-2 px-3 font-bold">User</th>
+            <th class="py-2 px-3 font-bold">Logged</th>
+            <th class="py-2 px-3 font-bold">Expected</th>
           </tr>
         </thead>
         <tbody>
@@ -58,9 +61,9 @@
           {% for row in summary_data %}
           {% set ns.total_logged = ns.total_logged + (row.numeric_hours | float) %}
           {% set ns.total_expected = ns.total_expected + 8 %}
-          <tr class="border-t border-upgradAccent" x-show="userVisible('{{ row.user|lower }}') && (!onlyReds || ((row.total_hours is string and false) or ((row.total_hours | float(0)) < (row.expected | float(0)))) )">
-            <td class="py-2 px-3 text-left font-bold">
-              <a href="#user-{{ loop.index }}" class="text-upgradPurple hover:underline font-bold {% if (row.total_hours is string and ('On Leave' in row.total_hours or 'Leave' in row.total_hours or 'Holiday' in row.total_hours)) %}text-gray-400{% elif (row.total_hours | float(0)) < (row.expected | float(0)) %}text-upgradRed{% endif %}" @click.prevent="expandAndScrollToUser('user-{{ loop.index }}', {{ loop.index }})">{{ row.user }}</a>
+          <tr class="border-t border-upgradAccent">
+            <td class="py-2 px-3 text-left font-bold text-upgradPurple">
+              <a href="#user-{{ loop.index }}" class="hover:underline font-bold {% if (row.total_hours is string and ('On Leave' in row.total_hours or 'Leave' in row.total_hours or 'Holiday' in row.total_hours)) %}text-gray-400{% elif (row.total_hours | float(0)) < (row.expected | float(0)) %}text-upgradRed{% endif %}" @click.prevent="expandAndScrollToUser('user-{{ loop.index }}', {{ loop.index }})">{{ row.user }}</a>
             </td>
             <td class="py-2 px-3 font-bold {% if (row.total_hours is string and ('On Leave' in row.total_hours or 'Leave' in row.total_hours or 'Holiday' in row.total_hours)) %}text-gray-400{% elif (row.total_hours | float(0)) < (row.expected | float(0)) %}text-upgradRed{% else %}text-upgradTeal{% endif %}">
               {% if row.total_hours is string and ('On Leave' in row.total_hours or 'Leave' in row.total_hours or 'Holiday' in row.total_hours) %}
@@ -69,10 +72,10 @@
                 {{ row.total_hours | round_half }}
               {% endif %}
             </td>
-            <td class="py-2 px-3">{{ row.expected | round_half }}</td>
+            <td class="py-2 px-3 text-black">{{ row.expected | round_half }}</td>
           </tr>
           {% endfor %}
-          <tr class="border-t border-gray-100 font-bold bg-gray-50">
+          <tr class="border-t border-upgradAccent font-bold bg-upgradLight">
             <td class="py-2 px-3 text-end">TOTAL</td>
             <td class="py-2 px-3">{{ ns.total_logged | round_half }}</td>
             <td class="py-2 px-3">{{ ns.total_expected }}</td>
@@ -89,14 +92,15 @@
 
   <div class="space-y-6 mt-6">
     {% for row in summary_data %}
-    <div :id="'user-{{ loop.index }}'" class="bg-white rounded-xl shadow p-6" x-data="userLogCard(false, {{ loop.index }})" x-ref="'userCard' + {{ loop.index }}" x-show="userVisible('{{ row.user|lower }}') && (!onlyReds || ((row.total_hours is string and false) or ((row.total_hours | float(0)) < (row.expected | float(0)))) )" @expand-all.window="open = true" @collapse-all.window="open = false" @expand-user-{{ loop.index }}.window="open = true">
+    <div :id="'user-{{ loop.index }}'" class="bg-white rounded-xl shadow p-6 border border-upgradAccent" x-data="userLogCard(false, {{ loop.index }})" x-ref="'userCard' + {{ loop.index }}" x-show="userVisible('{{ row.user|lower }}') && (!onlyReds || ((row.total_hours is string and false) or ((row.total_hours | float(0)) < (row.expected | float(0)))) )" @expand-all.window="open = true" @collapse-all.window="open = false" @expand-user-{{ loop.index }}.window="open = true">
       <div class="flex justify-end mb-2">
-        <button @click="backToTop()" class="text-xs text-blue-600 hover:text-blue-800 bg-blue-50 rounded px-2 py-1 border border-blue-200">Back to Top</button>
+        <button @click="backToTop()" class="text-xs text-upgradRed hover:text-upgradPurple bg-upgradPink rounded px-2 py-1 border border-upgradAccent">Back to Top</button>
       </div>
-      <button type="button" class="w-full flex justify-between items-center text-left text-upgradPurple hover:text-upgradRed font-bold text-xs focus:outline-none py-1 {% if (row.total_hours is string and ('On Leave' in row.total_hours or 'Leave' in row.total_hours or 'Holiday' in row.total_hours)) %}bg-gray-100{% elif (row.total_hours | float(0)) < (row.expected | float(0)) %}bg-upgradPink/40{% endif %}" @click="open = !open">
-        <span class="flex items-center gap-2 {% if (row.total_hours is string and ('On Leave' in row.total_hours or 'Leave' in row.total_hours or 'Holiday' in row.total_hours)) %}text-gray-400{% elif (row.total_hours | float(0)) < (row.expected | float(0)) %}text-upgradRed{% endif %}">
+      <button type="button" class="w-full flex justify-between items-center text-left text-upgradPurple hover:text-upgradRed font-bold text-xs focus:outline-none py-1" @click="open = !open">
+        <span class="flex items-center gap-2">
           {{ row.user }}
-          <span class="inline-block text-base font-extrabold text-upgradTeal ml-2">
+          {% set is_red = (row.total_hours is number and row.expected is number and row.total_hours < row.expected) %}
+          <span class="inline-block text-base font-extrabold {{ 'text-upgradRed' if is_red else 'text-upgradTeal' }} ml-2">
             {% if row.total_hours is string and ('On Leave' in row.total_hours or 'Leave' in row.total_hours or 'Holiday' in row.total_hours) %}
               {{ row.total_hours }}
             {% else %}
@@ -116,22 +120,28 @@
         <div class="mb-4">
           <h6 class="text-xs text-gray-500 font-semibold mb-2">{{ log_date }}</h6>
           <div class="overflow-x-auto">
-            <table class="min-w-[500px] w-full bg-white rounded-lg border border-gray-200 text-xs text-center mb-2">
-              <thead class="bg-gray-100 text-gray-700">
+            <table class="min-w-[500px] w-full bg-white rounded-lg border border-upgradAccent text-xs text-center mb-2">
+              <thead class="bg-upgradPurple text-white">
                 <tr>
-                  <th class="py-2 px-3 font-semibold">Issue</th>
-                  <th class="py-2 px-3 font-semibold">Parent Summary</th>
-                  <th class="py-2 px-3 font-semibold">Task Summary</th>
-                  <th class="py-2 px-3 font-semibold">Hours</th>
+                  <th class="py-2 px-3 font-bold">Issue</th>
+                  <th class="py-2 px-3 font-bold">Parent Summary</th>
+                  <th class="py-2 px-3 font-bold">Task Summary</th>
+                  <th class="py-2 px-3 font-bold">Hours</th>
                 </tr>
               </thead>
               <tbody>
                 {% for item in items %}
-                <tr class="border-t border-gray-100">
-                  <td><a href="#" class="text-blue-600 hover:underline" @click.prevent="openJiraModal('{{ item.link }}')">{{ item.issue_key }}</a></td>
+                <tr class="border-t border-upgradAccent">
+                  <td>
+                    {% if item.issue_key and item.link %}
+                      <a href="#" class="text-upgradPurple hover:underline font-bold" @click.prevent="openJiraModal('{{ item.link }}')">{{ item.issue_key }}</a>
+                    {% else %}
+                      {{ item.issue_key or item.issue or '' }}
+                    {% endif %}
+                  </td>
                   <td>{{ item.parent_summary }}</td>
-                  <td>{{ item.summary }}</td>
-                  <td>{{ item.hours | round_half }}</td>
+                  <td>{{ item.summary or item.task_summary }}</td>
+                  <td>{{ item.hours }}</td>
                 </tr>
                 {% endfor %}
               </tbody>

@@ -3,13 +3,18 @@
 <h2>Daily Capacity - {{ date.strftime('%d %b %Y') if date else '' }}</h2>
 
 <form method="GET" class="mb-3 d-flex gap-2 align-items-center">
-    <input type="date" name="date" class="form-control" value="{{ date.strftime('%Y-%m-%d') if date else '' }}">
-    <select name="function" class="form-select" style="width:200px;">
-        <option value="All" {% if selected_function == 'All' %}selected{% endif %}>All Functions</option>
-        {% for func in functions %}
-            <option value="{{ func }}" {% if func == selected_function %}selected{% endif %}>{{ func }}</option>
-        {% endfor %}
-    </select>
+    <input type="date" name="date" class="block w-40 rounded-lg border border-upgradAccent bg-white px-3 py-2 text-sm shadow-sm focus:border-upgradRed focus:ring-2 focus:ring-upgradYellow focus:outline-none transition-all duration-150" value="{{ date.strftime('%Y-%m-%d') if date else '' }}">
+    <div class="relative" style="width:200px;">
+        <select name="function" class="block w-full rounded-lg border border-upgradAccent bg-white px-3 py-2 text-sm shadow-sm focus:border-upgradRed focus:ring-2 focus:ring-upgradYellow focus:outline-none transition-all duration-150 appearance-none pr-8">
+            <option value="All" {% if selected_function == 'All' %}selected{% endif %}>All Functions</option>
+            {% for func in functions %}
+                <option value="{{ func }}" {% if func == selected_function %}selected{% endif %}>{{ func }}</option>
+            {% endfor %}
+        </select>
+        <span class="pointer-events-none absolute right-3 top-1/2 transform -translate-y-1/2 text-upgradAccent">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+        </span>
+    </div>
     <button type="submit" class="btn btn-primary">Show</button>
 </form>
 

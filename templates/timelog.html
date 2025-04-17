@@ -61,13 +61,15 @@
           {% for row in summary_data %}
           {% set ns.total_logged = ns.total_logged + row.total_hours %}
           {% set ns.total_expected = ns.total_expected + row.expected %}
-          <tr class="border-t border-upgradAccent" x-show="userVisible('{{ row.user|lower }}') && (!onlyReds || (row.total_hours < row.expected))">
+          {% if not onlyReds or (row.total_hours < row.expected) %}
+          <tr class="border-t border-upgradAccent" x-show="userVisible('{{ row.user|lower }}')">
             <td class="py-2 px-3 text-left font-bold">
               <a href="#user-{{ loop.index }}" class="text-upgradPurple hover:underline font-bold {% if row.total_hours < row.expected %}text-upgradRed{% endif %}" @click.prevent="expandAndScrollToUser('user-{{ loop.index }}', {{ loop.index }})">{{ row.user }}</a>
             </td>
             <td class="py-2 px-3 font-bold {% if row.total_hours < row.expected %}text-upgradRed{% else %}text-upgradTeal{% endif %}">{{ row.total_hours | round_half }}</td>
             <td class="py-2 px-3">{{ row.expected | round_half }}</td>
           </tr>
+          {% endif %}
           {% endfor %}
           <tr class="border-t border-upgradAccent font-bold bg-upgradLight">
             <td class="py-2 px-3 text-end">TOTAL</td>

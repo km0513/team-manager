@@ -1,9 +1,9 @@
 {% extends 'base.html' %}
 {% block content %}
 <div class="max-w-4xl mx-auto px-4 py-6">
-  <h3 class="mb-6 text-2xl font-bold text-blue-700">HelperQA-AI</h3>
-  <div class="mb-6 p-4 rounded-lg bg-blue-50 border border-blue-200 text-blue-900 text-sm">
-    <strong class="block mb-2 text-blue-800">HelperQA-AI Guide:</strong>
+  <h3 class="mb-6 text-2xl font-bold text-upgradRed">HelperQA-AI</h3>
+  <div class="mb-6 p-4 rounded-lg bg-upgradYellow border border-upgradAccent text-upgradRed text-sm">
+    <strong class="block mb-2 text-upgradRed">HelperQA-AI Guide:</strong>
     <ul class="mb-2 list-disc list-inside">
       <li><strong>📷 Upload Screenshot</strong>: Performs UI analysis like layout issues or suggestions.</li>
       <li><strong>🌐 Web Page URL</strong>: Captures and analyzes live web page layout.</li>
@@ -14,8 +14,8 @@
 
   <form method="POST" enctype="multipart/form-data" id="feedbackForm" class="space-y-4">
     <div>
-      <label for="inputType" class="block text-xs font-medium text-gray-600 mb-1">Choose Input Type</label>
-      <select class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 text-sm" id="inputType" name="input_type" required>
+      <label for="inputType" class="block text-xs font-medium text-upgradRed mb-1">Choose Input Type</label>
+      <select class="block w-full rounded-md border-upgradAccent shadow-sm focus:border-upgradRed focus:ring focus:ring-upgradYellow focus:ring-opacity-50 text-sm" id="inputType" name="input_type" required>
         <option value="">-- Select --</option>
         <option value="upload">📷 Upload Screenshot</option>
         <option value="url">🌐 Enter Web Page URL</option>
@@ -25,30 +25,30 @@
 
     <!-- Screenshot Upload -->
     <div class="hidden" id="uploadGroup">
-      <label class="block text-xs font-medium text-gray-600 mb-1">Upload Image</label>
-      <input type="file" name="screenshot" class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 text-sm" accept="image/*">
+      <label class="block text-xs font-medium text-upgradRed mb-1">Upload Image</label>
+      <input type="file" name="screenshot" class="block w-full rounded-md border-upgradAccent shadow-sm focus:border-upgradRed focus:ring focus:ring-upgradYellow focus:ring-opacity-50 text-sm" accept="image/*">
     </div>
 
     <!-- URL Input -->
     <div class="hidden" id="urlGroup">
-      <label class="block text-xs font-medium text-gray-600 mb-1">Enter Page URL</label>
-      <input type="url" name="page_url" class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 text-sm" placeholder="https://example.com">
+      <label class="block text-xs font-medium text-upgradRed mb-1">Enter Page URL</label>
+      <input type="url" name="page_url" class="block w-full rounded-md border-upgradAccent shadow-sm focus:border-upgradRed focus:ring focus:ring-upgradYellow focus:ring-opacity-50 text-sm" placeholder="https://example.com">
     </div>
 
     <!-- Test Case Generator Section -->
     <div id="testcaseGroup" class="hidden mt-2">
-      <label class="block text-xs font-medium text-gray-600 mb-1">Enter Jira ID or Paste Story Description</label>
-      <input type="text" name="jira_id" class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 text-sm mb-2" placeholder="Optional: JIRA-1234">
-      <textarea name="story_text" class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 text-sm mb-2" rows="4" placeholder="Or paste the story/epic/bug here..."></textarea>
-      <label class="block text-xs font-medium text-gray-600 mb-1">Or Upload a Document</label>
-      <input type="file" name="story_doc" class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 text-sm" accept=".txt,.pdf,.doc,.docx">
+      <label class="block text-xs font-medium text-upgradRed mb-1">Enter Jira ID or Paste Story Description</label>
+      <input type="text" name="jira_id" class="block w-full rounded-md border-upgradAccent shadow-sm focus:border-upgradRed focus:ring focus:ring-upgradYellow focus:ring-opacity-50 text-sm mb-2" placeholder="Optional: JIRA-1234">
+      <textarea name="story_text" class="block w-full rounded-md border-upgradAccent shadow-sm focus:border-upgradRed focus:ring focus:ring-upgradYellow focus:ring-opacity-50 text-sm mb-2" rows="4" placeholder="Or paste the story/epic/bug here..."></textarea>
+      <label class="block text-xs font-medium text-upgradRed mb-1">Or Upload a Document</label>
+      <input type="file" name="story_doc" class="block w-full rounded-md border-upgradAccent shadow-sm focus:border-upgradRed focus:ring focus:ring-upgradYellow focus:ring-opacity-50 text-sm" accept=".txt,.pdf,.doc,.docx">
     </div>
 
     <!-- Button Groups -->
     <div class="flex gap-2 mt-3 hidden" id="btnGroup">
       <input type="hidden" name="ai_mode" id="aiMode" value="review">
-      <button type="submit" id="analyzeBtn" class="px-4 py-2 bg-blue-600 hover:bg-blue-800 text-white text-xs font-semibold rounded shadow">🔍 Analyze UI</button>
-      <button type="submit" id="testcaseBtn" class="px-4 py-2 bg-cyan-100 hover:bg-cyan-200 text-cyan-900 border border-cyan-400 text-xs font-semibold rounded shadow">🧪 Generate Test Cases</button>
+      <button type="submit" id="analyzeBtn" class="px-4 py-2 bg-upgradRed hover:bg-upgradAccent text-white text-xs font-semibold rounded shadow">🔍 Analyze UI</button>
+      <button type="submit" id="testcaseBtn" class="px-4 py-2 bg-upgradYellow hover:bg-upgradAccent text-upgradRed border border-upgradAccent text-xs font-semibold rounded shadow">🧪 Generate Test Cases</button>
     </div>
   </form>
 
@@ -56,14 +56,14 @@
   <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
     <div>
       {% if page_url %}
-      <h5 class="text-base font-semibold mb-1">Analyzed URL</h5>
-      <code class="block mb-2 text-xs text-gray-600 bg-gray-100 rounded px-2 py-1">{{ page_url }}</code>
+      <h5 class="text-base font-semibold mb-1 text-upgradRed">Analyzed URL</h5>
+      <code class="block mb-2 text-xs text-upgradRed bg-upgradYellow rounded px-2 py-1">{{ page_url }}</code>
       {% endif %}
-      <img src="{{ image_url }}" class="w-full rounded-lg shadow border border-gray-200" alt="Screenshot">
+      <img src="{{ image_url }}" class="w-full rounded-lg shadow border border-upgradAccent" alt="Screenshot">
     </div>
     <div>
-      <h5 class="text-base font-semibold mb-1">Analysis / Testcases</h5>
-      <div class="p-4 bg-gray-50 border border-gray-200 rounded-lg min-h-[200px] prose prose-sm max-w-none">
+      <h5 class="text-base font-semibold mb-1 text-upgradRed">Analysis / Testcases</h5>
+      <div class="p-4 bg-upgradYellow border border-upgradAccent rounded-lg min-h-[200px] prose prose-sm max-w-none">
         {{ feedback | safe if feedback else "No analysis found." }}
       </div>
     </div>

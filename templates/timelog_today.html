@@ -33,6 +33,10 @@
         <label class="block text-xs font-medium text-gray-600 mb-1">Search User:</label>
         <input type="text" id="userSearch" x-model="userFilter" class="block w-40 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 text-sm" placeholder="Type to filter users...">
       </div>
+      <div class="flex items-center mt-2">
+        <input type="checkbox" id="onlyReds" x-model="onlyReds" class="mr-2">
+        <label for="onlyReds" class="text-xs font-bold text-upgradRed">Only Reds</label>
+      </div>
     </form>
   </div>
   {% endif %}
@@ -54,12 +58,18 @@
           {% for row in summary_data %}
           {% set ns.total_logged = ns.total_logged + (row.numeric_hours | float) %}
           {% set ns.total_expected = ns.total_expected + 8 %}
-          <tr class="border-t border-gray-100 summary-row" x-show="userVisible('{{ row.user|lower }}')">
-            <td class="py-2 px-3 text-left font-medium">
-              <a href="#user-{{ loop.index }}" class="text-blue-700 hover:underline" @click.prevent="expandAndScrollToUser('user-{{ loop.index }}', {{ loop.index }})">{{ row.user }}</a>
+          <tr class="border-t border-upgradAccent" x-show="userVisible('{{ row.user|lower }}') && (!onlyReds || ((row.total_hours is string and false) or ((row.total_hours | float(0)) < (row.expected | float(0)))) )">
+            <td class="py-2 px-3 text-left font-bold">
+              <a href="#user-{{ loop.index }}" class="text-upgradPurple hover:underline font-bold {% if (row.total_hours is string and ('On Leave' in row.total_hours or 'Leave' in row.total_hours or 'Holiday' in row.total_hours)) %}text-gray-400{% elif (row.total_hours | float(0)) < (row.expected | float(0)) %}text-upgradRed{% endif %}" @click.prevent="expandAndScrollToUser('user-{{ loop.index }}', {{ loop.index }})">{{ row.user }}</a>
             </td>
-            <td class="py-2 px-3 font-semibold" :class="{'text-green-600': '{{ row.status }}' === 'good', 'text-gray-500': '{{ row.status }}' === 'onleave', 'text-red-600': '{{ row.status }}' === 'bad'}">{{ row.total_hours }}</td>
-            <td class="py-2 px-3">8</td>
+            <td class="py-2 px-3 font-bold {% if (row.total_hours is string and ('On Leave' in row.total_hours or 'Leave' in row.total_hours or 'Holiday' in row.total_hours)) %}text-gray-400{% elif (row.total_hours | float(0)) < (row.expected | float(0)) %}text-upgradRed{% else %}text-upgradTeal{% endif %}">
+              {% if row.total_hours is string and ('On Leave' in row.total_hours or 'Leave' in row.total_hours or 'Holiday' in row.total_hours) %}
+                {{ row.total_hours }}
+              {% else %}
+                {{ row.total_hours | round_half }}
+              {% endif %}
+            </td>
+            <td class="py-2 px-3">{{ row.expected | round_half }}</td>
           </tr>
           {% endfor %}
           <tr class="border-t border-gray-100 font-bold bg-gray-50">
@@ -72,20 +82,29 @@
     </div>
   </div>
 
-  <div class="mt-4 flex gap-2 justify-end">
-    <button @click="expandAll()" class="px-4 py-2 bg-blue-500 hover:bg-blue-700 text-white text-xs font-semibold rounded shadow">Expand All</button>
-    <button @click="collapseAll()" class="px-4 py-2 bg-gray-300 hover:bg-gray-400 text-gray-800 text-xs font-semibold rounded shadow">Collapse All</button>
+  <div class="flex flex-wrap gap-2 justify-end mb-2">
+    <button @click="expandAll()" class="px-3 py-1 bg-upgradYellow hover:bg-upgradAccent text-upgradRed text-xs font-bold rounded shadow border border-upgradAccent transition">Expand All</button>
+    <button @click="collapseAll()" class="px-3 py-1 bg-upgradAccent hover:bg-upgradRed text-white text-xs font-bold rounded shadow border border-upgradAccent transition">Collapse All</button>
   </div>
 
   <div class="space-y-6 mt-6">
     {% for row in summary_data %}
-    <div :id="'user-{{ loop.index }}'" class="bg-white rounded-xl shadow p-6" x-data="userLogCard(false, {{ loop.index }})" x-ref="'userCard' + {{ loop.index }}" x-show="userVisible('{{ row.user|lower }}')" @expand-all.window="open = true" @collapse-all.window="open = false" @expand-user-{{ loop.index }}.window="open = true">
+    <div :id="'user-{{ loop.index }}'" class="bg-white rounded-xl shadow p-6" x-data="userLogCard(false, {{ loop.index }})" x-ref="'userCard' + {{ loop.index }}" x-show="userVisible('{{ row.user|lower }}') && (!onlyReds || ((row.total_hours is string and false) or ((row.total_hours | float(0)) < (row.expected | float(0)))) )" @expand-all.window="open = true" @collapse-all.window="open = false" @expand-user-{{ loop.index }}.window="open = true">
       <div class="flex justify-end mb-2">
         <button @click="backToTop()" class="text-xs text-blue-600 hover:text-blue-800 bg-blue-50 rounded px-2 py-1 border border-blue-200">Back to Top</button>
       </div>
-      <button type="button" class="w-full flex justify-between items-center text-left text-blue-700 hover:text-blue-900 font-semibold text-base focus:outline-none" @click="open = !open">
-        <span>{{ row.user }} <span class="text-xs font-normal text-gray-500">({{ row.total_hours }} hrs)</span></span>
-        <svg :class="{'rotate-180': open}" class="w-5 h-5 ml-2 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+      <button type="button" class="w-full flex justify-between items-center text-left text-upgradPurple hover:text-upgradRed font-bold text-xs focus:outline-none py-1 {% if (row.total_hours is string and ('On Leave' in row.total_hours or 'Leave' in row.total_hours or 'Holiday' in row.total_hours)) %}bg-gray-100{% elif (row.total_hours | float(0)) < (row.expected | float(0)) %}bg-upgradPink/40{% endif %}" @click="open = !open">
+        <span class="flex items-center gap-2 {% if (row.total_hours is string and ('On Leave' in row.total_hours or 'Leave' in row.total_hours or 'Holiday' in row.total_hours)) %}text-gray-400{% elif (row.total_hours | float(0)) < (row.expected | float(0)) %}text-upgradRed{% endif %}">
+          {{ row.user }}
+          <span class="inline-block text-base font-extrabold text-upgradTeal ml-2">
+            {% if row.total_hours is string and ('On Leave' in row.total_hours or 'Leave' in row.total_hours or 'Holiday' in row.total_hours) %}
+              {{ row.total_hours }}
+            {% else %}
+              {{ row.total_hours | round_half }} hrs
+            {% endif %}
+          </span>
+        </span>
+        <svg :class="{'rotate-180': open}" class="w-3 h-3 ml-2 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
       </button>
       <div x-show="open" x-transition x-cloak class="mt-4 border-t pt-4">
         {% set logs_by_date = {} %}
@@ -159,6 +178,7 @@ function userLogCard(expanded, idx) {
 function timelogPage() {
   return {
     userFilter: '',
+    onlyReds: false,
     showModal: false,
     modalUrl: '',
     expandAll() {

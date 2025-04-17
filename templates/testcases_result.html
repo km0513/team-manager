@@ -6,23 +6,23 @@
   [x-cloak] { display: none !important; }
 </style>
 <div class="max-w-5xl mx-auto px-4 py-8">
-  <div class="bg-white rounded-xl shadow border border-gray-200 p-6">
-    <h3 class="mb-6 text-2xl font-bold text-blue-700 flex items-center gap-2">
+  <div class="bg-white rounded-xl shadow border border-upgradAccent p-6">
+    <h3 class="mb-6 text-2xl font-bold text-upgradRed flex items-center gap-2">
       🧪 Generated Test Cases
       {% if jira_id %}
-        <span class="ml-2 text-base text-gray-600 font-normal">for <span class="font-semibold">{{ jira_id }}</span></span>
+        <span class="ml-2 text-base text-upgradAccent font-normal">for <span class="font-semibold">{{ jira_id }}</span></span>
       {% else %}
-        <span class="ml-2 text-base text-gray-600 font-normal">from Uploaded Requirement</span>
+        <span class="ml-2 text-base text-upgradAccent font-normal">from Uploaded Requirement</span>
       {% endif %}
     </h3>
 
     <!-- Alpine.js collapsible for original requirement -->
     <div x-data="{ open: false }" class="mb-6">
-      <button @click="open = !open" class="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded shadow text-sm font-semibold focus:outline-none">
+      <button @click="open = !open" class="flex items-center gap-2 px-4 py-2 bg-upgradYellow hover:bg-upgradAccent text-upgradRed rounded shadow text-sm font-semibold focus:outline-none">
         <svg :class="{'rotate-90': open}" class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>
         <span>View Original Requirement</span>
       </button>
-      <div x-show="open" x-transition x-cloak class="mt-3 bg-gray-50 border border-gray-200 rounded p-4">
+      <div x-show="open" x-transition x-cloak class="mt-3 bg-upgradLight border border-upgradAccent rounded p-4">
         {% if jira_id %}
           <iframe 
             src="{{ jira_base_url }}/browse/{{ jira_id }}" 
@@ -33,16 +33,16 @@
             style="background: #fff;">
           </iframe>
         {% else %}
-          <pre class="text-xs text-gray-700 whitespace-pre-wrap">{{ original_requirement }}</pre>
+          <pre class="text-xs text-upgradAccent whitespace-pre-wrap">{{ original_requirement }}</pre>
         {% endif %}
       </div>
     </div>
 
-    <p class="mb-4 text-green-700 font-medium">Here are some structured functional test cases based on the input provided:</p>
+    <p class="mb-4 text-upgradTeal font-medium">Here are some structured functional test cases based on the input provided:</p>
 
-    <div class="overflow-x-auto rounded-lg border border-gray-100 bg-gray-50">
+    <div class="overflow-x-auto rounded-lg border border-upgradAccent bg-upgradLight">
       <table class="min-w-[700px] w-full text-xs text-left" id="testcases-table">
-        <thead class="bg-green-100 text-green-900">
+        <thead class="bg-upgradYellow text-upgradRed">
           <tr>
             <th class="py-2 px-3 font-semibold w-1/5">Test Case</th>
             <th class="py-2 px-3 font-semibold w-1/5">Preconditions</th>
@@ -58,9 +58,9 @@
     </div>
 
     <div class="flex flex-col md:flex-row md:justify-between gap-2 mt-6">
-      <a href="/HelperQA-AI" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-semibold rounded shadow text-center">⬅ Back to HelperQA-AI</a>
+      <a href="/HelperQA-AI" class="px-4 py-2 bg-upgradYellow hover:bg-upgradAccent text-upgradRed text-xs font-semibold rounded shadow text-center">⬅ Back to HelperQA-AI</a>
       <div class="flex flex-row gap-2">
-        <button class="px-4 py-2 bg-green-600 hover:bg-green-800 text-white text-xs font-semibold rounded shadow text-center" onclick="downloadTestCasesCSV()">⬇ Download as CSV</button>
+        <button class="px-4 py-2 bg-upgradRed hover:bg-upgradAccent text-white text-xs font-semibold rounded shadow text-center" onclick="downloadTestCasesCSV()">⬇ Download as CSV</button>
       </div>
     </div>
   </div>

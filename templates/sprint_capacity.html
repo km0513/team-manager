@@ -12,6 +12,13 @@
   .text-upgradAccent { color: #FFC107; }
   .border-upgradAccent { border-color: #FFC107; }
   [x-cloak] { display: none !important; }
+  .bg-upgradPink { background-color: #FFC0CB; }
+  .animate-pulse { animation: pulse 2s infinite; }
+  @keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.5; }
+    100% { opacity: 1; }
+  }
 </style>
 <h2 class="mb-6 text-xl font-bold text-upgradYellow flex items-center gap-2">
   <svg xmlns="http://www.w3.org/2000/svg" class="inline w-6 h-6 text-upgradYellow" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 17v2a2 2 0 002 2h14a2 2 0 002-2v-2M16 11V7a4 4 0 10-8 0v4M5 17h14" /></svg>
@@ -52,7 +59,9 @@
     <tbody>
       {% for entry in my_sprint_data %}
       <tr>
-        <td class="py-2 px-3 text-left">{{ entry.user_name }}</td>
+        <td class="py-2 px-3 text-left font-bold">
+          <span class="text-upgradPurple">{{ entry.user_name }}</span>
+        </td>
         <td class="py-2 px-3">{{ entry.total_days }}</td>
         <td class="py-2 px-3">{{ entry.leaves }}</td>
         <td class="py-2 px-3">{{ entry.capacity_hours }}</td>

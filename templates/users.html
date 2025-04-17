@@ -92,12 +92,14 @@
           <td class="py-2 px-3">{{ user.designation }}</td>
           <td class="py-2 px-3">
             <div class="flex flex-wrap gap-2">
+              {# 
               <a href="/users/edit/{{ user.id }}" class="bg-upgradYellow hover:bg-upgradAccent text-upgradRed px-2 py-1 rounded text-xs flex items-center font-bold transition" title="Edit User">
                 <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536M9 13h3l8-8a2 2 0 00-2.828-2.828l-8 8v3z" /></svg>Edit
               </a>
               <a href="/users/delete/{{ user.id }}" class="bg-upgradRed hover:bg-upgradPurple text-white px-2 py-1 rounded text-xs flex items-center font-bold transition" onclick="return confirm('Are you sure you want to delete {{ user.name }}?')" title="Delete User">
                 <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>Delete
               </a>
+              #}
               <a href="{{ url_for('timelog_today', user_email=user.email) }}" target="_blank" class="bg-upgradTeal hover:bg-upgradPurple text-white px-2 py-1 rounded text-xs flex items-center font-bold transition" title="View Today's Timelog">
                 <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6 1a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>Timelog
               </a>

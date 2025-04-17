@@ -92,9 +92,18 @@
         <tr>
           <th class="sticky left-0 bg-[#B71C1C] z-10 py-2 px-3 font-extrabold text-left">User</th>
           {% for day in dates %}
-            <th class="py-2 px-2 font-bold {% if day.weekday() >= 5 %}bg-[#FFEBEE] text-[#B71C1C]{% endif %}" {% if day.date() == current_date.date() %}id="today-col" style="background-color:#FFEBEE;color:#111;font-weight:bold;"{% endif %}>
-              <div>{{ day.day }}</div>
-              <div class="text-[10px]" {% if day.date() == current_date.date() %}style="color:#111;"{% endif %}>{{ day.strftime('%a') }}</div>
+            <th class="py-2 px-2 font-bold {% if day.weekday() >= 5 %}bg-[#FFEBEE] text-[#B71C1C]{% endif %} {% if day.date() == current_date.date() %}today-header{% endif %}" {% if day.date() == current_date.date() %}id="today-col" style="background-color:#FFEBEE;color:#111;font-weight:bold;position:relative;"{% endif %}>
+              {% if day.date() == current_date.date() %}
+                <div class="flex flex-col items-center">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-[#B71C1C] mb-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                  <span class="text-[10px] text-[#B71C1C] font-semibold">Today</span>
+                  <span>{{ day.day }}</span>
+                  <span class="text-[10px]" style="color:#111;">{{ day.strftime('%a') }}</span>
+                </div>
+              {% else %}
+                <div>{{ day.day }}</div>
+                <div class="text-[10px]" {% if day.date() == current_date.date() %}style="color:#111;"{% endif %}>{{ day.strftime('%a') }}</div>
+              {% endif %}
             </th>
           {% endfor %}
         </tr>
@@ -166,10 +175,16 @@
 </div>
 
 <div class="sticky bottom-0 bg-[#FFF6EB] py-4 border-t border-[#FFAB91] z-20 w-full flex justify-center">
-  <button id="sticky-save-btn" type="button" class="px-8 py-3 bg-[#B71C1C] hover:bg-[#FFAB00] text-white text-base font-bold rounded-lg shadow-lg transition-all duration-150 focus:outline-none focus:ring-4 focus:ring-[#FFD600]">Save Changes</button>
+  <button id="sticky-save-btn" type="submit" class="px-8 py-3 bg-[#B71C1C] hover:bg-[#FFAB00] text-white text-base font-bold rounded-lg shadow-lg transition-all duration-150 focus:outline-none focus:ring-4 focus:ring-[#FFD600]" style="display:none;">Save Changes</button>
 </div>
 
 <script>
+// Hide loader overlay as soon as possible
+(function() {
+  const loader = document.getElementById('loader-overlay');
+  if (loader) loader.style.display = 'none';
+})();
+
 document.getElementById('userFilter').addEventListener('change', function () {
   const selectedId = this.value;
   document.querySelectorAll('.user-row').forEach(row => {
@@ -197,11 +212,24 @@ document.getElementById('userFilter').addEventListener('change', function () {
 })();
 
 const saveBtn = document.getElementById('sticky-save-btn');
-if (saveBtn) {
+const leaveForm = document.querySelector('.leave-calendar-form');
+if (leaveForm && saveBtn) {
+  let isDirty = false;
+  leaveForm.addEventListener('change', function() {
+    isDirty = true;
+    saveBtn.style.display = 'block';
+  });
   saveBtn.addEventListener('click', function() {
-    document.querySelector('.leave-calendar-form').submit();
+    isDirty = false;
+    saveBtn.style.display = 'none';
+    leaveForm.submit();
+  });
+  window.addEventListener('beforeunload', function() {
+    isDirty = false;
+    saveBtn.style.display = 'none';
   });
 }
+
 const radios = document.querySelectorAll('.leave-calendar-form input[type=radio]');
 radios.forEach(radio => {
   radio.addEventListener('change', function() {
@@ -211,13 +239,6 @@ radios.forEach(radio => {
     });
     this.parentElement.querySelector('.tick').style.display = 'inline';
   });
-});
-window.addEventListener('load', function() {
-  const loader = document.getElementById('loader-overlay');
-  if (loader) {
-    loader.style.opacity = '0';
-    setTimeout(() => loader.style.display = 'none', 300);
-  }
 });
 
 (function() {

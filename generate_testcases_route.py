@@ -7,6 +7,7 @@ from openai import OpenAI
 from requests.auth import HTTPBasicAuth
 import os
 import traceback
+from docx import Document
 
 load_dotenv()
 
@@ -90,8 +91,19 @@ def generate_testcases():
         if not extracted_text.strip():
             return render_template("generate_testcases.html", error="❌ Please provide a Jira ID, story text, or upload a document.")
 
+        use_lxp_context = request.form.get('use_lxp_context') == 'yes'
+        lxp_context = ''
+        if use_lxp_context:
+            try:
+                doc = Document('lxp-context.docx')
+                lxp_context = '\n'.join([para.text for para in doc.paragraphs if para.text.strip()])
+            except Exception as e:
+                print('❌ Error reading LXP context:', e)
+                lxp_context = ''
+
         prompt_text = (
             f"You are a QA expert. Based on this user story or feature description:\n\n"
+            f"{lxp_context + '\n\n' if lxp_context else ''}"
             f"{extracted_text}\n\n"
             "Generate structured functional test cases in the following format:\n\n"
             "### 1: Test Title\n"

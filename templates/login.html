@@ -7,6 +7,15 @@
 </style>
 
 <div class="flex justify-center items-center min-h-[60vh]">
+  <!-- Info box on the left -->
+  <div class="hidden md:flex flex-col items-center mr-8">
+    <div class="bg-upgradYellow border border-upgradAccent text-upgradRed rounded-lg px-6 py-4 max-w-xs text-center shadow">
+      <div class="font-bold mb-2">Not an admin? No problem!</div>
+      <div class="mb-1">You can use <a href="{{ url_for('mytimelogs') }}" class="text-upgradRed underline font-semibold">My Timelogs</a> to view your logs without logging in.</div>
+      <div>You can also try our <a href="{{ url_for('HelperQA_AI') }}" class="text-upgradRed underline font-semibold">AI-Utility-Helper</a> for UI analysis and test case generation.</div>
+    </div>
+  </div>
+  <!-- Login form -->
   <form method="POST" class="w-full max-w-xs bg-white border border-upgradAccent rounded-xl shadow p-6 space-y-4">
     <h2 class="text-xl font-bold text-upgradRed mb-4 text-center">Admin Login</h2>
     <div class="mb-3">

@@ -264,8 +264,32 @@ def dashboard():
         function_capacity=function_capacity
     )
 
+@app.route('/dashboard')
+def dashboard_admin():
+    users = User.query.all()
+    today = datetime.now().date()
+    total_users = len(users)
+    users_on_leave = []
+    function_capacity = {}
+    standard_hours = 8
+    for user in User.query.all():
+        # Check if user is on leave today
+        leave = Leave.query.filter_by(user_id=user.id, start_date=today).first()
+        available_hours = 0 if leave else standard_hours
+        func = user.designation or 'Unknown'
+        function_capacity.setdefault(func, 0)
+        function_capacity[func] += available_hours
 
+    # Sort by function name for display
+    function_capacity = dict(sorted(function_capacity.items()))
 
+    return render_template(
+        'dashboard.html',
+        users_on_leave=users_on_leave,
+        today=today,
+        total_users=total_users,
+        function_capacity=function_capacity
+    )
 
 @app.route('/users', methods=['GET'])
 def users():

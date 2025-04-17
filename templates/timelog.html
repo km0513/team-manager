@@ -61,15 +61,13 @@
           {% for row in summary_data %}
           {% set ns.total_logged = ns.total_logged + row.total_hours %}
           {% set ns.total_expected = ns.total_expected + row.expected %}
-          {% if not onlyReds or (row.total_hours < row.expected) %}
-          <tr class="border-t border-upgradAccent" x-show="userVisible('{{ row.user|lower }}')">
+          <tr class="border-t border-upgradAccent" x-show="userVisible('{{ row.user|lower }}') && (!onlyReds || ({{ row.total_hours }} < {{ row.expected }}))">
             <td class="py-2 px-3 text-left font-bold">
               <a href="#user-{{ loop.index }}" class="text-upgradPurple hover:underline font-bold {% if row.total_hours < row.expected %}text-upgradRed{% endif %}" @click.prevent="expandAndScrollToUser('user-{{ loop.index }}', {{ loop.index }})">{{ row.user }}</a>
             </td>
             <td class="py-2 px-3 font-bold {% if row.total_hours < row.expected %}text-upgradRed{% else %}text-upgradTeal{% endif %}">{{ row.total_hours | round_half }}</td>
             <td class="py-2 px-3">{{ row.expected | round_half }}</td>
           </tr>
-          {% endif %}
           {% endfor %}
           <tr class="border-t border-upgradAccent font-bold bg-upgradLight">
             <td class="py-2 px-3 text-end">TOTAL</td>
@@ -94,8 +92,7 @@
   {% if summary_data %}
   <div class="space-y-2">
     {% for row in summary_data %}
-    {% if not onlyReds or (row.total_hours < row.expected) %}
-    <div :id="'user-{{ loop.index }}'" class="bg-white rounded shadow-sm p-2 border border-upgradAccent" x-data="userLogCard(false, {{ loop.index }})" x-ref="'userCard' + {{ loop.index }}" x-show="userVisible('{{ row.user|lower }}')" @expand-all.window="open = true" @collapse-all.window="open = false" @expand-user-{{ loop.index }}.window="open = true">
+    <div :id="'user-{{ loop.index }}'" class="bg-white rounded shadow-sm p-2 border border-upgradAccent" x-data="userLogCard(false, {{ loop.index }})" x-ref="'userCard' + {{ loop.index }}" x-show="userVisible('{{ row.user|lower }}') && (!onlyReds || ({{ row.total_hours }} < {{ row.expected }}))" @expand-all.window="open = true" @collapse-all.window="open = false" @expand-user-{{ loop.index }}.window="open = true">
       <div class="flex justify-end mb-0.5">
         <button @click="backToTop()" class="text-xs text-upgradRed hover:text-upgradPurple bg-upgradPink rounded px-1.5 py-0.5 border border-upgradAccent">Back to Top</button>
       </div>
@@ -141,7 +138,6 @@
         {% endfor %}
       </div>
     </div>
-    {% endif %}
     {% endfor %}
   </div>
   {% endif %}

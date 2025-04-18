@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, session
+from flask import Flask, render_template, request, redirect, url_for, session, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from werkzeug.utils import secure_filename
@@ -24,16 +24,16 @@ import requests
 from requests.auth import HTTPBasicAuth
 from collections import defaultdict
 
+from jira_worklog_batch import get_epoch_ms, fetch_worklog_ids_updated_since, fetch_worklogs_by_ids, fetch_issue_details_bulk
+
+from generate_testcases_core import generate_testcases_core
+from generate_testcases_route import fetch_jira_description
+from ai_utils import AIUtility
+
 # Initialize Flask app
 app = Flask(__name__)
 app.config['SERVER_NAME'] = 'teammanagerqai.herokuapp.com'
-from generate_testcases_route import testcase_bp
-app.register_blueprint(testcase_bp)
-
-
-
-
-
+# Load environment variables from .env file
 load_dotenv()  # This loads the .env file
 print(" OpenAI Key begins with:", os.getenv("OPENAI_API_KEY")[:8])
 from openai import OpenAI
@@ -50,8 +50,7 @@ app.config['SESSION_PERMANENT'] = False
 app.config['SESSION_USE_SIGNER'] = True
 Session(app)
 
-
-
+# Email configuration
 from flask_mail import Mail
 
 app.config['MAIL_SERVER'] = 'smtp.gmail.com'
@@ -63,11 +62,9 @@ app.config['MAIL_DEFAULT_SENDER'] = os.getenv('MAIL_USERNAME')
 
 mail = Mail(app)
 
-
 # Database and migration setup
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
-
 
 # Jira configuration
 JIRA_BASE_URL = "https://upgrad-jira.atlassian.net"
@@ -75,6 +72,14 @@ JIRA_EMAIL = "kishore.murkhanad@upgrad.com"
 JIRA_API_TOKEN = os.getenv('JIRA_API_TOKEN')
 auth = HTTPBasicAuth(JIRA_EMAIL, JIRA_API_TOKEN)
 headers = {"Accept": "application/json"}
+
+# Instantiate the AI utility once (at the top of your app)
+ai_util = AIUtility(
+    openai_api_key=os.getenv("OPENAI_API_KEY"),
+    jira_base_url=os.getenv("JIRA_BASE_URL"),
+    jira_email=os.getenv("JIRA_EMAIL"),
+    jira_token=os.getenv("JIRA_API_TOKEN")
+)
 
 # Models
 class User(db.Model):
@@ -97,12 +102,6 @@ class Holiday(db.Model):
     date = db.Column(db.Date, unique=True, nullable=False)
     description = db.Column(db.String(200))
 
-
-
-
-
-
-
 # Helper functions
 def get_time_spent_by_user(date):
     return get_time_spent_by_user_range(date, date)
@@ -119,9 +118,6 @@ def fetch_jira_account_id(email):
         if results:
             return results[0].get("accountId")
     return None
-
-
-
 
 def get_time_spent_by_user_range(start, end):
     worklog_author_ids = [
@@ -147,7 +143,6 @@ def get_time_spent_by_user_range(start, end):
                 time_spent = worklog.get("timeSpentSeconds", 0)
                 user_time_spent[author] += time_spent
     return {account_id: round(seconds / 3600, 2) for account_id, seconds in user_time_spent.items()}
-
 
 from datetime import datetime
 
@@ -182,7 +177,6 @@ def filter_sprints_this_month(sprints):
     print(" Filtered Events for Current Month:", filtered_events)
     return filtered_events
 
-
 def fetch_jira_sprints(board_id):
     url = f"{JIRA_BASE_URL}/rest/agile/1.0/board/{board_id}/sprint"
     response = requests.get(url, auth=auth)
@@ -195,8 +189,6 @@ def fetch_jira_sprints(board_id):
         print(" Jira Sprint Fetch Failed:", response.status_code, response.text)
         return []
 
-
-
 # Routes
 
 @app.template_filter('round_half')
@@ -205,12 +197,9 @@ def round_half(value):
 
 @app.before_request
 def require_login():
-    # Allow unauthenticated access to user management, HelperQA, and View Today's Timelog
-    if 'logged_in' not in session:
-        if request.blueprint == 'testcase_bp':
-            return None
-        if request.endpoint in ['login', 'static', 'HelperQA_AI', 'generate_testcases', 'timelog_today', 'users', 'export_users', 'export_timelog_links', 'mytimelogs']:
-            return None
+    if 'logged_in' not in session and request.endpoint not in ['login', 'static', 'HelperQA_AI', 'generate_testcases', 'generate_testcases_auth',
+            'timelog_today', 'users', 'export_users', 'export_timelog_links', 'mytimelogs',
+            'user_timelog', 'HelperQA_AI', 'generate_testcases']:
         return redirect('/login')
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -227,9 +216,15 @@ def logout():
     session.pop('logged_in', None)
     return redirect('/login')
 
-
-
 @app.route('/')
+def root():
+    # If user is logged in, redirect to /dashboard
+    if session.get('logged_in'):
+        return redirect(url_for('dashboard_admin'))
+    # Otherwise, show public or login page (customize as needed)
+    return redirect(url_for('login'))
+
+@app.route('/dashboard')
 def dashboard():
     today = date.today()
 
@@ -256,12 +251,24 @@ def dashboard():
     # Sort by function name for display
     function_capacity = dict(sorted(function_capacity.items()))
 
+    # --- Holiday and Weekend Logic for Dashboard ---
+    holiday = Holiday.query.filter_by(date=today).first()
+    is_holiday = holiday is not None
+    holiday_name = holiday.description if holiday else None
+    is_weekend = today.weekday() >= 5
+
+    if is_holiday or is_weekend:
+        function_capacity = {func: 0 for func in function_capacity}
+
     return render_template(
         'dashboard.html',
         users_on_leave=user_names,
         today=today,
         total_users=total_users,
-        function_capacity=function_capacity
+        function_capacity=function_capacity,
+        is_holiday=is_holiday,
+        holiday_name=holiday_name,
+        is_weekend=is_weekend
     )
 
 @app.route('/dashboard')
@@ -283,12 +290,24 @@ def dashboard_admin():
     # Sort by function name for display
     function_capacity = dict(sorted(function_capacity.items()))
 
+    # --- Holiday and Weekend Logic for Dashboard ---
+    holiday = Holiday.query.filter_by(date=today).first()
+    is_holiday = holiday is not None
+    holiday_name = holiday.description if holiday else None
+    is_weekend = today.weekday() >= 5
+
+    if is_holiday or is_weekend:
+        function_capacity = {func: 0 for func in function_capacity}
+
     return render_template(
         'dashboard.html',
         users_on_leave=users_on_leave,
         today=today,
         total_users=total_users,
-        function_capacity=function_capacity
+        function_capacity=function_capacity,
+        is_holiday=is_holiday,
+        holiday_name=holiday_name,
+        is_weekend=is_weekend
     )
 
 @app.route('/users', methods=['GET'])
@@ -345,7 +364,6 @@ def delete_user(user_id):
     db.session.commit()
     return redirect('/users')
 
-
 @app.route('/holidays', methods=['GET', 'POST'])
 def manage_holidays():
     if request.method == 'POST':
@@ -360,7 +378,6 @@ def manage_holidays():
 
     holidays = Holiday.query.order_by(Holiday.date).all()
     return render_template('holidays.html', holidays=holidays)
-
 
 @app.route('/leave-calendar', methods=['GET', 'POST'])
 def leave_calendar():
@@ -448,12 +465,6 @@ def holiday_calendar():
 import csv
 from flask import Response
 
-
-
-from flask import Response
-from io import StringIO
-import csv
-
 @app.route('/leave-calendar-export')
 def export_leaves():
     # Export all users who are on leave (forget learner filter)
@@ -479,8 +490,6 @@ def export_leaves():
         mimetype='text/csv',
         headers={"Content-Disposition": "attachment;filename=leave_records.csv"}
     )
-
-
 
 @app.route('/capacity', methods=['GET'])
 def capacity():
@@ -533,10 +542,6 @@ def capacity():
     return render_template("capacity.html", capacity_data=capacity_data, year=year, month=month,
                            functions=functions, selected_function=selected_function,
                            total_capacity=total_capacity, total_leaves=total_leaves)
-
-
-
-
 
 @app.route('/sprint-capacity', methods=['GET', 'POST'])
 def sprint_capacity():
@@ -623,6 +628,7 @@ def sprint_capacity_export():
     df.to_csv(csv_path, index=False)
     return send_file(csv_path, as_attachment=True, download_name=filename)
 
+from timelog_cache import save_to_cache, load_from_cache, clear_timelog_cache
 
 @app.route('/timelog', methods=['GET', 'POST'])
 def timelog():
@@ -634,108 +640,154 @@ def timelog():
     start = end = selected_function = None
 
     work_functions = sorted(set([u.designation for u in users if u.designation]))
-
-    # Set current_date to local timezone (IST)
     ist = pytz.timezone('Asia/Kolkata')
     now = datetime.now(ist)
     current_date = now.strftime('%Y-%m-%d')
 
+    # User pagination parameters
+    user_page = int(request.args.get('user_page', 1))
+    users_per_page = 10
+    filtered_users = users
     if request.method == 'POST':
         start = request.form.get('start')
         end = request.form.get('end')
         selected_function = request.form.get('work_function')
+        show_details = True  # Always show details after fetch
+        clear_timelog_cache()
+    else:
+        start = request.args.get('start')
+        end = request.args.get('end')
+        selected_function = request.args.get('work_function', 'All')
+        show_details = request.args.get('show_details', '0') == '1'
+    if selected_function and selected_function != 'All':
+        filtered_users = [u for u in users if u.jira_account_id and u.designation == selected_function]
+    else:
+        filtered_users = [u for u in users if u.jira_account_id]
+    total_users = len(filtered_users)
+    user_start = (user_page - 1) * users_per_page
+    user_end = user_start + users_per_page
+    paginated_users = filtered_users[user_start:user_end]
+    next_user_page = user_page + 1 if user_end < total_users else None
+    prev_user_page = user_page - 1 if user_page > 1 else None
 
-        filtered_users = [u for u in users if u.jira_account_id and (selected_function == 'All' or u.designation == selected_function)]
-
+    overall_total_logged = 0
+    overall_total_expected = 0
+    cache_params = {"start": start, "end": end, "user_ids": [u.jira_account_id for u in filtered_users]}
+    cache_data = load_from_cache(cache_params)
+    if not cache_data:
+        # Fetch from Jira and cache using /worklog/updated for efficiency
         if start and end:
+            since_epoch = get_epoch_ms(start)
+            until_epoch = get_epoch_ms(end) + 24*3600*1000 - 1
+            # 1. Get all updated worklog IDs since start
+            worklog_ids = fetch_worklog_ids_updated_since(JIRA_BASE_URL, headers, auth, since_epoch)
+            # 2. Fetch worklog details in batch
+            all_worklogs = fetch_worklogs_by_ids(JIRA_BASE_URL, headers, auth, worklog_ids)
+            # 3. Filter worklogs by date, user, and build user map
+            user_map_all = {u.jira_account_id: u.name for u in filtered_users}
+            detailed_data_all = defaultdict(list)
+            overall_total_logged = 0
+            overall_total_expected = 0
+            expected_map = {}
+            # Collect all unique issue IDs
+            issue_ids = set()
+            for wl in all_worklogs:
+                author_id = wl.get('author', {}).get('accountId')
+                started = wl.get('started', '')[:10]
+                if author_id in user_map_all and start <= started <= end:
+                    issue_id = str(wl.get('issueId'))
+                    issue_ids.add(issue_id)
+            print("[DEBUG] Issue IDs sent to Jira bulk API:", issue_ids)
+            # Fetch issue details in bulk (fallback to individual if bulk fails)
+            issue_details = fetch_issue_details_bulk(JIRA_BASE_URL, headers, auth, issue_ids) if issue_ids else {}
+            if not issue_details:
+                print("[DEBUG] Bulk API returned no data, falling back to individual issue fetches.")
+                from jira_worklog_batch import fetch_issue_details_individual
+                issue_details = fetch_issue_details_individual(JIRA_BASE_URL, headers, auth, issue_ids)
+            print("[DEBUG] Jira issue details response (truncated):", str(issue_details)[:500])
+            for wl in all_worklogs:
+                author_id = wl.get('author', {}).get('accountId')
+                started = wl.get('started', '')[:10]
+                if author_id in user_map_all and start <= started <= end:
+                    user_name = user_map_all[author_id]
+                    hours = round(wl.get('timeSpentSeconds', 0) / 3600, 2)
+                    issue_id = str(wl.get('issueId'))
+                    issue_info = issue_details.get(issue_id, {})
+                    issue_key = issue_info.get('key', '')
+                    summary = issue_info.get('summary', '')
+                    parent_summary = issue_info.get('parent_summary', '')
+                    detailed_data_all[user_name].append({
+                        "issue_key": issue_key,
+                        "summary": summary,
+                        "parent_summary": parent_summary,
+                        "hours": hours,
+                        "link": f"{JIRA_BASE_URL}/browse/{issue_key}" if issue_key else '',
+                        "started": started
+                    })
+            # Calculate expected for all users
             start_date = datetime.strptime(start, "%Y-%m-%d")
             end_date = datetime.strptime(end, "%Y-%m-%d")
-
-            assignee_ids = [u.jira_account_id for u in filtered_users]
-            jql = f"""
-                issuetype = Sub-task AND
-                assignee in ({','.join(assignee_ids)}) AND
-                worklogDate >= "{start}" AND
-                worklogDate <= "{end}"
-            """
-            print("JQL:", jql)
-
-            url = f"{JIRA_BASE_URL}/rest/api/2/search"
-            params = {
-                "jql": jql,
-                "fields": "summary,parent,assignee,worklog",
-                "maxResults": 1000
-            }
-
-            response = requests.get(url, headers=headers, params=params, auth=auth)
-
-            if not response.ok:
-                return render_template("timelog.html", summary_data=[], detailed_data={}, start=start, end=end, work_functions=work_functions, selected_function=selected_function)
-
-            issues = response.json().get("issues", [])
-
-            user_map = {u.jira_account_id: u.name for u in filtered_users}
-            user_order = [u.name for u in filtered_users]
-            ordered_detailed_data = {name: [] for name in user_order}
-
-            for issue in issues:
-                issue_key = issue.get("key")
-                summary = issue["fields"].get("summary", "")
-                parent = issue["fields"].get("parent", {}).get("fields", {}).get("summary", "")
-                assignee_id = issue["fields"].get("assignee", {}).get("accountId")
-
-                worklog_url = f"{JIRA_BASE_URL}/rest/api/3/issue/{issue_key}/worklog"
-                worklog_resp = requests.get(worklog_url, headers=headers, auth=auth)
-                if not worklog_resp.ok:
-                    continue
-
-                for worklog in worklog_resp.json().get("worklogs", []):
-                    started = worklog.get("started", "")[:10]
-                    if start <= started <= end:
-                        time_spent = worklog.get("timeSpentSeconds", 0)
-                        user_name = user_map.get(worklog["author"].get("accountId"))
-                        if user_name:
-                            ordered_detailed_data[user_name].append({
-                                "issue_key": issue_key,
-                                "summary": summary,
-                                "parent_summary": parent,
-                                "hours": round(time_spent / 3600, 2),
-                                "link": f"{JIRA_BASE_URL}/browse/{issue_key}",
-                                "started": started
-                            })
-                        if user_name:
-                            total_logged_by_user[user_name] = total_logged_by_user.get(user_name, 0) + time_spent / 3600
-
-            # Get working weekdays in range
             all_working_days = [d for d in (start_date + timedelta(days=i) for i in range((end_date - start_date).days + 1)) if d.weekday() < 5]
-
-            for name in user_order:
-                user = next((u for u in filtered_users if u.name == name), None)
-
+            for user in filtered_users:
                 leave_days = Leave.query.filter(
                     Leave.user_id == user.id,
                     Leave.start_date >= start_date.date(),
                     Leave.start_date <= end_date.date()
                 ).all()
-
                 leave_map = {(leave.start_date, leave.leave_type) for leave in leave_days}
                 leave_sum = sum([1 if l_type == 'FD' else 0.5 for (l_date, l_type) in leave_map if l_date in [d.date() for d in all_working_days]])
                 available_days = max(0, len(all_working_days) - leave_sum)
                 expected = available_days * 8
+                total_hours = round(sum(item["hours"] for item in detailed_data_all.get(user.name, [])), 2)
+                overall_total_logged += total_hours
+                overall_total_expected += expected
+                expected_map[user.name] = expected
+            # Save all data to cache
+            save_to_cache(cache_params, {
+                "detailed_data_all": detailed_data_all,
+                "overall_total_logged": overall_total_logged,
+                "overall_total_expected": overall_total_expected,
+                "expected_map": expected_map
+            })
+            cache_data = load_from_cache(cache_params)
+    else:
+        overall_total_logged = cache_data["overall_total_logged"]
+        overall_total_expected = cache_data["overall_total_expected"]
 
-                entries = ordered_detailed_data.get(name, [])
-                total_hours = round(sum(item["hours"] for item in entries), 2)
-                status = "good" if total_hours >= expected else "low"
-                filter_url = f"{JIRA_BASE_URL}/issues/?jql=assignee%20in%20({','.join([u.jira_account_id for u in filtered_users if u.name == name])})%20AND%20worklogDate%3E%3D{start}%20AND%20worklogDate%3C%3D{end}"
+    # Only build user table if show_details is True
+    if show_details and cache_data:
+        detailed_data_all = cache_data["detailed_data_all"]
+        expected_map = cache_data["expected_map"]
+        user_order = [u.name for u in paginated_users]
+        ordered_detailed_data = {name: detailed_data_all.get(name, []) for name in user_order}
+        for name in user_order:
+            total_hours = round(sum(item["hours"] for item in ordered_detailed_data.get(name, [])), 2)
+            expected = expected_map.get(name, 0)
+            status = "good" if total_hours >= expected else "low"
+            filter_url = f"{JIRA_BASE_URL}/issues/?jql=assignee%20in%20({','.join([u.jira_account_id for u in paginated_users if u.name == name])})%20AND%20worklogDate%3E%3D{start}%20AND%20worklogDate%3C%3D{end}"
+            summary_data.append({
+                "user": name,
+                "total_hours": total_hours,
+                "expected": expected,
+                "status": status,
+                "link": filter_url,
+                "anchor": name.replace(' ', '_').replace('.', '').lower()
+            })
 
-                summary_data.append({
-                    "user": name,
-                    "total_hours": total_hours,
-                    "expected": expected,
-                    "status": status,
-                    "link": filter_url,
-                    "anchor": name.replace(' ', '_').replace('.', '').lower()
-                })
+    # --- Holiday and Weekend Logic for Timelog Pages ---
+    holiday = Holiday.query.filter_by(date=start).first() if start else None
+    is_holiday = holiday is not None
+    holiday_name = holiday.description if holiday else None
+    is_weekend = False
+    if start and end and start == end:
+        dt = datetime.strptime(start, "%Y-%m-%d")
+        is_weekend = dt.weekday() >= 5
+
+    # If holiday or weekend, set expected to zero for all users
+    if (is_holiday or is_weekend) and summary_data:
+        for row in summary_data:
+            row['expected'] = 0
+        overall_total_expected = 0
 
     return render_template(
         "timelog.html",
@@ -745,178 +797,240 @@ def timelog():
         end=end,
         work_functions=work_functions,
         selected_function=selected_function,
-        current_date=current_date
+        user_page=user_page,
+        next_user_page=next_user_page,
+        prev_user_page=prev_user_page,
+        current_date=current_date,
+        overall_total_logged=overall_total_logged,
+        overall_total_expected=overall_total_expected,
+        show_details=show_details,
+        is_holiday=is_holiday,
+        holiday_name=holiday_name,
+        is_weekend=is_weekend
     )
-
 
 @app.route('/timelog-today', methods=['GET', 'POST'])
 @app.route('/timelog-today/<user_email>', methods=['GET'])
 def timelog_today(user_email=None):
+    # Only require login if the route is /timelog-today/<user_email> and user_email is missing or empty,
+    # and only if the route was actually called with a user_email parameter (not just a query param)
+    if request.url_rule and '<user_email>' in str(request.url_rule) and (not user_email):
+        return redirect(url_for('login', next=request.url))
     users = User.query.all()
     work_functions = sorted(set([u.designation for u in users if u.designation]))
+    ist = pytz.timezone('Asia/Kolkata')
+    now = datetime.now(ist)
+    current_date = now.strftime('%Y-%m-%d')
 
-    is_user_specific = user_email is not None
-
-    selected_function = request.form.get('work_function') if request.method == 'POST' else request.args.get('work_function', 'All')
-    filtered_users = [u for u in users if u.jira_account_id and (selected_function == 'All' or u.designation == selected_function)]
-
-    if is_user_specific:
+    # Pagination params
+    user_page = int(request.args.get('user_page', 1))
+    users_per_page = 10
+    filtered_users = users
+    if user_email:
         filtered_users = [u for u in users if u.email == user_email and u.jira_account_id]
-
-    summary_data = []
-    detailed_data = defaultdict(list)
-    user_map = {u.jira_account_id: u.name for u in filtered_users}
-    user_email_map = {u.jira_account_id: u.email for u in filtered_users}
-    user_id_map = {u.jira_account_id: u.id for u in filtered_users}
-    user_order = [u.name for u in filtered_users]
-    ordered_detailed_data = {name: [] for name in user_order}
-
-    date_str = request.args.get('date')
-    if date_str:
-        current_date = datetime.strptime(date_str, '%Y-%m-%d').date()
     else:
-        current_date = datetime.today().date()
-
-    today_str = current_date.strftime('%Y-%m-%d')
-    display_date_str = current_date.strftime('%-d %B %Y') if os.name != 'nt' else current_date.strftime('%#d %B %Y')
-
-    assignee_ids = [u.jira_account_id for u in filtered_users]
-
-    jql = f"""
-        issuetype = Sub-task AND
-        assignee in ({','.join(assignee_ids)}) AND
-        worklogDate = "{today_str}"
-    """
-
-    url = f"{JIRA_BASE_URL}/rest/api/2/search"
-    params = {
-        "jql": jql,
-        "fields": "summary,parent,assignee,worklog",
-        "maxResults": 1000
-    }
-
-    response = requests.get(url, headers=headers, params=params, auth=auth)
-    if not response.ok:
-        if request.args.get('modal') == '1':
-            return render_template("timelog_today_modal.html",
-                                  summary_data=[],
-                                  detailed_data={},
-                                  start=today_str,
-                                  end=today_str,
-                                  work_functions=work_functions,
-                                  selected_function=selected_function,
-                                  previous_date=None,
-                                  next_date=None,
-                                  is_today_view=True,
-                                  disable_date_inputs=True,
-                                  display_date_str=display_date_str,
-                                  is_user_specific=is_user_specific,
-                                  user_email=user_email)
-        return render_template("timelog_today.html",
-                              summary_data=[],
-                              detailed_data={},
-                              start=today_str,
-                              end=today_str,
-                              work_functions=work_functions,
-                              selected_function=selected_function,
-                              previous_date=None,
-                              next_date=None,
-                              is_today_view=True,
-                              disable_date_inputs=True,
-                              display_date_str=display_date_str,
-                              is_user_specific=is_user_specific,
-                              user_email=user_email)
-
-    issues = response.json().get("issues", [])
-
-    for issue in issues:
-        issue_key = issue.get("key")
-        summary = issue["fields"].get("summary", "")
-        parent = issue["fields"].get("parent", {}).get("fields", {}).get("summary", "")
-        assignee_id = issue["fields"].get("assignee", {}).get("accountId")
-
-        worklog_url = f"{JIRA_BASE_URL}/rest/api/3/issue/{issue_key}/worklog"
-        worklog_resp = requests.get(worklog_url, headers=headers, auth=auth)
-        if not worklog_resp.ok:
-            continue
-
-        for worklog in worklog_resp.json().get("worklogs", []):
-            started = worklog.get("started", "")[:10]
-            if started == today_str:
-                time_spent = worklog.get("timeSpentSeconds", 0)
-                user_name = user_map.get(worklog["author"].get("accountId"))
-                if user_name:
-                    ordered_detailed_data[user_name].append({
-                        "issue_key": issue_key,
-                        "summary": summary,
-                        "parent_summary": parent,
-                        "hours": round(time_spent / 3600, 2),
-                        "link": f"{JIRA_BASE_URL}/browse/{issue_key}",
-                        "started": started
-                    })
-
-    for name in user_order:
-        entries = ordered_detailed_data.get(name, [])
-        total_hours = round(sum(item["hours"] for item in entries), 2)
-        email = next((u.email for u in filtered_users if u.name == name), '')
-        user_id = next((u.id for u in filtered_users if u.name == name), None)
-
-        leave_status = None
-        if user_id:
-            leave = Leave.query.filter_by(user_id=user_id, start_date=current_date).first()
-            if leave:
-                leave_status = f"On Leave ({leave.leave_type})"
-
-        if leave_status:
-            display_hours = leave_status
-            numeric_hours = 0.0
+        selected_function = request.form.get('work_function') if request.method == 'POST' else request.args.get('work_function', 'All')
+        if selected_function and selected_function != 'All':
+            filtered_users = [u for u in users if u.jira_account_id and u.designation == selected_function]
         else:
-            display_hours = total_hours
-            numeric_hours = total_hours
+            filtered_users = [u for u in users if u.jira_account_id]
+    total_users = len(filtered_users)
+    user_start = (user_page - 1) * users_per_page
+    user_end = user_start + users_per_page
+    paginated_users = filtered_users[user_start:user_end]
+    next_user_page = user_page + 1 if user_end < total_users else None
+    prev_user_page = user_page - 1 if user_page > 1 else None
 
-        summary_data.append({
-            "user": name,
-            "total_hours": display_hours,
-            "numeric_hours": numeric_hours,
-            "expected": 8,
-            "status": "good" if not leave_status and numeric_hours >= 8 else ("onleave" if leave_status else "low"),
-            "link": url_for('timelog_today', user_email=email, date=today_str) if is_user_specific else url_for('timelog_today', date=today_str, work_function=selected_function),
-            "anchor": name.replace(' ', '_').replace('.', '').lower(),
-            "copy_url": request.url_root.strip('/') + url_for('timelog_today', user_email=email)
+    # Date for today
+    date_str = request.args.get('date') or current_date
+    start = end = date_str
+    display_date_str = datetime.strptime(date_str, "%Y-%m-%d").strftime('%d %B %Y')
+    # Previous/Next date logic for navigation
+    current_dt = datetime.strptime(date_str, "%Y-%m-%d")
+    previous_date = (current_dt - timedelta(days=1)).strftime('%Y-%m-%d')
+    next_date = (current_dt + timedelta(days=1)).strftime('%Y-%m-%d') if current_dt.date() < date.today() else None
+
+    # Caching and batch fetching (same as timelog)
+    cache_params = {"start": start, "end": end, "user_ids": [u.jira_account_id for u in filtered_users]}
+    cache_data = load_from_cache(cache_params)
+    summary_data = []
+    ordered_detailed_data = {}
+    overall_total_logged = 0
+    overall_total_expected = 0
+    if not cache_data:
+        since_epoch = get_epoch_ms(start)
+        until_epoch = get_epoch_ms(end) + 24*3600*1000 - 1
+        worklog_ids = fetch_worklog_ids_updated_since(JIRA_BASE_URL, headers, auth, since_epoch)
+        all_worklogs = fetch_worklogs_by_ids(JIRA_BASE_URL, headers, auth, worklog_ids)
+        user_map_all = {u.jira_account_id: u.name for u in filtered_users}
+        detailed_data_all = defaultdict(list)
+        expected_map = {}
+        issue_ids = set()
+        for wl in all_worklogs:
+            author_id = wl.get('author', {}).get('accountId')
+            started = wl.get('started', '')[:10]
+            if author_id in user_map_all and start <= started <= end:
+                issue_id = str(wl.get('issueId'))
+                issue_ids.add(issue_id)
+        issue_details = fetch_issue_details_bulk(JIRA_BASE_URL, headers, auth, issue_ids) if issue_ids else {}
+        if not issue_details:
+            from jira_worklog_batch import fetch_issue_details_individual
+            issue_details = fetch_issue_details_individual(JIRA_BASE_URL, headers, auth, issue_ids)
+        for wl in all_worklogs:
+            author_id = wl.get('author', {}).get('accountId')
+            started = wl.get('started', '')[:10]
+            if author_id in user_map_all and start <= started <= end:
+                user_name = user_map_all[author_id]
+                hours = round(wl.get('timeSpentSeconds', 0) / 3600, 2)
+                issue_id = str(wl.get('issueId'))
+                issue_info = issue_details.get(issue_id, {})
+                issue_key = issue_info.get('key', '')
+                summary = issue_info.get('summary', '')
+                parent_summary = issue_info.get('parent_summary', '')
+                detailed_data_all[user_name].append({
+                    "issue_key": issue_key,
+                    "summary": summary,
+                    "parent_summary": parent_summary,
+                    "hours": hours,
+                    "link": f"{JIRA_BASE_URL}/browse/{issue_key}" if issue_key else '',
+                    "started": started
+                })
+        # Calculate expected for all users
+        start_date = datetime.strptime(start, "%Y-%m-%d")
+        end_date = datetime.strptime(end, "%Y-%m-%d")
+        all_working_days = [d for d in (start_date + timedelta(days=i) for i in range((end_date - start_date).days + 1)) if d.weekday() < 5]
+        for user in filtered_users:
+            leave_days = Leave.query.filter(
+                Leave.user_id == user.id,
+                Leave.start_date >= start_date.date(),
+                Leave.start_date <= end_date.date()
+            ).all()
+            leave_map = {(leave.start_date, leave.leave_type) for leave in leave_days}
+            leave_sum = sum([1 if l_type == 'FD' else 0.5 for (l_date, l_type) in leave_map if l_date in [d.date() for d in all_working_days]])
+            available_days = max(0, len(all_working_days) - leave_sum)
+            expected = available_days * 8
+            total_hours = round(sum(item["hours"] for item in detailed_data_all.get(user.name, [])), 2)
+            overall_total_logged += total_hours
+            overall_total_expected += expected
+            expected_map[user.name] = expected
+        save_to_cache(cache_params, {
+            "detailed_data_all": detailed_data_all,
+            "overall_total_logged": overall_total_logged,
+            "overall_total_expected": overall_total_expected,
+            "expected_map": expected_map
         })
+        cache_data = load_from_cache(cache_params)
+    else:
+        overall_total_logged = cache_data["overall_total_logged"]
+        overall_total_expected = cache_data["overall_total_expected"]
 
-    previous_date = (current_date - timedelta(days=1)).strftime('%Y-%m-%d')
-    next_date = (current_date + timedelta(days=1)).strftime('%Y-%m-%d') if current_date < date.today() else None
+    # Build summary and details for paginated users
+    if cache_data:
+        detailed_data_all = cache_data["detailed_data_all"]
+        expected_map = cache_data["expected_map"]
+        user_order = [u.name for u in paginated_users]
+        ordered_detailed_data = {name: detailed_data_all.get(name, []) for name in user_order}
+        for name in user_order:
+            total_hours = round(sum(item["hours"] for item in ordered_detailed_data.get(name, [])), 2)
+            expected = expected_map.get(name, 0)
+            status = "good" if total_hours >= expected else "low"
+            summary_data.append({
+                "user": name,
+                "total_hours": total_hours,
+                "expected": expected,
+                "status": status,
+                "link": '',
+                "anchor": name.replace(' ', '_').replace('.', '').lower()
+            })
 
-    if request.args.get('modal') == '1':
-        return render_template("timelog_today_modal.html",
-                              summary_data=summary_data,
-                              detailed_data=ordered_detailed_data,
-                              start=today_str,
-                              end=today_str,
-                              work_functions=work_functions,
-                              selected_function=selected_function,
-                              previous_date=previous_date,
-                              next_date=next_date,
-                              is_today_view=True,
-                              disable_date_inputs=True,
-                              display_date_str=display_date_str,
-                              is_user_specific=is_user_specific,
-                              user_email=user_email)
-    return render_template("timelog_today.html",
-                           summary_data=summary_data,
-                           detailed_data=ordered_detailed_data,
-                           start=today_str,
-                           end=today_str,
-                           work_functions=work_functions,
-                           selected_function=selected_function,
-                           previous_date=previous_date,
-                           next_date=next_date,
-                           is_today_view=True,
-                           disable_date_inputs=True,
-                           display_date_str=display_date_str,
-                           is_user_specific=is_user_specific,
-                           user_email=user_email)
+    # --- Holiday and Weekend Logic for Timelog Pages ---
+    holiday = Holiday.query.filter_by(date=start).first() if start else None
+    is_holiday = holiday is not None
+    holiday_name = holiday.description if holiday else None
+    is_weekend = False
+    if start and end and start == end:
+        dt = datetime.strptime(start, "%Y-%m-%d")
+        is_weekend = dt.weekday() >= 5
+
+    # If holiday or weekend, set expected to zero for all users
+    if (is_holiday or is_weekend) and summary_data:
+        for row in summary_data:
+            row['expected'] = 0
+        overall_total_expected = 0
+
+    return render_template(
+        "timelog_today.html",
+        summary_data=summary_data,
+        detailed_data=ordered_detailed_data,
+        start=start,
+        end=end,
+        work_functions=work_functions,
+        selected_function=request.args.get('work_function', 'All'),
+        user_page=user_page,
+        next_user_page=next_user_page,
+        prev_user_page=prev_user_page,
+        current_date=current_date,
+        overall_total_logged=overall_total_logged,
+        overall_total_expected=overall_total_expected,
+        display_date_str=display_date_str,
+        previous_date=previous_date,
+        next_date=next_date,
+        is_holiday=is_holiday,
+        holiday_name=holiday_name,
+        is_weekend=is_weekend
+    )
+
+@app.route('/user-timelog/<user_email>')
+def user_timelog(user_email):
+    user = User.query.filter_by(email=user_email).first()
+    today = request.args.get('date')
+    if today:
+        date_obj = datetime.strptime(today, "%Y-%m-%d").date()
+    else:
+        date_obj = datetime.now().date()
+    logs = []
+    total_logged_hours = 0
+    is_holiday = False
+    holiday_name = None
+    is_weekend = date_obj.weekday() >= 5
+    is_on_leave = False
+    if user:
+        # Check leave (full day only)
+        leave = Leave.query.filter_by(user_id=user.id, start_date=date_obj, leave_type='FD').first()
+        is_on_leave = leave is not None
+        # Holiday check
+        holiday = Holiday.query.filter_by(date=date_obj).first()
+        is_holiday = holiday is not None
+        holiday_name = holiday.description if holiday else None
+        # Timelog fetch logic for user (with parent summary)
+        jql = f"worklogAuthor = '{user.jira_account_id}' AND worklogDate = '{date_obj.strftime('%Y-%m-%d')}'"
+        url = f"{JIRA_BASE_URL}/rest/api/3/search"
+        params = {"jql": jql, "fields": "worklog,summary,parent", "maxResults": 100}
+        response = requests.get(url, headers=headers, params=params, auth=auth)
+        if response.ok:
+            data = response.json()
+            for issue in data.get("issues", []):
+                issue_key = issue.get("key", "")
+                summary = issue.get("fields", {}).get("summary", "")
+                parent_summary = issue.get("fields", {}).get("parent", {}).get("fields", {}).get("summary", "")
+                for worklog in issue.get("fields", {}).get("worklog", {}).get("worklogs", []):
+                    author_id = worklog.get("author", {}).get("accountId")
+                    started = worklog.get("started", "")
+                    if author_id == user.jira_account_id and started[:10] == date_obj.strftime('%Y-%m-%d'):
+                        hours = round(worklog.get("timeSpentSeconds", 0) / 3600, 2)
+                        total_logged_hours += hours
+                        logs.append({
+                            'issue_key': issue_key,
+                            'summary': summary,
+                            'parent_summary': parent_summary,
+                            'hours': hours,
+                            'started': started[:10]
+                        })
+    # Previous/Next date logic
+    previous_date = (date_obj - timedelta(days=1)).strftime('%Y-%m-%d')
+    next_date = (date_obj + timedelta(days=1)).strftime('%Y-%m-%d') if date_obj < datetime.now().date() else None
+    display_date_str = date_obj.strftime('%d %B %Y')
+    return render_template('user_timelog.html', user=user, logs=logs, is_holiday=is_holiday, holiday_name=holiday_name, is_weekend=is_weekend, is_on_leave=is_on_leave, date_obj=date_obj, total_logged_hours=total_logged_hours, previous_date=previous_date, next_date=next_date, display_date_str=display_date_str)
 
 @app.route('/generate-testcases-auth', methods=['POST'])
 def generate_testcases_auth():
@@ -952,49 +1066,46 @@ def update_jira_id():
 
     return render_template('update_jira_id.html', users=users)
 
-@app.route("/reset-session")
-def reset_session():
-    session.clear()
-    return "Session cleared!"
-
-
-
-import requests
-import base64
-from flask import Flask, request, render_template, url_for
-from werkzeug.utils import secure_filename
-import os
-
-
 @app.route('/HelperQA-AI', methods=['GET', 'POST'])
 def HelperQA_AI():
+    global client
     feedback_html = None
     image_url = None
     page_url = None
-    user = None
-    email_checked = None
-
-    if not session.get('logged_in'):
-        if request.method == 'GET' and request.args.get('email'):
-            email = request.args.get('email', '').strip().lower()
+    email_checked = False
+    user_exists = False
+    if request.method == 'GET' and not (session.get('logged_in') or session.get('ai_helper_email')):
+        email = request.args.get('email')
+        if email:
             user = User.query.filter_by(email=email).first()
             email_checked = True
-        elif request.method == 'POST':
-            email = request.form.get('email', '').strip().lower()
-            user = User.query.filter_by(email=email).first()
-            email_checked = True
-            if not user:
-                return render_template("HelperQA-AI.html", image_url=None, page_url=None, feedback=None, user=None, email_checked=True)
-        else:
-            user = None
-            email_checked = False
-    else:
-        user = None
-        email_checked = False
-
-    if (session.get('logged_in') or user) and request.method == 'POST':
+            if user:
+                session['ai_helper_email'] = email
+                user_exists = True
+            else:
+                return render_template("HelperQA-AI.html", email_checked=email_checked, user_exists=user_exists)
+    if request.method == 'POST':
         input_type = request.form.get('input_type')
-        ai_mode = request.form.get('ai_mode', 'review')  # default to review
+        ai_mode = request.form.get('ai_mode', 'review')
+        if not (session.get('logged_in') or session.get('ai_helper_email')):
+            return redirect(url_for('HelperQA_AI'))
+        if input_type == "testcase_story" and ai_mode == "testcases":
+            jira_id = request.form.get('jira_id', '').strip()
+            story_text = request.form.get('story_text', '').strip()
+            uploaded_file = request.files.get('story_doc')
+            testcases_rows, error, extracted_text, jira_id_out = ai_util.run(
+                jira_id=jira_id,
+                story_text=story_text,
+                uploaded_file=uploaded_file
+            )
+            if error:
+                return render_template("HelperQA-AI.html", feedback=error)
+            return render_template("testcases_result.html",
+                                   jira_id=jira_id_out,
+                                   content=testcases_rows,
+                                   original_requirement=extracted_text,
+                                   jira_base_url=os.getenv("JIRA_BASE_URL"))
+        # ... existing logic for upload/url/AI review ...
         access_key = '8akGljPIc5sEfw'  # Replace with your ScreenshotOne key
 
         image_b64 = None
@@ -1051,7 +1162,6 @@ def HelperQA_AI():
                 system_message = "You are an expert test engineer. Draft comprehensive test cases from UI screenshots."
 
             try:
-                client = OpenAI()
                 response = client.chat.completions.create(
                     model="gpt-4o",
                     messages=[
@@ -1071,7 +1181,7 @@ def HelperQA_AI():
             except Exception as e:
                 feedback_html = f" Error during AI analysis: {str(e)}"
 
-    return render_template("HelperQA-AI.html", image_url=image_url, page_url=page_url, feedback=feedback_html, user=user, email_checked=email_checked)
+    return render_template("HelperQA-AI.html", image_url=image_url, page_url=page_url, feedback=feedback_html)
 
 
 @app.route('/mytimelogs', methods=['GET'])
@@ -1085,6 +1195,24 @@ def mytimelogs():
         email_checked = True
     return render_template('mytimelogs.html', user=user, email_checked=email_checked)
 
+@app.route('/api/issue_details', methods=['POST'])
+def api_issue_details():
+    data = request.get_json()
+    issue_ids = data.get('issue_ids', [])
+    from jira_worklog_batch import fetch_issue_details_individual
+    # Use persistent cache-backed fetch
+    issue_details = fetch_issue_details_individual(JIRA_BASE_URL, headers, auth, issue_ids)
+    return jsonify(issue_details)
+
+@app.route('/get-jira-description')
+def get_jira_description():
+    jira_id = request.args.get('jira_id', '').strip()
+    if not jira_id:
+        return jsonify({'description': 'No Jira ID provided.'})
+    desc, err = ai_util.fetch_jira_description(jira_id)
+    if err:
+        return jsonify({'description': f'Error: {err}'})
+    return jsonify({'description': desc})
 
 if __name__ == '__main__':
     with app.app_context():

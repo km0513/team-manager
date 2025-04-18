@@ -1,21 +1,7 @@
 {% extends 'base.html' %}
 {% block content %}
 {% if session.get('logged_in') %}
-  <!-- Show all users table for admin -->
-  <div class="bg-upgradLight rounded-xl shadow p-6 mb-6 border border-upgradAccent">
-    <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-4 gap-2">
-      <div class="text-lg font-bold text-upgradRed flex items-center">
-        <i class="bi bi-people-fill mr-2"></i> Existing Users
-      </div>
-      <a href="/update-jira-id" class="border border-upgradTeal text-upgradTeal hover:bg-upgradLight font-bold px-3 py-1.5 rounded text-sm flex items-center transition">
-        <i class="bi bi-link-45deg mr-1"></i> Jira ID Mapping
-      </a>
-    </div>
-    <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-4 gap-2">
-      <div class="font-bold text-upgradPurple text-sm flex items-center">
-        <i class="bi bi-link-45deg mr-1"></i> Timelog Links Table
-      </div>
-    </div>
+   
     <!-- Add User Form -->
     <form method="POST" action="/users" class="flex flex-col md:flex-row md:items-end md:justify-start gap-2 mb-4 p-3 rounded border border-upgradAccent bg-white">
       <div class="flex-1">
@@ -52,9 +38,21 @@
         <button type="submit" class="bg-upgradYellow hover:bg-upgradAccent text-upgradRed font-bold px-4 py-2 rounded">Import</button>
       </div>
     </form>
+    
+      <!-- Show all users table for admin -->
+
+    <div class="bg-upgradLight rounded-xl shadow p-6 mb-6 border border-upgradAccent">
+      <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-4 gap-2">
+        <div class="text-lg font-bold text-upgradRed flex items-center">
+          <i class="bi bi-people-fill mr-2"></i> Existing Users
+        </div>
+        <a href="/update-jira-id" class="border border-upgradTeal text-upgradTeal hover:bg-upgradLight font-bold px-3 py-1.5 rounded text-sm flex items-center transition">
+          <i class="bi bi-link-45deg mr-1"></i> Jira ID Mapping
+        </a>
+      </div>
     <!-- Existing Users Table -->
-    <div class="overflow-x-auto">
-      <table class="min-w-[500px] w-full bg-white rounded-lg border border-upgradAccent text-xs text-center">
+    <div class="overflow-x-auto text-left">
+       <table class="min-w-[500px] w-full bg-white rounded-lg border border-upgradAccent text-xs text-left">
         <thead class="bg-upgradPurple text-white">
           <tr>
             <th class="py-2 px-3 font-bold">ID</th>
@@ -73,8 +71,9 @@
             <td class="py-2 px-3 text-black">{{ user.designation }}</td>
             <td class="py-2 px-3">
               <div class="flex flex-wrap gap-2">
-                <a href="{{ url_for('timelog_today', user_email=user.email) }}" class="bg-upgradTeal hover:bg-upgradPurple text-white px-2 py-1 rounded text-xs flex items-center font-bold transition" title="View Today's Timelog">
-                  <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6 1a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>Timelog
+                <a href="{{ url_for('user_timelog', user_email=user.email) }}" class="bg-blue-600 hover:bg-blue-800 text-white px-2 py-1 rounded text-xs flex items-center font-bold transition" title="View Efforts">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                  Efforts
                 </a>
               </div>
             </td>

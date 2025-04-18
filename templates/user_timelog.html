@@ -1,0 +1,95 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="max-w-5xl mx-auto px-2">
+  <div class="flex items-center justify-between mb-4">
+    <div>
+      {% if previous_date %}
+        <a href="{{ url_for('user_timelog', user_email=user.email, date=previous_date) }}" class="bg-red-400 hover:bg-red-600 text-white px-3 py-1 rounded">Previous Day</a>
+      {% endif %}
+    </div>
+    <div>
+      <span class="bg-gray-200 text-gray-800 px-3 py-1 rounded">{{ display_date_str }}</span>
+    </div>
+    <div>
+      {% if next_date %}
+        <a href="{{ url_for('user_timelog', user_email=user.email, date=next_date) }}" class="bg-blue-400 hover:bg-blue-600 text-white px-3 py-1 rounded">{{ next_date == date_obj.strftime('%Y-%m-%d') and 'Today' or 'Next Day' }}</a>
+      {% endif %}
+    </div>
+  </div>
+  <div class="mb-4 text-lg font-semibold">Total Logged Hours: {{ total_logged_hours }}</div>
+  <h3 class="text-xl font-bold">📅 Timelog for {{ user.name }} ({{ user.email }}) on {{ display_date_str }}</h3>
+  {% if error %}
+    <div class="bg-upgradRed text-white rounded p-4 my-4">{{ error }}</div>
+  {% endif %}
+  {% if is_holiday %}
+    <div class="msg-banner bg-green-100 border border-green-400 text-green-800 rounded p-4 mt-8 mb-8 text-center font-semibold">
+      <span class="text-xl">🎉</span> Capacity is zero today due to <b>{{ holiday_name }}</b>! Take a break and celebrate!
+    </div>
+  {% elif is_weekend %}
+    <div class="msg-banner bg-yellow-100 border border-yellow-400 text-yellow-800 rounded p-4 mt-8 mb-8 text-center font-semibold">
+      <span class="text-xl">🌞</span> It's the weekend! No work, no capacity—enjoy your time off!
+    </div>
+  {% elif is_on_leave %}
+    <div class="msg-banner bg-blue-100 border border-blue-400 text-blue-800 rounded p-4 mt-8 mb-8 text-center font-semibold">
+      <span class="text-xl">🏖️</span> You are on <b>Full Day Leave</b> today. Enjoy your break!
+    </div>
+  {% elif not logs or logs|length == 0 %}
+    <div class="msg-banner bg-yellow-100 border border-yellow-400 text-yellow-800 rounded p-4 mt-8 mb-8 text-center font-semibold">
+      <span class="text-xl">📝</span> No timelogs have been entered for this day.<br>
+      <span>Please ensure you enter your daily timelogs to maintain accurate records and enable effective tracking.</span>
+    </div>
+  {% endif %}
+  {% if logs %}
+    <div class="mt-6">
+      <table class="min-w-[500px] w-full bg-white rounded-lg border border-upgradAccent text-xs text-center mb-2">
+        <thead class="bg-upgradPurple text-white">
+          <tr>
+            <th class="py-2 px-3 font-semibold">Issue</th>
+            <th class="py-2 px-3 font-semibold">Parent Summary</th>
+            <th class="py-2 px-3 font-semibold">Task Summary</th>
+            <th class="py-2 px-3 font-semibold">Hours</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for log in logs %}
+          <tr>
+            <td class="text-upgradPurple font-bold">
+              <a href="https://upgrad-jira.atlassian.net/browse/{{ log.issue_key }}"
+                 onclick="event.preventDefault(); openJiraModal('https://upgrad-jira.atlassian.net/browse/{{ log.issue_key }}')"
+                 class="text-upgradPurple underline hover:text-upgradRed font-bold cursor-pointer">
+                 {{ log.issue_key }}
+              </a>
+            </td>
+            <td>{{ log.parent_summary }}</td>
+            <td>{{ log.summary }}</td>
+            <td class="font-bold">{{ log.hours }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% endif %}
+</div>
+<script>
+function openJiraModal(url) {
+  const modal = document.createElement('div');
+  modal.style.position = 'fixed';
+  modal.style.top = 0;
+  modal.style.left = 0;
+  modal.style.width = '100vw';
+  modal.style.height = '100vh';
+  modal.style.background = 'rgba(0,0,0,0.5)';
+  modal.style.display = 'flex';
+  modal.style.alignItems = 'center';
+  modal.style.justifyContent = 'center';
+  modal.style.zIndex = 9999;
+  modal.innerHTML = `
+    <div style="background:white;padding:0.5rem 0.5rem 0.5rem 0.5rem;border-radius:10px;max-width:90vw;max-height:90vh;display:flex;flex-direction:column;">
+      <button onclick="this.parentNode.parentNode.remove()" style="align-self:flex-end;background:#b91c1c;color:white;border:none;border-radius:4px;padding:0.25rem 0.75rem;margin-bottom:0.5rem;font-weight:bold;">Close</button>
+      <iframe src="${url}" style="width:80vw;height:70vh;border:none;"></iframe>
+    </div>
+  `;
+  document.body.appendChild(modal);
+}
+</script>
+{% endblock %}

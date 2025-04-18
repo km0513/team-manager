@@ -12,29 +12,11 @@
     <span class="block">The result will appear below with options to expand requirements or view Jira directly in-app.</span>
   </div>
 
-  {% if not session.get('logged_in') and user %}
+  {% if session.get('ai_helper_email') %}
     <div class="mb-4 bg-white rounded-lg shadow p-4 border border-upgradAccent">
-      <h3 class="font-bold text-upgradRed mb-2">Welcome {{ user.name }}!</h3>
-      <p><b>Email:</b> {{ user.email }}</p>
-      <p><b>Designation:</b> {{ user.designation }}</p>
+      <h3 class="font-bold text-upgradRed mb-2">Welcome to AI-Utility-Helper!</h3>
       <div class="mt-2 text-upgradGreen font-semibold">You may now use AI-Utility-Helper below.</div>
     </div>
-  {% endif %}
-
-  {% if not session.get('logged_in') and not user %}
-    <div class="bg-upgradLight rounded-xl shadow p-6 mb-4 border border-upgradAccent max-w-md mx-auto">
-      <h2 class="text-xl font-bold text-upgradRed mb-4 text-center">AI-Utility-Helper</h2>
-      <form method="GET" action="/HelperQA-AI" class="flex flex-col gap-4 mb-4">
-        <input type="email" name="email" placeholder="Enter your email" required class="block w-full rounded-lg border border-upgradAccent bg-white px-3 py-2 text-sm shadow-sm focus:border-upgradRed focus:ring-2 focus:ring-upgradYellow focus:outline-none transition-all duration-150">
-        <button type="submit" class="bg-upgradRed hover:bg-upgradAccent text-white font-bold px-4 py-2 rounded transition">Continue</button>
-      </form>
-      {% if email_checked %}
-        <div class="mt-2 text-upgradRed font-semibold">No user found with that email.</div>
-      {% endif %}
-    </div>
-  {% endif %}
-
-  {% if session.get('logged_in') or user %}
     <form method="POST" enctype="multipart/form-data" id="feedbackForm" class="space-y-4">
       <div>
         <label for="inputType" class="block text-xs font-medium text-upgradRed mb-1">Choose Input Type</label>
@@ -76,15 +58,29 @@
             <span class="text-xs font-bold text-upgradRed">Use LXP related context</span>
           </label>
         </div>
+        <div class="flex gap-2 mt-3" id="btnGroupTestcase">
+          <input type="hidden" name="ai_mode" id="aiModeTestcase" value="testcases">
+          <button type="submit" id="testcaseBtn" class="px-4 py-2 bg-upgradYellow hover:bg-upgradAccent text-upgradRed border border-upgradAccent text-xs font-semibold rounded shadow">🧪 Generate Test Cases</button>
+        </div>
       </div>
 
       <!-- Button Groups -->
       <div class="flex gap-2 mt-3 hidden" id="btnGroup">
         <input type="hidden" name="ai_mode" id="aiMode" value="review">
         <button type="submit" id="analyzeBtn" class="px-4 py-2 bg-upgradRed hover:bg-upgradAccent text-white text-xs font-semibold rounded shadow">🔍 Analyze UI</button>
-        <button type="submit" id="testcaseBtn" class="px-4 py-2 bg-upgradYellow hover:bg-upgradAccent text-upgradRed border border-upgradAccent text-xs font-semibold rounded shadow">🧪 Generate Test Cases</button>
       </div>
     </form>
+  {% elif not session.get('logged_in') and not session.get('ai_helper_email') %}
+    <div class="bg-upgradLight rounded-xl shadow p-6 mb-4 border border-upgradAccent max-w-md mx-auto">
+      <h2 class="text-xl font-bold text-upgradRed mb-4 text-center">AI-Utility-Helper</h2>
+      <form method="GET" action="/HelperQA-AI" class="flex flex-col gap-4 mb-4">
+        <input type="email" name="email" placeholder="Enter your email" required class="block w-full rounded-lg border border-upgradAccent bg-white px-3 py-2 text-sm shadow-sm focus:border-upgradRed focus:ring-2 focus:ring-upgradYellow focus:outline-none transition-all duration-150">
+        <button type="submit" class="bg-upgradRed hover:bg-upgradAccent text-white font-bold px-4 py-2 rounded transition">Continue</button>
+      </form>
+      {% if email_checked %}
+        <div class="mt-2 text-upgradRed font-semibold">No user found with that email.</div>
+      {% endif %}
+    </div>
   {% endif %}
 
   {% if image_url %}
@@ -114,37 +110,49 @@
   const testcaseGroup = document.getElementById("testcaseGroup");
   const btnGroup = document.getElementById("btnGroup");
   const analyzeBtn = document.getElementById("analyzeBtn");
-  const testcaseBtn = document.getElementById("testcaseBtn");
+  const btnGroupTestcase = document.getElementById("btnGroupTestcase");
   const aiMode = document.getElementById("aiMode");
+  const aiModeTestcase = document.getElementById("aiModeTestcase");
 
   inputType.addEventListener("change", function () {
     const type = this.value;
 
-    // Visibility toggles (Tailwind: use hidden/block)
-    uploadGroup.classList.toggle("hidden", type !== "upload");
-    urlGroup.classList.toggle("hidden", type !== "url");
-    testcaseGroup.classList.toggle("hidden", type !== "testcase_story");
+    // Hide all groups initially
+    uploadGroup.classList.add("hidden");
+    urlGroup.classList.add("hidden");
+    testcaseGroup.classList.add("hidden");
+    btnGroup.classList.add("hidden");
+    analyzeBtn.style.display = "none";
+    btnGroupTestcase.classList.add("hidden");
 
-    // Button logic
-    if (type === "upload" || type === "url") {
+    // Show relevant group and button
+    if (type === "upload") {
+      uploadGroup.classList.remove("hidden");
       btnGroup.classList.remove("hidden");
       analyzeBtn.style.display = "inline-block";
-      testcaseBtn.style.display = "inline-block";
+      feedbackForm.action = "/HelperQA-AI";
+      aiMode.value = "review";
+    } else if (type === "url") {
+      urlGroup.classList.remove("hidden");
+      btnGroup.classList.remove("hidden");
+      analyzeBtn.style.display = "inline-block";
       feedbackForm.action = "/HelperQA-AI";
       aiMode.value = "review";
     } else if (type === "testcase_story") {
-      btnGroup.classList.remove("hidden");
-      analyzeBtn.style.display = "none";
-      testcaseBtn.style.display = "inline-block";
-      feedbackForm.action = "/generate-testcases";
-      aiMode.value = "testcases";
-    } else {
-      btnGroup.classList.add("hidden");
+      testcaseGroup.classList.remove("hidden");
+      btnGroupTestcase.classList.remove("hidden");
+      feedbackForm.action = "/HelperQA-AI";
+      aiModeTestcase.value = "testcases";
     }
 
     // Required fields
     document.querySelector('[name="screenshot"]').required = (type === "upload");
     document.querySelector('[name="page_url"]').required = (type === "url");
+  });
+
+  // On page load, trigger change to restore state if needed
+  window.addEventListener('DOMContentLoaded', function() {
+    inputType.dispatchEvent(new Event('change'));
   });
 </script>
 {% endblock %}

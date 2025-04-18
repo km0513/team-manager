@@ -30,7 +30,11 @@
     <div>
       <div class="text-xs text-gray-600 mb-1">On leave today ({{ today }})</div>
       <div class="text-base font-semibold text-orange-500">
-        {% if users_on_leave %}
+        {% if is_holiday %}
+          <span class="text-green-600 text-sm">🎉 Today is <b>{{ holiday_name }}</b>! Enjoy your well-deserved break! 🥳</span>
+        {% elif is_weekend %}
+          <span class="text-blue-600 text-sm">🛋️ It's the weekend! Time to recharge and have some fun! ✨</span>
+        {% elif users_on_leave %}
           {{ users_on_leave|join(', ') }}
         {% else %}
           <span class="text-gray-400 text-xs">No one is on leave 🎉</span>
@@ -51,6 +55,15 @@
     <span class="text-xs text-gray-500">(Standard: 8 hrs/user)</span>
   </div>
   <div class="overflow-x-auto">
+    {% if is_holiday %}
+      <div class="mb-4 p-3 rounded bg-green-50 border border-green-200 text-green-700 text-center text-base font-semibold">
+        🏖️ Capacity is zero today due to <b>{{ holiday_name }}</b>! Take a break and celebrate!
+      </div>
+    {% elif is_weekend %}
+      <div class="mb-4 p-3 rounded bg-blue-50 border border-blue-200 text-blue-700 text-center text-base font-semibold">
+        🌞 It's the weekend! No work, no capacity—enjoy your time off!
+      </div>
+    {% endif %}
     <table class="min-w-[320px] bg-white rounded-lg border border-gray-200 text-sm text-center">
       <thead class="bg-gray-100 text-gray-700">
         <tr>

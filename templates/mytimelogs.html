@@ -12,7 +12,7 @@
     <p><b>Name:</b> {{ user.name }}</p>
     <p><b>Email:</b> {{ user.email }}</p>
     <p><b>Designation:</b> {{ user.designation }}</p>
-    <a href="{{ url_for('timelog_today', user_email=user.email) }}" class="mt-4 inline-block bg-upgradTeal hover:bg-upgradPurple text-white px-4 py-2 rounded text-xs font-bold transition">View Today's Timelog</a>
+    <a href="{{ url_for('user_timelog', user_email=user.email) }}" class="mt-4 inline-block bg-upgradTeal hover:bg-upgradPurple text-white px-4 py-2 rounded text-xs font-bold transition">View Today's Timelog</a>
   </div>
   {% elif email_checked %}
   <div class="mt-4 text-upgradRed font-semibold">No user found with that email.</div>

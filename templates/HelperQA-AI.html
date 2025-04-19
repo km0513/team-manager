@@ -47,13 +47,11 @@
 
       <!-- Test Case Generator Section -->
       <div id="testcaseGroup" class="hidden mt-2">
-        <label class="block text-xs font-medium text-upgradRed mb-1">Enter Jira Ticket ID (required for validation)</label>
+        <label class="block text-xs font-medium text-upgradRed mb-1">Enter Jira Ticket ID (optional)</label>
         <div class="flex gap-2 items-center mb-2">
-          <input type="text" name="jira_id" id="jiraIdInput" class="block w-full rounded-lg border border-upgradAccent bg-white px-3 py-2 text-sm shadow-sm focus:border-upgradRed focus:ring-2 focus:ring-upgradYellow focus:outline-none transition-all duration-150" placeholder="e.g. ABC-123" required>
+          <input type="text" name="jira_id" id="jiraIdInput" class="block w-full rounded-lg border border-upgradAccent bg-white px-3 py-2 text-sm shadow-sm focus:border-upgradRed focus:ring-2 focus:ring-upgradYellow focus:outline-none transition-all duration-150" placeholder="e.g. ABC-123">
         </div>
-        <div id="jiraError" class="text-upgradRed font-semibold mb-2" style="display:none;"></div>
-        <div id="jiraSuccess" class="text-upgradGreen font-semibold mb-2" style="display:none;"></div>
-        <div id="testcaseDetails" style="display:none;">
+        <div id="testcaseDetails">
           <textarea name="story_text" class="block w-full rounded-lg border border-upgradAccent bg-white px-3 py-2 text-sm shadow-sm focus:border-upgradRed focus:ring-2 focus:ring-upgradYellow focus:outline-none transition-all duration-150" rows="4" placeholder="Or paste the story/epic/bug here..."></textarea>
           <label class="block text-xs font-medium text-upgradRed mb-1">Or Upload a Document</label>
           <input type="file" name="story_doc" class="block w-full rounded-lg border border-upgradAccent bg-white px-3 py-2 text-sm shadow-sm focus:border-upgradRed focus:ring-2 focus:ring-upgradYellow focus:outline-none transition-all duration-150" accept=".txt,.pdf,.doc,.docx">
@@ -164,79 +162,14 @@
       const type = inputType.value;
       if (type === 'testcase_story') {
         const jiraIdInput = document.getElementById('jiraIdInput');
-        const jiraError = document.getElementById('jiraError');
         if (!jiraIdInput) {
           console.error('jiraIdInput not found');
           return true;
-        }
-        if (!jiraError) {
-          console.error('jiraError not found');
-          return true;
-        }
-        const jiraId = jiraIdInput.value.trim();
-        jiraError.style.display = 'none';
-        jiraError.textContent = '';
-        if (!jiraId) {
-          jiraError.textContent = 'Jira Ticket ID is required.';
-          jiraError.style.display = 'block';
-          e.preventDefault();
-          console.log('Prevented submit: Jira ID required');
-          return false;
-        }
-        // Validate Jira ID via AJAX
-        try {
-          const resp = await fetch(`/get-jira-description?jira_id=${encodeURIComponent(jiraId)}`);
-          const data = await resp.json();
-          console.log('Jira validation response:', {status: resp.status, data: data});
-          if (resp.status !== 200 || data.error) {
-            console.log('Setting error message:', data.error, jiraError);
-            jiraError.textContent = data.error || 'Invalid or inaccessible Jira ID.';
-            jiraError.style.display = 'block';
-            e.preventDefault();
-            console.log('Prevented submit: Jira validation failed');
-            return false;
-          }
-        } catch (err) {
-          jiraError.textContent = 'Error validating Jira ID.';
-          jiraError.style.display = 'block';
-          e.preventDefault();
-          console.log('Prevented submit: AJAX error');
-          console.log('Validation AJAX error:', err);
-          return false;
         }
       }
     });
   } else {
     console.error('feedbackForm event handler was not attached.');
-  }
-
-  // Prevent form submit if Jira not validated
-  if (feedbackForm) {
-    feedbackForm.addEventListener('submit', function(e) {
-      const type = inputType.value;
-      if (type === 'testcase_story') {
-        const jiraIdInput = document.getElementById('jiraIdInput');
-        const jiraError = document.getElementById('jiraError');
-        if (!jiraIdInput) {
-          console.error('jiraIdInput not found');
-          return true;
-        }
-        if (!jiraError) {
-          console.error('jiraError not found');
-          return true;
-        }
-        const jiraId = jiraIdInput.value.trim();
-        jiraError.style.display = 'none';
-        jiraError.textContent = '';
-        if (!jiraId) {
-          jiraError.textContent = 'Jira Ticket ID is required.';
-          jiraError.style.display = 'block';
-          e.preventDefault();
-          console.log('Prevented submit: Jira ID required');
-          return false;
-        }
-      }
-    });
   }
 </script>
 {% endblock %}

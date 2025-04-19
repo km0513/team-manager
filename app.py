@@ -1046,32 +1046,31 @@ def generate_testcases_auth():
 @app.route('/generate-testcases', methods=['GET', 'POST'])
 def generate_testcases():
     print("DEBUG: /generate-testcases route was hit")
-    if session.get('logged_in') or session.get('testcase_user'):
-        if request.method == 'POST':
-            jira_id = request.form.get('jira_id', '').strip()
-            story_text = request.form.get('story_text', '').strip()
-            uploaded_file = request.files.get('story_doc')
-            print("DEBUG: /generate-testcases POST called")
-            print("DEBUG: Jira ID received:", jira_id)
-            print("DEBUG: Story text received:", story_text)
-            from generate_testcases_core import generate_testcases_core
-            from generate_testcases_route import fetch_jira_description
-            from app import client  # already initialized
-            table_rows, error, extracted_text, jira_id_out = generate_testcases_core(
-                jira_id, story_text, uploaded_file, fetch_jira_description, client
-            )
-            print("DEBUG: generate_testcases_core returned error:", error)
-            return render_template(
-                'testcases_result.html',
-                content=table_rows,
-                error=error,
-                original_requirement=extracted_text,
-                jira_id=jira_id_out,
-                jira_base_url=os.getenv('JIRA_BASE_URL', '')
-            )
-        return render_template('generate_testcases.html', user_exists=True)
-    else:
-        return render_template('generate_testcases.html')
+    print("DEBUG: session contents at /generate-testcases:", dict(session))
+    # Allow access to test case generation for everyone (logged in or not)
+    if request.method == 'POST':
+        jira_id = request.form.get('jira_id', '').strip()
+        story_text = request.form.get('story_text', '').strip()
+        uploaded_file = request.files.get('story_doc')
+        print("DEBUG: /generate-testcases POST called")
+        print("DEBUG: Jira ID received:", jira_id)
+        print("DEBUG: Story text received:", story_text)
+        from generate_testcases_core import generate_testcases_core
+        from generate_testcases_route import fetch_jira_description
+        client = None
+        table_rows, error, extracted_text, jira_id_out = generate_testcases_core(
+            jira_id, story_text, uploaded_file, fetch_jira_description, client
+        )
+        print("DEBUG: generate_testcases_core returned error:", error)
+        return render_template(
+            'testcases_result.html',
+            content=table_rows,
+            error=error,
+            original_requirement=extracted_text,
+            jira_id=jira_id_out,
+            jira_base_url=os.getenv('JIRA_BASE_URL', '')
+        )
+    return render_template('generate_testcases.html')
 
 @app.route('/update-jira-id', methods=['GET', 'POST'])
 def update_jira_id():

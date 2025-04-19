@@ -1,3 +1,5 @@
+print("DEBUG: ai_utils.py loaded in environment")
+
 import os
 import openai
 import requests

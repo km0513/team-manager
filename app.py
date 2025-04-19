@@ -1045,6 +1045,7 @@ def generate_testcases_auth():
 
 @app.route('/generate-testcases', methods=['GET', 'POST'])
 def generate_testcases():
+    print("DEBUG: /generate-testcases route was hit")
     if session.get('logged_in') or session.get('testcase_user'):
         if request.method == 'POST':
             jira_id = request.form.get('jira_id', '').strip()
@@ -1053,7 +1054,6 @@ def generate_testcases():
             print("DEBUG: /generate-testcases POST called")
             print("DEBUG: Jira ID received:", jira_id)
             print("DEBUG: Story text received:", story_text)
-            # Import the helper and fetch_jira_description from generate_testcases_route for DRY
             from generate_testcases_core import generate_testcases_core
             from generate_testcases_route import fetch_jira_description
             from app import client  # already initialized
@@ -1061,7 +1061,6 @@ def generate_testcases():
                 jira_id, story_text, uploaded_file, fetch_jira_description, client
             )
             print("DEBUG: generate_testcases_core returned error:", error)
-            # Render result template
             return render_template(
                 'testcases_result.html',
                 content=table_rows,

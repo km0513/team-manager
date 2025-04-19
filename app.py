@@ -1046,8 +1046,26 @@ def generate_testcases_auth():
 @app.route('/generate-testcases', methods=['GET', 'POST'])
 def generate_testcases():
     if session.get('logged_in') or session.get('testcase_user'):
-        # Normal testcase generation logic here (reuse existing logic or import from blueprint)
-        # For now, just render the form
+        if request.method == 'POST':
+            jira_id = request.form.get('jira_id', '').strip()
+            story_text = request.form.get('story_text', '').strip()
+            uploaded_file = request.files.get('story_doc')
+            # Import the helper and fetch_jira_description from generate_testcases_route for DRY
+            from generate_testcases_core import generate_testcases_core
+            from generate_testcases_route import fetch_jira_description
+            from app import client  # already initialized
+            table_rows, error, extracted_text, jira_id_out = generate_testcases_core(
+                jira_id, story_text, uploaded_file, fetch_jira_description, client
+            )
+            # Render result template
+            return render_template(
+                'testcases_result.html',
+                content=table_rows,
+                error=error,
+                original_requirement=extracted_text,
+                jira_id=jira_id_out,
+                jira_base_url=os.getenv('JIRA_BASE_URL', '')
+            )
         return render_template('generate_testcases.html', user_exists=True)
     else:
         return render_template('generate_testcases.html')

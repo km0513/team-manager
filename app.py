@@ -1050,6 +1050,9 @@ def generate_testcases():
             jira_id = request.form.get('jira_id', '').strip()
             story_text = request.form.get('story_text', '').strip()
             uploaded_file = request.files.get('story_doc')
+            print("DEBUG: /generate-testcases POST called")
+            print("DEBUG: Jira ID received:", jira_id)
+            print("DEBUG: Story text received:", story_text)
             # Import the helper and fetch_jira_description from generate_testcases_route for DRY
             from generate_testcases_core import generate_testcases_core
             from generate_testcases_route import fetch_jira_description
@@ -1057,6 +1060,7 @@ def generate_testcases():
             table_rows, error, extracted_text, jira_id_out = generate_testcases_core(
                 jira_id, story_text, uploaded_file, fetch_jira_description, client
             )
+            print("DEBUG: generate_testcases_core returned error:", error)
             # Render result template
             return render_template(
                 'testcases_result.html',

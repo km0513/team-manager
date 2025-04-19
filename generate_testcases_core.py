@@ -14,6 +14,9 @@ def generate_testcases_core(jira_id, story_text, uploaded_file, fetch_jira_descr
     Unified core logic for test case generation from Jira, story text, or upload.
     Returns: (table_rows, error, extracted_text, jira_id_out)
     """
+    print("DEBUG: [generate_testcases_core] Called with jira_id=", jira_id)
+    print("DEBUG: [generate_testcases_core] Story text:", story_text)
+    print("DEBUG: [generate_testcases_core] Uploaded file:", uploaded_file)
     extracted_text = ""
     jira_id_out = jira_id
     try:
@@ -27,9 +30,12 @@ def generate_testcases_core(jira_id, story_text, uploaded_file, fetch_jira_descr
         elif story_text:
             extracted_text = story_text
         elif jira_id:
+            print("DEBUG: [generate_testcases_core] Fetching Jira description for:", jira_id)
             extracted_text = fetch_jira_description(jira_id)
+            print("DEBUG: [generate_testcases_core] fetch_jira_description result:", extracted_text)
             jira_id_out = jira_id
         if not extracted_text.strip():
+            print("DEBUG: [generate_testcases_core] Returning:", "testcases_rows length: N/A", "error: Please provide a Jira ID, story text, or upload a document.", "extracted_text: N/A", "jira_id_out: N/A")
             return None, "❌ Please provide a Jira ID, story text, or upload a document.", None, None
         prompt_text = (
             f"You are a QA expert. Based on this user story or feature description:\n\n"
@@ -80,7 +86,9 @@ def generate_testcases_core(jira_id, story_text, uploaded_file, fetch_jira_descr
             except ImportError:
                 html_output = f"<pre>{raw_output}</pre>"
             testcases_rows = f"<tr><td colspan='5'>{html_output}</td></tr>"
+        print("DEBUG: [generate_testcases_core] Returning:", "testcases_rows length:", len(testcases_rows), "error: None", "extracted_text:", extracted_text.strip(), "jira_id_out:", jira_id_out)
         return testcases_rows, None, extracted_text.strip(), jira_id_out
     except Exception as e:
         print("❌ Exception in generate_testcases_core:", traceback.format_exc())
+        print("DEBUG: [generate_testcases_core] Returning:", "testcases_rows length: N/A", "error:", str(e), "extracted_text: N/A", "jira_id_out: N/A")
         return None, f"❌ Error: {str(e)}", None, None

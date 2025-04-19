@@ -33,6 +33,7 @@ def fetch_jira_description(issue_key):
     try:
         response = requests.get(url, headers=headers, auth=auth)
         print(f"DEBUG: Jira API GET {url} status={response.status_code}")
+        print(f"DEBUG: Jira API response text: {response.text}")
         if response.status_code == 404:
             return None, f"Jira ticket '{issue_key}' not found."
         if response.status_code == 401:

@@ -148,29 +148,17 @@
         </table>
       </div>
       {% if user_page and (next_user_page or prev_user_page) %}
-      <div class="flex justify-center my-4 gap-2">
-        {% if prev_user_page %}
-          <form method="get">
-            <input type="hidden" name="start" value="{{ start }}">
-            <input type="hidden" name="end" value="{{ end }}">
-            <input type="hidden" name="work_function" value="{{ selected_function }}">
-            <input type="hidden" name="show_details" value="1">
+        <form method="POST" class="flex items-center justify-center gap-2 mt-2 mb-4">
+          {% if prev_user_page %}
             <input type="hidden" name="user_page" value="{{ prev_user_page }}">
-            <button class="px-4 py-2 bg-upgradAccent text-white rounded hover:bg-upgradRed">Previous Users</button>
-          </form>
-        {% endif %}
-        <span class="px-4 py-2 bg-gray-200 rounded">User Page {{ user_page }}</span>
-        {% if next_user_page %}
-          <form method="get">
-            <input type="hidden" name="start" value="{{ start }}">
-            <input type="hidden" name="end" value="{{ end }}">
-            <input type="hidden" name="work_function" value="{{ selected_function }}">
-            <input type="hidden" name="show_details" value="1">
+            <button class="px-2 py-1 bg-upgradAccent text-white rounded text-xs hover:bg-upgradRed">Previous</button>
+          {% endif %}
+          <span class="px-2 py-1 bg-gray-200 rounded text-xs">User Page {{ user_page }}</span>
+          {% if next_user_page %}
             <input type="hidden" name="user_page" value="{{ next_user_page }}">
-            <button class="px-4 py-2 bg-upgradAccent text-white rounded hover:bg-upgradRed">Next Users</button>
-          </form>
-        {% endif %}
-      </div>
+            <button class="px-2 py-1 bg-upgradAccent text-white rounded text-xs hover:bg-upgradRed">Next</button>
+          {% endif %}
+        </form>
       {% endif %}
     {% endif %}
   </div>

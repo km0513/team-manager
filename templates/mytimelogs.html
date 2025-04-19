@@ -12,6 +12,17 @@
     <p><b>Name:</b> {{ user.name }}</p>
     <p><b>Email:</b> {{ user.email }}</p>
     <p><b>Designation:</b> {{ user.designation }}</p>
+    <p><b>Total Hours Logged This Month:</b> <span class="font-bold text-upgradTeal">{{ total_hours_month }}</span></p>
+    <p><b>Expected Hours This Month:</b> <span class="font-bold text-upgradRed">{{ expected_hours_month }}</span></p>
+    {% if total_hours_month < expected_hours_month %}
+      <div class="mt-2 p-2 bg-yellow-100 border-l-4 border-yellow-500 text-yellow-800 rounded">
+        You have logged less than the expected hours for this month. Please ensure you enter all your timelogs to stay on track!
+      </div>
+    {% else %}
+      <div class="mt-2 p-2 bg-green-100 border-l-4 border-green-500 text-green-800 rounded">
+        Great job! You are up to date with your expected hours for this month. Keep it up!
+      </div>
+    {% endif %}
     <a href="{{ url_for('user_timelog', user_email=user.email) }}" class="mt-4 inline-block bg-upgradTeal hover:bg-upgradPurple text-white px-4 py-2 rounded text-xs font-bold transition">View Today's Timelog</a>
   </div>
   {% elif email_checked %}

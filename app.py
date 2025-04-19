@@ -1193,7 +1193,45 @@ def mytimelogs():
     if email:
         user = User.query.filter_by(email=email).first()
         email_checked = True
-    return render_template('mytimelogs.html', user=user, email_checked=email_checked)
+    total_hours_month = get_total_hours_for_user_month(email) if user else 0
+    expected_hours_month = get_expected_hours_for_month() if user else 0
+    return render_template('mytimelogs.html', user=user, email_checked=email_checked, total_hours_month=total_hours_month, expected_hours_month=expected_hours_month)
+
+def get_total_hours_for_user_month(email):
+    user = User.query.filter_by(email=email).first()
+    if not user or not user.jira_account_id:
+        return 0
+    ist = pytz.timezone('Asia/Kolkata')
+    now = datetime.now(ist)
+    start_date = now.replace(day=1)
+    start = start_date.strftime('%Y-%m-%d')
+    end = now.strftime('%Y-%m-%d')
+    # Use worklog updated API
+    from jira_worklog_batch import get_epoch_ms, fetch_worklog_ids_updated_since, fetch_worklogs_by_ids
+    since_epoch = get_epoch_ms(start)
+    worklog_ids = fetch_worklog_ids_updated_since(JIRA_BASE_URL, headers, auth, since_epoch)
+    all_worklogs = fetch_worklogs_by_ids(JIRA_BASE_URL, headers, auth, worklog_ids)
+    total_seconds = 0
+    for wl in all_worklogs:
+        author = wl.get('author', {}).get('accountId')
+        if author == user.jira_account_id:
+            # Only count logs in this month
+            started = wl.get('started', '')
+            if started and started[:7] == start[:7]:
+                total_seconds += wl.get('timeSpentSeconds', 0)
+    return round(total_seconds / 3600, 2)
+
+def get_expected_hours_for_month():
+    ist = pytz.timezone('Asia/Kolkata')
+    now = datetime.now(ist)
+    start_date = now.replace(day=1)
+    end_date = now
+    total_days = (end_date - start_date).days + 1
+    # Count working days (Mon-Fri)
+    working_days = sum(1 for i in range(total_days)
+                       if (start_date + timedelta(days=i)).weekday() < 5)
+    expected_hours = working_days * 8
+    return expected_hours
 
 @app.route('/api/issue_details', methods=['POST'])
 def api_issue_details():

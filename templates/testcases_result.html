@@ -2,39 +2,43 @@
 {% block content %}
 <div class="container mt-4 d-flex justify-content-center">
   <div class="card shadow rounded-4 p-4 w-100" style="max-width: 1100px; background: #fffbe6; border: 2px solid #f5c542;">
-    <h3 class="mb-4 text-danger fw-bold d-flex align-items-center">
-      <span class="me-2" style="font-size: 1.7rem;">🧪</span> Generated Test Cases for
+    <h3 class="mb-4 text-danger fw-bold d-flex align-items-center" style="gap: 0.1rem; font-size: 1.25rem;">
+      <span style="font-size: 1.25rem;">🧪</span>
+      Generated Test Cases for
       {% if jira_id %}
-        <span class="ms-2 text-dark fw-normal" style="font-size: 1.1rem;"><a href="{{ jira_base_url }}/browse/{{ jira_id }}" target="_blank" rel="noopener" style="text-decoration: underline; color: #b36b00;">{{ jira_id }}</a></span>
+        <span class="text-dark fw-normal" style="font-size: 1.25rem;">
+          <a href="{{ jira_base_url }}/browse/{{ jira_id }}" target="_blank" rel="noopener" style="text-decoration: underline; color: #b36b00;">{{ jira_id }}</a>
+        </span>
       {% else %}
-        <span class="ms-2 text-dark fw-normal" style="font-size: 1.1rem;">Uploaded Requirement/Text </span>
+        <span class="text-dark fw-normal" style="font-size: 1.25rem;">Uploaded Requirement/Text:</span>
       {% endif %}
     </h3>
 
     {% if not jira_id %}
       <div class="mb-3">
-        <div class="accordion" id="uploadedReqAccordion">
-          <div class="accordion-item">
-            <h2 class="accordion-header" id="uploadedReqHeading">
-              <button class="accordion-button collapsed bg-warning-subtle fw-semibold rounded-2" type="button"
-                      data-bs-toggle="collapse" data-bs-target="#uploadedReqCollapse"
-                      aria-expanded="false" aria-controls="uploadedReqCollapse" style="font-size: 1rem;">
-                <span class="me-2">▶</span> View Uploaded Requirement or Text
-              </button>
-            </h2>
-            <div id="uploadedReqCollapse" class="accordion-collapse collapse"
-                 aria-labelledby="uploadedReqHeading" data-bs-parent="#uploadedReqAccordion">
-              <div class="accordion-body"
-                   style="background: #fffde7; border-radius: 6px; padding: 10px; border: 1px solid #ffe066; white-space: pre-wrap; max-height: 350px; overflow-y: auto;">
-                {{ original_requirement|e }}
-              </div>
-            </div>
-          </div>
+        <button class="btn fw-bold mb-2 d-flex align-items-center" type="button" id="toggleReqBtn" style="background: #ffe066; color: #b36b00; border: 2px solid #b36b00; box-shadow: 0 2px 8px #ffe06655; font-size: 1.1rem;">
+          <span id="toggleReqIcon" style="font-size: 1.1rem; margin-right: 0.5rem;">📄</span> View Uploaded Requirement or Text
+        </button>
+        <div id="uploadedReqBox" style="display: none; background: #fffbe6; border-radius: 8px; padding: 14px; border: 2px solid #ffe066; white-space: pre-wrap; max-height: 350px; overflow-y: auto; font-size: 1.07rem; color: #222; box-shadow: 0 2px 12px #ffe06633;">
+          {{ original_requirement|e }}
         </div>
       </div>
+      <script>
+        const btn = document.getElementById('toggleReqBtn');
+        const box = document.getElementById('uploadedReqBox');
+        const icon = document.getElementById('toggleReqIcon');
+        btn.addEventListener('click', function() {
+          if (box.style.display === 'none') {
+            box.style.display = 'block';
+            icon.textContent = '▼';
+          } else {
+            box.style.display = 'none';
+            icon.textContent = '📄';
+          }
+        });
+      </script>
     {% endif %}
 
-    <p class="fw-medium mb-3 text-success">Here are some structured functional test cases based on the input provided:</p>
 
     <div class="table-responsive mb-0">
       <table class="table table-bordered align-middle mb-0" id="testcases-table" style="min-height: 200px;">

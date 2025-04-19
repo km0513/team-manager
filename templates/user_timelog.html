@@ -1,20 +1,14 @@
 {% extends 'base.html' %}
 {% block content %}
 <div class="max-w-5xl mx-auto px-2">
-  <div class="flex items-center justify-between mb-4">
-    <div>
-      {% if previous_date %}
-        <a href="{{ url_for('user_timelog', user_email=user.email, date=previous_date) }}" class="bg-red-400 hover:bg-red-600 text-white px-3 py-1 rounded">Previous Day</a>
-      {% endif %}
-    </div>
-    <div>
-      <span class="bg-gray-200 text-gray-800 px-3 py-1 rounded">{{ display_date_str }}</span>
-    </div>
-    <div>
-      {% if next_date %}
-        <a href="{{ url_for('user_timelog', user_email=user.email, date=next_date) }}" class="bg-blue-400 hover:bg-blue-600 text-white px-3 py-1 rounded">{{ next_date == date_obj.strftime('%Y-%m-%d') and 'Today' or 'Next Day' }}</a>
-      {% endif %}
-    </div>
+  <div class="flex items-center justify-center gap-2 mb-4">
+    {% if previous_date %}
+      <a href="{{ url_for('user_timelog', user_email=user.email, date=previous_date) }}" class="bg-red-400 hover:bg-red-600 text-white px-3 py-1 rounded">Previous Day</a>
+    {% endif %}
+    {% if next_date %}
+      <a href="{{ url_for('user_timelog', user_email=user.email, date=next_date) }}" class="bg-blue-400 hover:bg-blue-600 text-white px-3 py-1 rounded">Next Day</a>
+    {% endif %}
+    <span class="bg-gray-200 text-gray-800 px-3 py-1 rounded ml-2">{{ display_date_str }}</span>
   </div>
   <div class="mb-4 text-lg font-semibold">Total Logged Hours: {{ total_logged_hours }}</div>
   <h3 class="text-xl font-bold">📅 Timelog for {{ user.name }} ({{ user.email }}) on {{ display_date_str }}</h3>

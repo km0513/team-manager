@@ -108,27 +108,17 @@
 
   <!-- User pagination controls (distinct, below date navigation) -->
   {% if user_page and (next_user_page or prev_user_page) %}
-  <div class="flex justify-center my-4 gap-2">
-    {% if prev_user_page %}
-      <form method="get">
-        <input type="hidden" name="date" value="{{ start }}">
-        <input type="hidden" name="work_function" value="{{ selected_function }}">
+    <form method="POST" class="flex items-center justify-center gap-2 mt-2 mb-4">
+      {% if prev_user_page %}
         <input type="hidden" name="user_page" value="{{ prev_user_page }}">
-        <input type="hidden" name="user_email" value="{{ user_email }}">
-        <button type="submit" class="px-3 py-1 rounded bg-upgradRed text-white font-bold text-xs">Previous Users</button>
-      </form>
-    {% endif %}
-    <span class="px-4 py-2 bg-gray-200 rounded">User Page {{ user_page }}</span>
-    {% if next_user_page %}
-      <form method="get">
-        <input type="hidden" name="date" value="{{ start }}">
-        <input type="hidden" name="work_function" value="{{ selected_function }}">
+        <button type="submit" class="px-2 py-1 rounded bg-upgradRed text-white font-bold text-xs">Previous</button>
+      {% endif %}
+      <span class="px-2 py-1 bg-gray-200 rounded text-xs">User Page {{ user_page }}</span>
+      {% if next_user_page %}
         <input type="hidden" name="user_page" value="{{ next_user_page }}">
-        <input type="hidden" name="user_email" value="{{ user_email }}">
-        <button type="submit" class="px-3 py-1 rounded bg-upgradRed text-white font-bold text-xs">Next Users</button>
-      </form>
-    {% endif %}
-  </div>
+        <button type="submit" class="px-2 py-1 rounded bg-upgradRed text-white font-bold text-xs">Next</button>
+      {% endif %}
+    </form>
   {% endif %}
 
   <div class="flex flex-wrap gap-2 justify-end mb-2">

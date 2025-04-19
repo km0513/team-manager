@@ -50,7 +50,6 @@
         <label class="block text-xs font-medium text-upgradRed mb-1">Enter Jira Ticket ID (required for validation)</label>
         <div class="flex gap-2 items-center mb-2">
           <input type="text" name="jira_id" id="jiraIdInput" class="block w-full rounded-lg border border-upgradAccent bg-white px-3 py-2 text-sm shadow-sm focus:border-upgradRed focus:ring-2 focus:ring-upgradYellow focus:outline-none transition-all duration-150" placeholder="e.g. ABC-123" required>
-          <button type="button" id="validateJiraBtn" class="px-3 py-2 bg-upgradYellow hover:bg-upgradAccent text-upgradRed border border-upgradAccent text-xs font-semibold rounded shadow">Validate</button>
         </div>
         <div id="jiraError" class="text-upgradRed font-semibold mb-2" style="display:none;"></div>
         <div id="jiraSuccess" class="text-upgradGreen font-semibold mb-2" style="display:none;"></div>
@@ -211,66 +210,31 @@
     console.error('feedbackForm event handler was not attached.');
   }
 
-  // --- Jira Ticket Validation Logic ---
-  const validateJiraBtn = document.getElementById('validateJiraBtn');
-  const jiraIdInput = document.getElementById('jiraIdInput');
-  const jiraError = document.getElementById('jiraError');
-  const jiraSuccess = document.getElementById('jiraSuccess');
-  const testcaseDetails = document.getElementById('testcaseDetails');
-  let jiraValidated = false;
-
-  if (validateJiraBtn) {
-    validateJiraBtn.addEventListener('click', async function() {
-      jiraError.style.display = 'none';
-      jiraSuccess.style.display = 'none';
-      testcaseDetails.style.display = 'none';
-      jiraValidated = false;
-      const jiraId = jiraIdInput.value.trim();
-      if (!jiraId) {
-        jiraError.textContent = 'Jira Ticket ID is required.';
-        jiraError.style.display = 'block';
-        return;
-      }
-      try {
-        validateJiraBtn.disabled = true;
-        validateJiraBtn.textContent = 'Validating...';
-        const resp = await fetch(`/get-jira-description?jira_id=${encodeURIComponent(jiraId)}`);
-        const data = await resp.json();
-        console.log('Jira validation response:', {status: resp.status, data: data});
-        if (resp.status !== 200 || data.error) {
-          console.log('Setting error message:', data.error, jiraError);
-          jiraError.textContent = data.error || 'Invalid or inaccessible Jira ID.';
-          jiraError.style.display = 'block';
-          testcaseDetails.style.display = 'none';
-          jiraValidated = false;
-        } else {
-          jiraSuccess.textContent = 'Jira Ticket validated successfully!';
-          jiraSuccess.style.display = 'block';
-          testcaseDetails.style.display = 'block';
-          jiraValidated = true;
-        }
-      } catch (err) {
-        jiraError.textContent = 'Error validating Jira ID.';
-        jiraError.style.display = 'block';
-        testcaseDetails.style.display = 'none';
-        jiraValidated = false;
-        console.log('Validation AJAX error:', err);
-      } finally {
-        validateJiraBtn.disabled = false;
-        validateJiraBtn.textContent = 'Validate';
-      }
-    });
-  }
-
   // Prevent form submit if Jira not validated
   if (feedbackForm) {
     feedbackForm.addEventListener('submit', function(e) {
       const type = inputType.value;
-      if (type === 'testcase_story' && !jiraValidated) {
-        jiraError.textContent = 'Please validate Jira Ticket ID before generating test cases.';
-        jiraError.style.display = 'block';
-        e.preventDefault();
-        return false;
+      if (type === 'testcase_story') {
+        const jiraIdInput = document.getElementById('jiraIdInput');
+        const jiraError = document.getElementById('jiraError');
+        if (!jiraIdInput) {
+          console.error('jiraIdInput not found');
+          return true;
+        }
+        if (!jiraError) {
+          console.error('jiraError not found');
+          return true;
+        }
+        const jiraId = jiraIdInput.value.trim();
+        jiraError.style.display = 'none';
+        jiraError.textContent = '';
+        if (!jiraId) {
+          jiraError.textContent = 'Jira Ticket ID is required.';
+          jiraError.style.display = 'block';
+          e.preventDefault();
+          console.log('Prevented submit: Jira ID required');
+          return false;
+        }
       }
     });
   }

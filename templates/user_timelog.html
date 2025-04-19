@@ -56,7 +56,7 @@
             </td>
             <td>{{ log.parent_summary }}</td>
             <td>{{ log.summary }}</td>
-            <td class="font-bold">{{ log.hours }}</td>
+            <td class="font-bold">{{ log.hours | round_half }}</td>
           </tr>
           {% endfor %}
         </tbody>

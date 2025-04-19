@@ -201,7 +201,7 @@ def require_login():
         'login', 'static', 'HelperQA_AI', 'generate_testcases', 'generate_testcases_auth',
         'timelog_today', 'users', 'export_users', 'export_timelog_links', 'mytimelogs',
         'user_timelog', 'HelperQA_AI', 'generate_testcases', 'get_jira_description',
-        'util_ai_zone', 'analyseui', 'testcases_result'  # Allow test case results page from util-ai-zone without login
+        'analyseui', 'testcases_result', 'generate_testcases', 'generate_testcases_auth'  # Allow test case results page and test case generator from util-ai-zone and HelperQA-AI without login
     ]:
         return redirect('/login')
 
@@ -1042,7 +1042,9 @@ def user_timelog(user_email):
     previous_date = (date_obj - timedelta(days=1)).strftime('%Y-%m-%d')
     next_date = (date_obj + timedelta(days=1)).strftime('%Y-%m-%d') if date_obj < datetime.now().date() else None
     display_date_str = date_obj.strftime('%d %B %Y')
-    return render_template('user_timelog.html', user=user, logs=logs, is_holiday=is_holiday, holiday_name=holiday_name, is_weekend=is_weekend, is_on_leave=is_on_leave, date_obj=date_obj, total_logged_hours=total_logged_hours, previous_date=previous_date, next_date=next_date, display_date_str=display_date_str)
+    # Round total_logged_hours to the nearest 0.5 for display
+    total_logged_hours_rounded = round(float(total_logged_hours) * 2) / 2
+    return render_template('user_timelog.html', user=user, logs=logs, is_holiday=is_holiday, holiday_name=holiday_name, is_weekend=is_weekend, is_on_leave=is_on_leave, date_obj=date_obj, total_logged_hours=total_logged_hours_rounded, previous_date=previous_date, next_date=next_date, display_date_str=display_date_str)
 
 @app.route('/generate-testcases-auth', methods=['POST'])
 def generate_testcases_auth():
@@ -1290,77 +1292,6 @@ def get_jira_description():
     if err:
         return jsonify({'description': f'Error: {err}'})
     return jsonify({'description': desc})
-
-@app.route('/UTIL-AI-Zone', methods=['GET', 'POST'])
-def util_ai_zone():
-    if request.method == 'POST':
-        utility_type = request.form.get('utility_type')
-        if utility_type == 'screenshot' and 'screenshot' in request.files:
-            screenshot = request.files['screenshot']
-            if screenshot.filename == '':
-                flash('No file selected!', 'danger')
-                return redirect(url_for('util_ai_zone'))
-            import tempfile
-            temp_dir = tempfile.gettempdir()
-            temp_path = os.path.join(temp_dir, screenshot.filename)
-            screenshot.save(temp_path)
-            with open(temp_path, 'rb') as f:
-                image_bytes = f.read()
-            os.remove(temp_path)
-            try:
-                ai_result, err = ai_util.analyze_image(image_bytes)
-                if err:
-                    ai_result = f"AI analysis error: {err}"
-            except Exception as e:
-                ai_result = f"AI analysis exception: {e}"
-            import base64
-            image_url = "data:image/png;base64," + base64.b64encode(image_bytes).decode('utf-8')
-            return render_template('analyseui.html', ai_result=ai_result, image_url=image_url)
-        elif utility_type == 'url_analyze':
-            page_url = request.form.get('page_url', '').strip()
-            if not page_url:
-                flash('Please enter a URL to analyze.', 'danger')
-                return redirect(url_for('util_ai_zone'))
-            # --- Use the same prompt and logic as screenshot analysis ---
-            try:
-                ai_result, err = ai_util.analyze_url(page_url)
-                if err:
-                    ai_result = f"AI analysis error: {err}"
-            except Exception as e:
-                ai_result = f"AI analysis exception: {e}"
-            return render_template('analyseui.html', ai_result=ai_result, page_url=page_url)
-        elif utility_type == 'testcase_story':
-            jira_id = request.form.get('jira_id', '').strip()
-            story_text = request.form.get('story_text', '').strip()
-            uploaded_file = request.files.get('requirement_file')
-            if not (jira_id or story_text or (uploaded_file and uploaded_file.filename)):
-                flash('Please provide a Jira ID, story text, or upload a requirements document.', 'danger')
-                return redirect(url_for('util_ai_zone'))
-            # Only validate Jira ID if it is entered
-            if jira_id:
-                desc, err = fetch_jira_description(jira_id)
-                if desc is None or (err and str(err).startswith('Jira')) or (err and str(err).startswith('Unauthorized')) or (err and str(err).startswith('Jira fetch failed')):
-                    flash(err or 'Invalid or inaccessible Jira ID.', 'danger')
-                    return redirect(url_for('util_ai_zone'))
-            # If valid or not using Jira, proceed to generate test cases
-            from generate_testcases_core import generate_testcases_core
-            from openai import OpenAI
-            client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-            table_rows, error, extracted_text, jira_id_out = generate_testcases_core(
-                jira_id, story_text, uploaded_file, fetch_jira_description, client
-            )
-            return render_template(
-                'testcases_result.html',
-                content=table_rows,
-                error=error,
-                original_requirement=extracted_text,
-                jira_id=jira_id_out,
-                jira_base_url=os.getenv('JIRA_BASE_URL', '')
-            )
-        else:
-            flash('Please select a valid utility and provide required input.', 'danger')
-            return redirect(url_for('util_ai_zone'))
-    return render_template('UTIL-AI-Zone.html', ai_result=None, image_url=None)
 
 app.register_blueprint(testcase_bp)
 

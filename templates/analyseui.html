@@ -1,0 +1,51 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="max-w-2xl mx-auto bg-upgradLight rounded-xl shadow p-8 mt-10 border border-upgradAccent">
+  <h2 class="text-3xl font-bold text-upgradRed mb-4 text-center">AI UI Analysis Result</h2>
+  <div class="mb-8">
+    {% if image_url %}
+      <h5 class="text-base font-semibold mb-1 text-upgradRed">Uploaded Screenshot</h5>
+      <img src="{{ image_url }}" class="w-full rounded-lg shadow border border-upgradAccent mb-3" alt="Screenshot Preview">
+    {% elif page_url %}
+      <h5 class="text-base font-semibold mb-1 text-upgradRed">Analyzed URL</h5>
+      <code class="block mb-2 text-xs text-upgradRed bg-upgradYellow rounded px-2 py-1">{{ page_url }}</code>
+      <img src="https://image.thum.io/get/width/800/crop/768/{{ page_url }}" class="w-full rounded-lg shadow border border-upgradAccent mt-2 mb-3" alt="URL Preview">
+    {% endif %}
+  </div>
+  <div>
+    <h5 class="text-base font-semibold mb-3 text-upgradRed">AI Analysis</h5>
+    <div style="background: linear-gradient(135deg, #fffbe6 0%, #f5f7fa 100%); color: #222; padding: 1.4rem 1.6rem; border-radius: 14px; border: 2px solid #f5c542; min-height: 220px; font-size: 1.13rem; line-height: 1.8; word-break: break-word; white-space: pre-line; box-shadow: 0 2px 12px 0 rgba(245,197,66,0.08); letter-spacing: 0.01em;">
+      {% if ai_result %}
+        {# Split out UI/UX review, suggestions, and test cases as separate blocks if present #}
+        {% set ui_review_start = ai_result.find('UI/UX review') %}
+        {% set suggestions_start = ai_result.find('Suggestions for improvements') %}
+        {% set testcases_start = ai_result.find('Test Cases') %}
+
+        {% if ui_review_start != -1 %}
+          <div class="mb-5">
+            <div class="font-bold text-upgradRed mb-2">UI/UX Review</div>
+            <div class="bg-white border border-upgradAccent rounded-lg p-3 mb-2 whitespace-pre-line" style="font-size:1rem;">{{ ai_result[ui_review_start + 13 : suggestions_start if suggestions_start!=-1 else testcases_start if testcases_start!=-1 else None]|safe }}</div>
+          </div>
+        {% endif %}
+        {% if suggestions_start != -1 %}
+          <div class="mb-5">
+            <div class="font-bold text-upgradRed mb-2">Suggestions for Improvements</div>
+            <div class="bg-white border border-upgradAccent rounded-lg p-3 mb-2 whitespace-pre-line" style="font-size:1rem;">{{ ai_result[suggestions_start + 27 : testcases_start if testcases_start!=-1 else None]|safe }}</div>
+          </div>
+        {% endif %}
+        {% if testcases_start != -1 %}
+          <div class="mb-1">
+            <div class="font-bold text-upgradRed mb-2">Test Cases</div>
+            <div class="bg-white border border-upgradAccent rounded-lg p-3 whitespace-pre-line" style="font-size:1rem;">{{ ai_result[testcases_start + 10 : ]|safe }}</div>
+          </div>
+        {% endif %}
+        {% if ui_review_start == -1 and suggestions_start == -1 and testcases_start == -1 %}
+          {{ ai_result|safe }}
+        {% endif %}
+      {% else %}
+        No analysis found.
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

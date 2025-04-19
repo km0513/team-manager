@@ -1,0 +1,111 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="max-w-2xl mx-auto bg-upgradLight rounded-xl shadow p-8 mt-10 border border-upgradAccent">
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      <div class="mb-4">
+        {% for category, message in messages %}
+          <div class="p-3 rounded border text-center font-semibold {{ 'bg-red-100 text-red-700 border-red-300' if category == 'danger' else 'bg-upgradYellow text-upgradRed border-upgradAccent' }}">
+            {{ message }}
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+  {% endwith %}
+  <h2 class="text-3xl font-bold text-upgradRed mb-4 text-center">UTIL-AI-Zone</h2>
+  <p class="text-center text-upgradPurple mb-6 text-lg">Welcome to your all-in-one AI Utility Zone!<br>
+  Use this space to access, test, and expand your AI-powered tools and utilities.</p>
+  {% if image_url or ai_result %}
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
+      <div>
+        {% if image_url %}
+          <h5 class="text-base font-semibold mb-1 text-upgradRed">Uploaded Screenshot</h5>
+          <img src="{{ image_url }}" class="w-full rounded-lg shadow border border-upgradAccent" alt="Screenshot Preview">
+        {% endif %}
+      </div>
+      <div>
+        <h5 class="text-base font-semibold mb-1 text-upgradRed">AI Analysis</h5>
+        <div class="p-4 bg-upgradYellow border border-upgradAccent rounded-lg min-h-[200px] prose prose-sm max-w-none">
+          {{ ai_result|safe if ai_result else "No analysis found." }}
+        </div>
+      </div>
+    </div>
+  {% endif %}
+  {% if result %}
+    <div class="mb-4 p-3 rounded bg-upgradYellow border border-upgradAccent text-upgradRed text-center font-semibold">
+      {{ result }}
+    </div>
+  {% endif %}
+  <form id="aiUtilityForm" method="POST" action="" enctype="multipart/form-data" class="space-y-6 mt-8">
+    <div class="flex flex-col gap-4">
+      <label class="font-semibold text-upgradRed">Choose an AI Utility:</label>
+      <div class="flex flex-col gap-2">
+        <label class="flex items-center gap-2">
+          <input type="radio" name="utility_type" value="screenshot" checked class="accent-upgradRed" />
+          Screenshot Upload
+        </label>
+        <label class="flex items-center gap-2">
+          <input type="radio" name="utility_type" value="url_analyze" class="accent-upgradRed" />
+          Analyze by URL
+        </label>
+        <label class="flex items-center gap-2">
+          <input type="radio" name="utility_type" value="testcase_story" class="accent-upgradRed" />
+          Testcase from Story
+        </label>
+      </div>
+    </div>
+    <div id="uploadGroup" class="mt-4">
+      <label class="block text-xs font-medium text-upgradRed mb-1">Upload Screenshot</label>
+      <input type="file" name="screenshot" accept="image/*" class="block w-full text-sm text-upgradRed border border-upgradAccent rounded-lg cursor-pointer bg-white focus:outline-none" required />
+    </div>
+    <div id="urlGroup" class="mt-4 hidden">
+      <label class="block text-xs font-medium text-upgradRed mb-1">Enter Page URL</label>
+      <input type="url" name="page_url" class="block w-full rounded-lg border border-upgradAccent bg-white px-3 py-2 text-sm shadow-sm focus:border-upgradRed focus:ring-2 focus:ring-upgradYellow focus:outline-none transition-all duration-150" placeholder="https://example.com" />
+    </div>
+    <div id="testcaseGroup" class="mt-4 hidden">
+      <label class="block text-xs font-medium text-upgradRed mb-1">Jira ID or Paste Story or Upload Document</label>
+      <input type="text" name="jira_id" id="jiraIdInput" class="block w-full rounded-lg border border-upgradAccent bg-white px-3 py-2 text-sm shadow-sm mb-2" placeholder="e.g. ABC-123">
+      <textarea name="story_text" class="block w-full rounded-lg border border-upgradAccent bg-white px-3 py-2 text-sm shadow-sm mb-2" rows="4" placeholder="Or paste the story/epic/bug here..."></textarea>
+      <input type="file" name="requirement_file" accept=".txt,.doc,.docx,.pdf" class="block w-full text-sm text-upgradRed border border-upgradAccent rounded-lg cursor-pointer bg-white focus:outline-none mb-2" />
+    </div>
+    <button type="submit" class="w-full bg-upgradRed hover:bg-upgradAccent text-white font-bold px-4 py-2 rounded transition">Analyse/Testcases</button>
+  </form>
+</div>
+<script>
+  // Toggle form fields based on selected utility type
+  const utilityRadios = document.querySelectorAll('input[name="utility_type"]');
+  const uploadGroup = document.getElementById('uploadGroup');
+  const urlGroup = document.getElementById('urlGroup');
+  const testcaseGroup = document.getElementById('testcaseGroup');
+
+  utilityRadios.forEach(radio => {
+    radio.addEventListener('change', function() {
+      if (this.value === 'screenshot') {
+        uploadGroup.classList.remove('hidden');
+        urlGroup.classList.add('hidden');
+        testcaseGroup.classList.add('hidden');
+        uploadGroup.querySelector('input').required = true;
+        urlGroup.querySelector('input').required = false;
+      } else if (this.value === 'url_analyze') {
+        uploadGroup.classList.add('hidden');
+        urlGroup.classList.remove('hidden');
+        testcaseGroup.classList.add('hidden');
+        uploadGroup.querySelector('input').required = false;
+        urlGroup.querySelector('input').required = true;
+      } else if (this.value === 'testcase_story') {
+        uploadGroup.classList.add('hidden');
+        urlGroup.classList.add('hidden');
+        testcaseGroup.classList.remove('hidden');
+        uploadGroup.querySelector('input').required = false;
+        urlGroup.querySelector('input').required = false;
+      }
+    });
+  });
+
+  window.addEventListener('DOMContentLoaded', function() {
+    utilityRadios.forEach(radio => {
+      if(radio.checked) radio.dispatchEvent(new Event('change'));
+    });
+  });
+</script>
+{% endblock %}

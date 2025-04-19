@@ -31,8 +31,12 @@ def generate_testcases_core(jira_id, story_text, uploaded_file, fetch_jira_descr
             extracted_text = story_text
         elif jira_id:
             print("DEBUG: [generate_testcases_core] Fetching Jira description for:", jira_id)
-            extracted_text = fetch_jira_description(jira_id)
-            print("DEBUG: [generate_testcases_core] fetch_jira_description result:", extracted_text)
+            desc, error = fetch_jira_description(jira_id)
+            print("DEBUG: [generate_testcases_core] fetch_jira_description result:", desc, error)
+            if error:
+                print("DEBUG: [generate_testcases_core] Jira fetch error:", error)
+                return None, f"❌ Jira fetch error: {error}", None, None
+            extracted_text = desc
             jira_id_out = jira_id
         if not extracted_text.strip():
             print("DEBUG: [generate_testcases_core] Returning:", "testcases_rows length: N/A", "error: Please provide a Jira ID, story text, or upload a document.", "extracted_text: N/A", "jira_id_out: N/A")

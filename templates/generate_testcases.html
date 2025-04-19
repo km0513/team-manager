@@ -13,8 +13,12 @@
   {% endif %}
   {% if session.get('logged_in') or session.get('ai_helper_email') or user_exists %}
     <form method="POST" enctype="multipart/form-data" class="flex flex-col gap-4" action="/generate-testcases">
-      <input type="text" name="jira_id" placeholder="Jira ID (optional)" class="rounded border border-upgradRed px-3 py-2 text-sm focus:ring-2 focus:ring-upgradYellow">
-      <textarea name="story_text" rows="5" placeholder="Paste user story or feature description here..." class="rounded border border-upgradRed px-3 py-2 text-sm focus:ring-2 focus:ring-upgradYellow"></textarea>
+      <label class="font-bold text-upgradRed">Jira Ticket ID (required for Jira validation)</label>
+      <input type="text" name="jira_id" placeholder="Enter Jira Ticket ID (e.g., ABC-123)" class="rounded border border-upgradRed px-3 py-2 text-sm focus:ring-2 focus:ring-upgradYellow" required>
+      {% if jira_error %}
+        <div class="text-upgradRed font-semibold mb-2">{{ jira_error }}</div>
+      {% endif %}
+      <textarea name="story_text" rows="5" placeholder="Paste user story or feature description here... (optional)" class="rounded border border-upgradRed px-3 py-2 text-sm focus:ring-2 focus:ring-upgradYellow"></textarea>
       <input type="file" name="story_doc" accept=".txt,.docx" class="rounded border border-upgradRed px-3 py-2 text-sm focus:ring-2 focus:ring-upgradYellow">
       <div class="mb-4">
         <label>

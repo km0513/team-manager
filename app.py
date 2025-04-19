@@ -1,4 +1,5 @@
-from flask import Flask, render_template, request, redirect, url_for, session, jsonify
+import os
+from flask import Flask, render_template, request, redirect, url_for, session, jsonify, flash
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from werkzeug.utils import secure_filename
@@ -12,7 +13,6 @@ matplotlib.use('Agg')  # use non-interactive backend for server environments
 import matplotlib.pyplot as plt
 
 import re
-import os
 import json
 import base64
 from datetime import datetime, timedelta, date
@@ -27,7 +27,7 @@ from collections import defaultdict
 from jira_worklog_batch import get_epoch_ms, fetch_worklog_ids_updated_since, fetch_worklogs_by_ids, fetch_issue_details_bulk
 
 from generate_testcases_core import generate_testcases_core
-from generate_testcases_route import fetch_jira_description
+from generate_testcases_route import fetch_jira_description, testcase_bp
 from ai_utils import AIUtility
 
 # Initialize Flask app
@@ -197,9 +197,12 @@ def round_half(value):
 
 @app.before_request
 def require_login():
-    if 'logged_in' not in session and request.endpoint not in ['login', 'static', 'HelperQA_AI', 'generate_testcases', 'generate_testcases_auth',
-            'timelog_today', 'users', 'export_users', 'export_timelog_links', 'mytimelogs',
-            'user_timelog', 'HelperQA_AI', 'generate_testcases']:
+    if 'logged_in' not in session and request.endpoint not in [
+        'login', 'static', 'HelperQA_AI', 'generate_testcases', 'generate_testcases_auth',
+        'timelog_today', 'users', 'export_users', 'export_timelog_links', 'mytimelogs',
+        'user_timelog', 'HelperQA_AI', 'generate_testcases', 'get_jira_description',
+        'util_ai_zone', 'analyseui', 'testcases_result'  # Allow test case results page from util-ai-zone without login
+    ]:
         return redirect('/login')
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -858,13 +861,18 @@ def timelog_today(user_email=None):
     overall_total_logged = 0
     overall_total_expected = 0
     if not cache_data:
+        # Fetch from Jira and cache using /worklog/updated for efficiency
         since_epoch = get_epoch_ms(start)
         until_epoch = get_epoch_ms(end) + 24*3600*1000 - 1
+        # 1. Get all updated worklog IDs since start
         worklog_ids = fetch_worklog_ids_updated_since(JIRA_BASE_URL, headers, auth, since_epoch)
+        # 2. Fetch worklog details in batch
         all_worklogs = fetch_worklogs_by_ids(JIRA_BASE_URL, headers, auth, worklog_ids)
+        # 3. Filter worklogs by date, user, and build user map
         user_map_all = {u.jira_account_id: u.name for u in filtered_users}
         detailed_data_all = defaultdict(list)
         expected_map = {}
+        # Collect all unique issue IDs
         issue_ids = set()
         for wl in all_worklogs:
             author_id = wl.get('author', {}).get('accountId')
@@ -872,10 +880,14 @@ def timelog_today(user_email=None):
             if author_id in user_map_all and start <= started <= end:
                 issue_id = str(wl.get('issueId'))
                 issue_ids.add(issue_id)
+        print("[DEBUG] Issue IDs sent to Jira bulk API:", issue_ids)
+        # Fetch issue details in bulk (fallback to individual if bulk fails)
         issue_details = fetch_issue_details_bulk(JIRA_BASE_URL, headers, auth, issue_ids) if issue_ids else {}
         if not issue_details:
+            print("[DEBUG] Bulk API returned no data, falling back to individual issue fetches.")
             from jira_worklog_batch import fetch_issue_details_individual
             issue_details = fetch_issue_details_individual(JIRA_BASE_URL, headers, auth, issue_ids)
+        print("[DEBUG] Jira issue details response (truncated):", str(issue_details)[:500])
         for wl in all_worklogs:
             author_id = wl.get('author', {}).get('accountId')
             started = wl.get('started', '')[:10]
@@ -1047,7 +1059,7 @@ def generate_testcases_auth():
 def generate_testcases():
     print("DEBUG: /generate-testcases route was hit")
     print("DEBUG: session contents at /generate-testcases:", dict(session))
-    # Allow access to test case generation for everyone (logged in or not)
+    jira_error = None
     if request.method == 'POST':
         jira_id = request.form.get('jira_id', '').strip()
         story_text = request.form.get('story_text', '').strip()
@@ -1055,8 +1067,15 @@ def generate_testcases():
         print("DEBUG: /generate-testcases POST called")
         print("DEBUG: Jira ID received:", jira_id)
         print("DEBUG: Story text received:", story_text)
-        from generate_testcases_core import generate_testcases_core
+        # Validate Jira ID before generating test cases
         from generate_testcases_route import fetch_jira_description
+        desc, err = fetch_jira_description(jira_id)
+        print("DEBUG: Jira validation result:", desc, err)
+        if err or not desc:
+            jira_error = f"Invalid or inaccessible Jira ID: {jira_id}. Please check and try again."
+            return render_template('generate_testcases.html', jira_error=jira_error)
+        # If valid, proceed to generate test cases
+        from generate_testcases_core import generate_testcases_core
         client = None
         table_rows, error, extracted_text, jira_id_out = generate_testcases_core(
             jira_id, story_text, uploaded_file, fetch_jira_description, client
@@ -1271,6 +1290,79 @@ def get_jira_description():
     if err:
         return jsonify({'description': f'Error: {err}'})
     return jsonify({'description': desc})
+
+@app.route('/UTIL-AI-Zone', methods=['GET', 'POST'])
+def util_ai_zone():
+    if request.method == 'POST':
+        utility_type = request.form.get('utility_type')
+        if utility_type == 'screenshot' and 'screenshot' in request.files:
+            screenshot = request.files['screenshot']
+            if screenshot.filename == '':
+                flash('No file selected!', 'danger')
+                return redirect(url_for('util_ai_zone'))
+            import tempfile
+            temp_dir = tempfile.gettempdir()
+            temp_path = os.path.join(temp_dir, screenshot.filename)
+            screenshot.save(temp_path)
+            with open(temp_path, 'rb') as f:
+                image_bytes = f.read()
+            os.remove(temp_path)
+            try:
+                ai_result, err = ai_util.analyze_image(image_bytes)
+                if err:
+                    ai_result = f"AI analysis error: {err}"
+            except Exception as e:
+                ai_result = f"AI analysis exception: {e}"
+            import base64
+            image_url = "data:image/png;base64," + base64.b64encode(image_bytes).decode('utf-8')
+            return render_template('analyseui.html', ai_result=ai_result, image_url=image_url)
+        elif utility_type == 'url_analyze':
+            page_url = request.form.get('page_url', '').strip()
+            if not page_url:
+                flash('Please enter a URL to analyze.', 'danger')
+                return redirect(url_for('util_ai_zone'))
+            # --- Use the same prompt and logic as screenshot analysis ---
+            try:
+                ai_result, err = ai_util.analyze_url(page_url)
+                if err:
+                    ai_result = f"AI analysis error: {err}"
+            except Exception as e:
+                ai_result = f"AI analysis exception: {e}"
+            return render_template('analyseui.html', ai_result=ai_result, page_url=page_url)
+        elif utility_type == 'testcase_story':
+            jira_id = request.form.get('jira_id', '').strip()
+            story_text = request.form.get('story_text', '').strip()
+            uploaded_file = request.files.get('requirement_file')
+            if not (jira_id or story_text or (uploaded_file and uploaded_file.filename)):
+                flash('Please provide a Jira ID, story text, or upload a requirements document.', 'danger')
+                return redirect(url_for('util_ai_zone'))
+            # Only validate Jira ID if it is entered
+            if jira_id:
+                desc, err = fetch_jira_description(jira_id)
+                if desc is None or (err and str(err).startswith('Jira')) or (err and str(err).startswith('Unauthorized')) or (err and str(err).startswith('Jira fetch failed')):
+                    flash(err or 'Invalid or inaccessible Jira ID.', 'danger')
+                    return redirect(url_for('util_ai_zone'))
+            # If valid or not using Jira, proceed to generate test cases
+            from generate_testcases_core import generate_testcases_core
+            from openai import OpenAI
+            client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+            table_rows, error, extracted_text, jira_id_out = generate_testcases_core(
+                jira_id, story_text, uploaded_file, fetch_jira_description, client
+            )
+            return render_template(
+                'testcases_result.html',
+                content=table_rows,
+                error=error,
+                original_requirement=extracted_text,
+                jira_id=jira_id_out,
+                jira_base_url=os.getenv('JIRA_BASE_URL', '')
+            )
+        else:
+            flash('Please select a valid utility and provide required input.', 'danger')
+            return redirect(url_for('util_ai_zone'))
+    return render_template('UTIL-AI-Zone.html', ai_result=None, image_url=None)
+
+app.register_blueprint(testcase_bp)
 
 if __name__ == '__main__':
     with app.app_context():

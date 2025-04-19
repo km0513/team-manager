@@ -47,20 +47,27 @@
 
       <!-- Test Case Generator Section -->
       <div id="testcaseGroup" class="hidden mt-2">
-        <label class="block text-xs font-medium text-upgradRed mb-1">Enter Jira ID or Paste Story Description</label>
-        <input type="text" name="jira_id" class="block w-full rounded-lg border border-upgradAccent bg-white px-3 py-2 text-sm shadow-sm focus:border-upgradRed focus:ring-2 focus:ring-upgradYellow focus:outline-none transition-all duration-150 mb-2" placeholder="Optional: JIRA-1234">
-        <textarea name="story_text" class="block w-full rounded-lg border border-upgradAccent bg-white px-3 py-2 text-sm shadow-sm focus:border-upgradRed focus:ring-2 focus:ring-upgradYellow focus:outline-none transition-all duration-150" rows="4" placeholder="Or paste the story/epic/bug here..."></textarea>
-        <label class="block text-xs font-medium text-upgradRed mb-1">Or Upload a Document</label>
-        <input type="file" name="story_doc" class="block w-full rounded-lg border border-upgradAccent bg-white px-3 py-2 text-sm shadow-sm focus:border-upgradRed focus:ring-2 focus:ring-upgradYellow focus:outline-none transition-all duration-150" accept=".txt,.pdf,.doc,.docx">
-        <div class="mt-2">
-          <label class="inline-flex items-center">
-            <input type="checkbox" name="use_lxp_context" value="yes" class="mr-2">
-            <span class="text-xs font-bold text-upgradRed">Use LXP related context</span>
-          </label>
+        <label class="block text-xs font-medium text-upgradRed mb-1">Enter Jira Ticket ID (required for validation)</label>
+        <div class="flex gap-2 items-center mb-2">
+          <input type="text" name="jira_id" id="jiraIdInput" class="block w-full rounded-lg border border-upgradAccent bg-white px-3 py-2 text-sm shadow-sm focus:border-upgradRed focus:ring-2 focus:ring-upgradYellow focus:outline-none transition-all duration-150" placeholder="e.g. ABC-123" required>
+          <button type="button" id="validateJiraBtn" class="px-3 py-2 bg-upgradYellow hover:bg-upgradAccent text-upgradRed border border-upgradAccent text-xs font-semibold rounded shadow">Validate</button>
         </div>
-        <div class="flex gap-2 mt-3" id="btnGroupTestcase">
-          <input type="hidden" name="ai_mode" id="aiModeTestcase" value="testcases">
-          <button type="submit" id="testcaseBtn" class="px-4 py-2 bg-upgradYellow hover:bg-upgradAccent text-upgradRed border border-upgradAccent text-xs font-semibold rounded shadow">🧪 Generate Test Cases</button>
+        <div id="jiraError" class="text-upgradRed font-semibold mb-2" style="display:none;"></div>
+        <div id="jiraSuccess" class="text-upgradGreen font-semibold mb-2" style="display:none;"></div>
+        <div id="testcaseDetails" style="display:none;">
+          <textarea name="story_text" class="block w-full rounded-lg border border-upgradAccent bg-white px-3 py-2 text-sm shadow-sm focus:border-upgradRed focus:ring-2 focus:ring-upgradYellow focus:outline-none transition-all duration-150" rows="4" placeholder="Or paste the story/epic/bug here..."></textarea>
+          <label class="block text-xs font-medium text-upgradRed mb-1">Or Upload a Document</label>
+          <input type="file" name="story_doc" class="block w-full rounded-lg border border-upgradAccent bg-white px-3 py-2 text-sm shadow-sm focus:border-upgradRed focus:ring-2 focus:ring-upgradYellow focus:outline-none transition-all duration-150" accept=".txt,.pdf,.doc,.docx">
+          <div class="mt-2">
+            <label>
+              <input type="checkbox" name="use_lxp_context" value="yes" class="mr-2">
+              <span class="text-xs font-bold text-upgradRed">Use LXP related context</span>
+            </label>
+          </div>
+          <div class="flex gap-2 mt-3" id="btnGroupTestcase">
+            <input type="hidden" name="ai_mode" id="aiModeTestcase" value="testcases">
+            <button type="submit" id="testcaseBtn" class="px-4 py-2 bg-upgradYellow hover:bg-upgradAccent text-upgradRed border border-upgradAccent text-xs font-semibold rounded shadow">🧪 Generate Test Cases</button>
+          </div>
         </div>
       </div>
 
@@ -114,18 +121,19 @@
   const aiMode = document.getElementById("aiMode");
   const aiModeTestcase = document.getElementById("aiModeTestcase");
 
+  // Defensive: Log if any key element is missing
+  if (!feedbackForm) console.error('feedbackForm not found');
+  if (!inputType) console.error('inputType not found');
+  if (!testcaseGroup) console.error('testcaseGroup not found');
+
   inputType.addEventListener("change", function () {
     const type = this.value;
-
-    // Hide all groups initially
     uploadGroup.classList.add("hidden");
     urlGroup.classList.add("hidden");
     testcaseGroup.classList.add("hidden");
     btnGroup.classList.add("hidden");
     analyzeBtn.style.display = "none";
     btnGroupTestcase.classList.add("hidden");
-
-    // Show relevant group and button
     if (type === "upload") {
       uploadGroup.classList.remove("hidden");
       btnGroup.classList.remove("hidden");
@@ -144,15 +152,127 @@
       feedbackForm.action = "/HelperQA-AI";
       aiModeTestcase.value = "testcases";
     }
-
-    // Required fields
     document.querySelector('[name="screenshot"]').required = (type === "upload");
     document.querySelector('[name="page_url"]').required = (type === "url");
   });
 
-  // On page load, trigger change to restore state if needed
   window.addEventListener('DOMContentLoaded', function() {
     inputType.dispatchEvent(new Event('change'));
   });
+
+  if (feedbackForm) {
+    feedbackForm.addEventListener('submit', async function(e) {
+      const type = inputType.value;
+      if (type === 'testcase_story') {
+        const jiraIdInput = document.getElementById('jiraIdInput');
+        const jiraError = document.getElementById('jiraError');
+        if (!jiraIdInput) {
+          console.error('jiraIdInput not found');
+          return true;
+        }
+        if (!jiraError) {
+          console.error('jiraError not found');
+          return true;
+        }
+        const jiraId = jiraIdInput.value.trim();
+        jiraError.style.display = 'none';
+        jiraError.textContent = '';
+        if (!jiraId) {
+          jiraError.textContent = 'Jira Ticket ID is required.';
+          jiraError.style.display = 'block';
+          e.preventDefault();
+          console.log('Prevented submit: Jira ID required');
+          return false;
+        }
+        // Validate Jira ID via AJAX
+        try {
+          const resp = await fetch(`/get-jira-description?jira_id=${encodeURIComponent(jiraId)}`);
+          const data = await resp.json();
+          console.log('Jira validation response:', {status: resp.status, data: data});
+          if (resp.status !== 200 || data.error) {
+            console.log('Setting error message:', data.error, jiraError);
+            jiraError.textContent = data.error || 'Invalid or inaccessible Jira ID.';
+            jiraError.style.display = 'block';
+            e.preventDefault();
+            console.log('Prevented submit: Jira validation failed');
+            return false;
+          }
+        } catch (err) {
+          jiraError.textContent = 'Error validating Jira ID.';
+          jiraError.style.display = 'block';
+          e.preventDefault();
+          console.log('Prevented submit: AJAX error');
+          console.log('Validation AJAX error:', err);
+          return false;
+        }
+      }
+    });
+  } else {
+    console.error('feedbackForm event handler was not attached.');
+  }
+
+  // --- Jira Ticket Validation Logic ---
+  const validateJiraBtn = document.getElementById('validateJiraBtn');
+  const jiraIdInput = document.getElementById('jiraIdInput');
+  const jiraError = document.getElementById('jiraError');
+  const jiraSuccess = document.getElementById('jiraSuccess');
+  const testcaseDetails = document.getElementById('testcaseDetails');
+  let jiraValidated = false;
+
+  if (validateJiraBtn) {
+    validateJiraBtn.addEventListener('click', async function() {
+      jiraError.style.display = 'none';
+      jiraSuccess.style.display = 'none';
+      testcaseDetails.style.display = 'none';
+      jiraValidated = false;
+      const jiraId = jiraIdInput.value.trim();
+      if (!jiraId) {
+        jiraError.textContent = 'Jira Ticket ID is required.';
+        jiraError.style.display = 'block';
+        return;
+      }
+      try {
+        validateJiraBtn.disabled = true;
+        validateJiraBtn.textContent = 'Validating...';
+        const resp = await fetch(`/get-jira-description?jira_id=${encodeURIComponent(jiraId)}`);
+        const data = await resp.json();
+        console.log('Jira validation response:', {status: resp.status, data: data});
+        if (resp.status !== 200 || data.error) {
+          console.log('Setting error message:', data.error, jiraError);
+          jiraError.textContent = data.error || 'Invalid or inaccessible Jira ID.';
+          jiraError.style.display = 'block';
+          testcaseDetails.style.display = 'none';
+          jiraValidated = false;
+        } else {
+          jiraSuccess.textContent = 'Jira Ticket validated successfully!';
+          jiraSuccess.style.display = 'block';
+          testcaseDetails.style.display = 'block';
+          jiraValidated = true;
+        }
+      } catch (err) {
+        jiraError.textContent = 'Error validating Jira ID.';
+        jiraError.style.display = 'block';
+        testcaseDetails.style.display = 'none';
+        jiraValidated = false;
+        console.log('Validation AJAX error:', err);
+      } finally {
+        validateJiraBtn.disabled = false;
+        validateJiraBtn.textContent = 'Validate';
+      }
+    });
+  }
+
+  // Prevent form submit if Jira not validated
+  if (feedbackForm) {
+    feedbackForm.addEventListener('submit', function(e) {
+      const type = inputType.value;
+      if (type === 'testcase_story' && !jiraValidated) {
+        jiraError.textContent = 'Please validate Jira Ticket ID before generating test cases.';
+        jiraError.style.display = 'block';
+        e.preventDefault();
+        return false;
+      }
+    });
+  }
 </script>
 {% endblock %}

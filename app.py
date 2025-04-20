@@ -1246,23 +1246,9 @@ def HelperQA_AI():
     feedback_html = None
     image_url = None
     page_url = None
-    email_checked = False
-    user_exists = False
-    if request.method == 'GET' and not (session.get('logged_in') or session.get('ai_helper_email')):
-        email = request.args.get('email')
-        if email:
-            user = User.query.filter_by(email=email).first()
-            email_checked = True
-            if user:
-                session['ai_helper_email'] = email
-                user_exists = True
-            else:
-                return render_template("HelperQA-AI.html", email_checked=email_checked, user_exists=user_exists)
     if request.method == 'POST':
         input_type = request.form.get('input_type')
         ai_mode = request.form.get('ai_mode', 'review')
-        if not (session.get('logged_in') or session.get('ai_helper_email')):
-            return redirect(url_for('HelperQA_AI'))
         if input_type == "testcase_story" and ai_mode == "testcases":
             jira_id = request.form.get('jira_id', '').strip()
             story_text = request.form.get('story_text', '').strip()
@@ -1356,7 +1342,6 @@ def HelperQA_AI():
                 feedback_html = f" Error during AI analysis: {str(e)}"
 
     return render_template("HelperQA-AI.html", image_url=image_url, page_url=page_url, feedback=feedback_html)
-
 
 @app.route('/mytimelogs', methods=['GET'])
 def mytimelogs():

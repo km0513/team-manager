@@ -1181,7 +1181,7 @@ def mytimelogs():
         user = User.query.filter_by(email=email).first()
         email_checked = True
     total_hours_month = get_total_hours_for_user_month(email) if user else 0
-    expected_hours_month = get_expected_hours_for_month() if user else 0
+    expected_hours_month = get_expected_hours_for_user_month(email) if user else 0
     return render_template('mytimelogs.html', user=user, email_checked=email_checked, total_hours_month=total_hours_month, expected_hours_month=expected_hours_month)
 
 def get_total_hours_for_user_month(email):
@@ -1190,35 +1190,47 @@ def get_total_hours_for_user_month(email):
         return 0
     ist = pytz.timezone('Asia/Kolkata')
     now = datetime.now(ist)
-    start_date = now.replace(day=1)
-    start = start_date.strftime('%Y-%m-%d')
-    end = now.strftime('%Y-%m-%d')
-    # Use worklog updated API
-    from jira_worklog_batch import get_epoch_ms, fetch_worklog_ids_updated_since, fetch_worklogs_by_ids
-    since_epoch = get_epoch_ms(start)
-    worklog_ids = fetch_worklog_ids_updated_since(JIRA_BASE_URL, headers, auth, since_epoch)
-    all_worklogs = fetch_worklogs_by_ids(JIRA_BASE_URL, headers, auth, worklog_ids)
+    start_date = now.replace(day=1).date()
+    end_date = now.date()
+    from_date_str = start_date.strftime('%Y-%m-%d')
+    to_date_str = end_date.strftime('%Y-%m-%d')
+    jql = f"worklogAuthor = '{user.jira_account_id}' AND worklogDate >= '{from_date_str}' AND worklogDate <= '{to_date_str}'"
+    url = f"{JIRA_BASE_URL}/rest/api/3/search"
+    params = {"jql": jql, "fields": "worklog", "maxResults": 1000}
+    response = requests.get(url, headers=headers, params=params, auth=auth)
     total_seconds = 0
-    for wl in all_worklogs:
-        author = wl.get('author', {}).get('accountId')
-        if author == user.jira_account_id:
-            # Only count logs in this month
-            started = wl.get('started', '')
-            if started and started[:7] == start[:7]:
-                total_seconds += wl.get('timeSpentSeconds', 0)
+    if response.ok:
+        data = response.json()
+        for issue in data.get("issues", []):
+            for worklog in issue.get("fields", {}).get("worklog", {}).get("worklogs", []):
+                author_id = worklog.get("author", {}).get("accountId")
+                started = worklog.get("started", "")
+                if author_id == user.jira_account_id and started:
+                    dt = datetime.strptime(started[:10], '%Y-%m-%d').date()
+                    if start_date <= dt <= end_date:
+                        total_seconds += worklog.get('timeSpentSeconds', 0)
     return round(total_seconds / 3600, 2)
 
-def get_expected_hours_for_month():
+def get_expected_hours_for_user_month(email):
+    user = User.query.filter_by(email=email).first()
+    if not user:
+        return 0
     ist = pytz.timezone('Asia/Kolkata')
     now = datetime.now(ist)
-    start_date = now.replace(day=1)
-    end_date = now
+    start_date = now.replace(day=1).date()
+    end_date = now.date()
+    # Get holidays this month
+    holidays = set(h.date for h in Holiday.query.filter(Holiday.date >= start_date, Holiday.date <= end_date).all())
+    # Get full-day leaves for user this month
+    leaves = set(l.start_date for l in Leave.query.filter(Leave.user_id == user.id, Leave.start_date >= start_date, Leave.start_date <= end_date, Leave.leave_type == 'FD').all())
     total_days = (end_date - start_date).days + 1
-    # Count working days (Mon-Fri)
-    working_days = sum(1 for i in range(total_days)
-                       if (start_date + timedelta(days=i)).weekday() < 5)
-    expected_hours = working_days * 8
-    return expected_hours
+    expected_days = 0
+    for i in range(total_days):
+        day = start_date + timedelta(days=i)
+        if day.weekday() >= 5 or day in holidays or day in leaves:
+            continue
+        expected_days += 1
+    return expected_days * 8
 
 @app.route('/api/issue_details', methods=['POST'])
 def api_issue_details():
@@ -1270,21 +1282,24 @@ def get_underlogged_days_for_user(email):
     holidays = set(h.date for h in Holiday.query.filter(Holiday.date >= start_date, Holiday.date <= end_date).all())
     # Get all full-day leaves for user this month
     leaves = set(l.start_date for l in Leave.query.filter(Leave.user_id == user.id, Leave.start_date >= start_date, Leave.start_date <= end_date, Leave.leave_type == 'FD').all())
-    # Fetch all worklogs for user this month
-    from jira_worklog_batch import get_epoch_ms, fetch_worklog_ids_updated_since, fetch_worklogs_by_ids
-    since_epoch = get_epoch_ms(start_date.strftime('%Y-%m-%d'))
-    worklog_ids = fetch_worklog_ids_updated_since(JIRA_BASE_URL, headers, auth, since_epoch)
-    all_worklogs = fetch_worklogs_by_ids(JIRA_BASE_URL, headers, auth, worklog_ids)
-    # Aggregate hours per day
+    # Fetch all issues where user logged work this month
+    from_date_str = start_date.strftime('%Y-%m-%d')
+    to_date_str = end_date.strftime('%Y-%m-%d')
+    jql = f"worklogAuthor = '{user.jira_account_id}' AND worklogDate >= '{from_date_str}' AND worklogDate <= '{to_date_str}'"
+    url = f"{JIRA_BASE_URL}/rest/api/3/search"
+    params = {"jql": jql, "fields": "worklog", "maxResults": 1000}
+    response = requests.get(url, headers=headers, params=params, auth=auth)
     hours_per_day = {}
-    for wl in all_worklogs:
-        author = wl.get('author', {}).get('accountId')
-        if author == user.jira_account_id:
-            started = wl.get('started', '')
-            if started:
-                dt = datetime.strptime(started[:10], '%Y-%m-%d').date()
-                if start_date <= dt <= end_date:
-                    hours_per_day[dt] = hours_per_day.get(dt, 0) + wl.get('timeSpentSeconds', 0) / 3600
+    if response.ok:
+        data = response.json()
+        for issue in data.get("issues", []):
+            for worklog in issue.get("fields", {}).get("worklog", {}).get("worklogs", []):
+                author_id = worklog.get("author", {}).get("accountId")
+                started = worklog.get("started", "")
+                if author_id == user.jira_account_id and started:
+                    dt = datetime.strptime(started[:10], '%Y-%m-%d').date()
+                    if start_date <= dt <= end_date:
+                        hours_per_day[dt] = hours_per_day.get(dt, 0) + worklog.get('timeSpentSeconds', 0) / 3600
     # Now check each working day
     missed = []
     for i in range((end_date - start_date).days + 1):

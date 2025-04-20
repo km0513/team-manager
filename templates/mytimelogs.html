@@ -86,7 +86,7 @@
       list.style.display = '';
       data.forEach(day => {
         const li = document.createElement('li');
-        li.innerHTML = `${day.date_display}: <a href=\"${makeTimelogUrl(day.date)}\" target=\"_blank\" class=\"text-upgradTeal underline font-bold\">${day.hours}</a> hours`;
+        li.innerHTML = `${day.date_display}: <a href="${makeTimelogUrl(day.date)}" class="text-upgradTeal underline font-bold">${day.hours}</a> hours`;
         list.appendChild(li);
       });
     }

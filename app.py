@@ -648,9 +648,6 @@ def timelog():
     current_date = now.strftime('%Y-%m-%d')
 
     # User pagination parameters
-    user_page = int(request.args.get('user_page', 1))
-    users_per_page = 10
-    filtered_users = users
     if request.method == 'POST':
         start = request.form.get('start')
         end = request.form.get('end')
@@ -662,20 +659,18 @@ def timelog():
         end = request.args.get('end')
         selected_function = request.args.get('work_function', 'All')
         show_details = request.args.get('show_details', '0') == '1'
+    filtered_users = users
     if selected_function and selected_function != 'All':
         filtered_users = [u for u in users if u.jira_account_id and u.designation == selected_function]
     else:
         filtered_users = [u for u in users if u.jira_account_id]
-    total_users = len(filtered_users)
-    user_start = (user_page - 1) * users_per_page
-    user_end = user_start + users_per_page
-    paginated_users = filtered_users[user_start:user_end]
-    next_user_page = user_page + 1 if user_end < total_users else None
-    prev_user_page = user_page - 1 if user_page > 1 else None
+    paginated_users = filtered_users  # Show all filtered users
+    next_user_page = None
+    prev_user_page = None
 
     overall_total_logged = 0
     overall_total_expected = 0
-    cache_params = {"start": start, "end": end, "user_ids": [u.jira_account_id for u in filtered_users]}
+    cache_params = {"start": start, "end": end, "user_ids": [u.jira_account_id for u in paginated_users]}
     cache_data = load_from_cache(cache_params)
     if not cache_data:
         # Fetch from Jira and cache using /worklog/updated for efficiency
@@ -687,10 +682,8 @@ def timelog():
             # 2. Fetch worklog details in batch
             all_worklogs = fetch_worklogs_by_ids(JIRA_BASE_URL, headers, auth, worklog_ids)
             # 3. Filter worklogs by date, user, and build user map
-            user_map_all = {u.jira_account_id: u.name for u in filtered_users}
+            user_map_all = {u.jira_account_id: u.name for u in paginated_users}
             detailed_data_all = defaultdict(list)
-            overall_total_logged = 0
-            overall_total_expected = 0
             expected_map = {}
             # Collect all unique issue IDs
             issue_ids = set()
@@ -731,7 +724,7 @@ def timelog():
             start_date = datetime.strptime(start, "%Y-%m-%d")
             end_date = datetime.strptime(end, "%Y-%m-%d")
             all_working_days = [d for d in (start_date + timedelta(days=i) for i in range((end_date - start_date).days + 1)) if d.weekday() < 5]
-            for user in filtered_users:
+            for user in paginated_users:
                 leave_days = Leave.query.filter(
                     Leave.user_id == user.id,
                     Leave.start_date >= start_date.date(),
@@ -757,7 +750,142 @@ def timelog():
         overall_total_logged = cache_data["overall_total_logged"]
         overall_total_expected = cache_data["overall_total_expected"]
 
-    # Only build user table if show_details is True
+    # --- Build summary ONLY for paginated_users ---
+    cache_params = {"start": start, "end": end, "user_ids": [u.jira_account_id for u in paginated_users]}
+    cache_data = load_from_cache(cache_params)
+    if not cache_data:
+        # Fetch from Jira and cache using /worklog/updated for efficiency
+        if start and end:
+            since_epoch = get_epoch_ms(start)
+            until_epoch = get_epoch_ms(end) + 24*3600*1000 - 1
+            worklog_ids = fetch_worklog_ids_updated_since(JIRA_BASE_URL, headers, auth, since_epoch)
+            all_worklogs = fetch_worklogs_by_ids(JIRA_BASE_URL, headers, auth, worklog_ids)
+            user_map_all = {u.jira_account_id: u.name for u in paginated_users}
+            detailed_data_all = defaultdict(list)
+            expected_map = {}
+            issue_ids = set()
+            for wl in all_worklogs:
+                author_id = wl.get('author', {}).get('accountId')
+                started = wl.get('started', '')[:10]
+                if author_id in user_map_all and start <= started <= end:
+                    issue_id = str(wl.get('issueId'))
+                    issue_ids.add(issue_id)
+            issue_details = fetch_issue_details_bulk(JIRA_BASE_URL, headers, auth, issue_ids) if issue_ids else {}
+            if not issue_details:
+                from jira_worklog_batch import fetch_issue_details_individual
+                issue_details = fetch_issue_details_individual(JIRA_BASE_URL, headers, auth, issue_ids)
+            for wl in all_worklogs:
+                author_id = wl.get('author', {}).get('accountId')
+                started = wl.get('started', '')[:10]
+                if author_id in user_map_all and start <= started <= end:
+                    user_name = user_map_all[author_id]
+                    hours = round(wl.get('timeSpentSeconds', 0) / 3600, 2)
+                    issue_id = str(wl.get('issueId'))
+                    issue_info = issue_details.get(issue_id, {})
+                    issue_key = issue_info.get('key', '')
+                    summary = issue_info.get('summary', '')
+                    parent_summary = issue_info.get('parent_summary', '')
+                    detailed_data_all[user_name].append({
+                        "issue_key": issue_key,
+                        "summary": summary,
+                        "parent_summary": parent_summary,
+                        "hours": hours,
+                        "link": f"{JIRA_BASE_URL}/browse/{issue_key}" if issue_key else '',
+                        "started": started
+                    })
+            start_date = datetime.strptime(start, "%Y-%m-%d")
+            end_date = datetime.strptime(end, "%Y-%m-%d")
+            all_working_days = [d for d in (start_date + timedelta(days=i) for i in range((end_date - start_date).days + 1)) if d.weekday() < 5]
+            for user in paginated_users:
+                leave_days = Leave.query.filter(
+                    Leave.user_id == user.id,
+                    Leave.start_date >= start_date.date(),
+                    Leave.start_date <= end_date.date()
+                ).all()
+                leave_map = {(leave.start_date, leave.leave_type) for leave in leave_days}
+                leave_sum = sum([1 if l_type == 'FD' else 0.5 for (l_date, l_type) in leave_map if l_date in [d.date() for d in all_working_days]])
+                available_days = max(0, len(all_working_days) - leave_sum)
+                expected = available_days * 8
+                expected_map[user.name] = expected
+            save_to_cache(cache_params, {
+                "detailed_data_all": detailed_data_all,
+                "expected_map": expected_map
+            })
+            cache_data = load_from_cache(cache_params)
+    # --- Calculate overall totals for ALL filtered users ---
+    overall_total_logged = 0
+    overall_total_expected = 0
+    if start and end:
+        # Build a cache for all filtered users (not paginated)
+        cache_params_all = {"start": start, "end": end, "user_ids": [u.jira_account_id for u in filtered_users]}
+        cache_data_all = load_from_cache(cache_params_all)
+        if not cache_data_all:
+            since_epoch = get_epoch_ms(start)
+            until_epoch = get_epoch_ms(end) + 24*3600*1000 - 1
+            worklog_ids = fetch_worklog_ids_updated_since(JIRA_BASE_URL, headers, auth, since_epoch)
+            all_worklogs = fetch_worklogs_by_ids(JIRA_BASE_URL, headers, auth, worklog_ids)
+            user_map_all = {u.jira_account_id: u.name for u in filtered_users}
+            detailed_data_all = defaultdict(list)
+            expected_map = {}
+            issue_ids = set()
+            for wl in all_worklogs:
+                author_id = wl.get('author', {}).get('accountId')
+                started = wl.get('started', '')[:10]
+                if author_id in user_map_all and start <= started <= end:
+                    issue_id = str(wl.get('issueId'))
+                    issue_ids.add(issue_id)
+            issue_details = fetch_issue_details_bulk(JIRA_BASE_URL, headers, auth, issue_ids) if issue_ids else {}
+            if not issue_details:
+                from jira_worklog_batch import fetch_issue_details_individual
+                issue_details = fetch_issue_details_individual(JIRA_BASE_URL, headers, auth, issue_ids)
+            for wl in all_worklogs:
+                author_id = wl.get('author', {}).get('accountId')
+                started = wl.get('started', '')[:10]
+                if author_id in user_map_all and start <= started <= end:
+                    user_name = user_map_all[author_id]
+                    hours = round(wl.get('timeSpentSeconds', 0) / 3600, 2)
+                    issue_id = str(wl.get('issueId'))
+                    issue_info = issue_details.get(issue_id, {})
+                    issue_key = issue_info.get('key', '')
+                    summary = issue_info.get('summary', '')
+                    parent_summary = issue_info.get('parent_summary', '')
+                    detailed_data_all[user_name].append({
+                        "issue_key": issue_key,
+                        "summary": summary,
+                        "parent_summary": parent_summary,
+                        "hours": hours,
+                        "link": f"{JIRA_BASE_URL}/browse/{issue_key}" if issue_key else '',
+                        "started": started
+                    })
+            start_date = datetime.strptime(start, "%Y-%m-%d")
+            end_date = datetime.strptime(end, "%Y-%m-%d")
+            all_working_days = [d for d in (start_date + timedelta(days=i) for i in range((end_date - start_date).days + 1)) if d.weekday() < 5]
+            for user in filtered_users:
+                leave_days = Leave.query.filter(
+                    Leave.user_id == user.id,
+                    Leave.start_date >= start_date.date(),
+                    Leave.start_date <= end_date.date()
+                ).all()
+                leave_map = {(leave.start_date, leave.leave_type) for leave in leave_days}
+                leave_sum = sum([1 if l_type == 'FD' else 0.5 for (l_date, l_type) in leave_map if l_date in [d.date() for d in all_working_days]])
+                available_days = max(0, len(all_working_days) - leave_sum)
+                expected = available_days * 8
+                total_hours = round(sum(item["hours"] for item in detailed_data_all.get(user.name, [])), 2)
+                overall_total_logged += total_hours
+                overall_total_expected += expected
+            save_to_cache(cache_params_all, {
+                "detailed_data_all": detailed_data_all,
+                "overall_total_logged": overall_total_logged,
+                "overall_total_expected": overall_total_expected,
+                "expected_map": expected_map
+            })
+            cache_data_all = load_from_cache(cache_params_all)
+        else:
+            overall_total_logged = cache_data_all["overall_total_logged"]
+            overall_total_expected = cache_data_all["overall_total_expected"]
+    # --- Build summary for paginated users ---
+    summary_data = []
+    ordered_detailed_data = {}
     if show_details and cache_data:
         detailed_data_all = cache_data["detailed_data_all"]
         expected_map = cache_data["expected_map"]
@@ -800,9 +928,9 @@ def timelog():
         end=end,
         work_functions=work_functions,
         selected_function=selected_function,
-        user_page=user_page,
-        next_user_page=next_user_page,
-        prev_user_page=prev_user_page,
+        user_page=None,
+        next_user_page=None,
+        prev_user_page=None,
         current_date=current_date,
         overall_total_logged=overall_total_logged,
         overall_total_expected=overall_total_expected,
@@ -826,23 +954,28 @@ def timelog_today(user_email=None):
     current_date = now.strftime('%Y-%m-%d')
 
     # Pagination params
-    user_page = int(request.args.get('user_page', 1))
-    users_per_page = 10
+    if request.method == 'POST':
+        start = request.form.get('start')
+        end = request.form.get('end')
+        selected_function = request.form.get('work_function')
+        show_details = True  # Always show details after fetch
+        clear_timelog_cache()
+    else:
+        start = request.args.get('start')
+        end = request.args.get('end')
+        selected_function = request.args.get('work_function', 'All')
+        show_details = request.args.get('show_details', '0') == '1'
     filtered_users = users
     if user_email:
         filtered_users = [u for u in users if u.email == user_email and u.jira_account_id]
     else:
-        selected_function = request.form.get('work_function') if request.method == 'POST' else request.args.get('work_function', 'All')
         if selected_function and selected_function != 'All':
             filtered_users = [u for u in users if u.jira_account_id and u.designation == selected_function]
         else:
             filtered_users = [u for u in users if u.jira_account_id]
-    total_users = len(filtered_users)
-    user_start = (user_page - 1) * users_per_page
-    user_end = user_start + users_per_page
-    paginated_users = filtered_users[user_start:user_end]
-    next_user_page = user_page + 1 if user_end < total_users else None
-    prev_user_page = user_page - 1 if user_page > 1 else None
+    paginated_users = filtered_users  # Show all filtered users
+    next_user_page = None
+    prev_user_page = None
 
     # Date for today
     date_str = request.args.get('date') or current_date
@@ -854,7 +987,7 @@ def timelog_today(user_email=None):
     next_date = (current_dt + timedelta(days=1)).strftime('%Y-%m-%d') if current_dt.date() < date.today() else None
 
     # Caching and batch fetching (same as timelog)
-    cache_params = {"start": start, "end": end, "user_ids": [u.jira_account_id for u in filtered_users]}
+    cache_params = {"start": start, "end": end, "user_ids": [u.jira_account_id for u in paginated_users]}
     cache_data = load_from_cache(cache_params)
     summary_data = []
     ordered_detailed_data = {}
@@ -869,7 +1002,7 @@ def timelog_today(user_email=None):
         # 2. Fetch worklog details in batch
         all_worklogs = fetch_worklogs_by_ids(JIRA_BASE_URL, headers, auth, worklog_ids)
         # 3. Filter worklogs by date, user, and build user map
-        user_map_all = {u.jira_account_id: u.name for u in filtered_users}
+        user_map_all = {u.jira_account_id: u.name for u in paginated_users}
         detailed_data_all = defaultdict(list)
         expected_map = {}
         # Collect all unique issue IDs
@@ -911,7 +1044,7 @@ def timelog_today(user_email=None):
         start_date = datetime.strptime(start, "%Y-%m-%d")
         end_date = datetime.strptime(end, "%Y-%m-%d")
         all_working_days = [d for d in (start_date + timedelta(days=i) for i in range((end_date - start_date).days + 1)) if d.weekday() < 5]
-        for user in filtered_users:
+        for user in paginated_users:
             leave_days = Leave.query.filter(
                 Leave.user_id == user.id,
                 Leave.start_date >= start_date.date(),
@@ -978,9 +1111,9 @@ def timelog_today(user_email=None):
         end=end,
         work_functions=work_functions,
         selected_function=request.args.get('work_function', 'All'),
-        user_page=user_page,
-        next_user_page=next_user_page,
-        prev_user_page=prev_user_page,
+        user_page=None,
+        next_user_page=None,
+        prev_user_page=None,
         current_date=current_date,
         overall_total_logged=overall_total_logged,
         overall_total_expected=overall_total_expected,

@@ -51,20 +51,19 @@
         <div class="flex gap-2 items-center mb-2">
           <input type="text" name="jira_id" id="jiraIdInput" class="block w-full rounded-lg border border-upgradAccent bg-white px-3 py-2 text-sm shadow-sm focus:border-upgradRed focus:ring-2 focus:ring-upgradYellow focus:outline-none transition-all duration-150" placeholder="e.g. ABC-123">
         </div>
-        <div id="testcaseDetails">
-          <textarea name="story_text" class="block w-full rounded-lg border border-upgradAccent bg-white px-3 py-2 text-sm shadow-sm focus:border-upgradRed focus:ring-2 focus:ring-upgradYellow focus:outline-none transition-all duration-150" rows="4" placeholder="Or paste the story/epic/bug here..."></textarea>
-          <label class="block text-xs font-medium text-upgradRed mb-1">Or Upload a Document</label>
-          <input type="file" name="story_doc" class="block w-full rounded-lg border border-upgradAccent bg-white px-3 py-2 text-sm shadow-sm focus:border-upgradRed focus:ring-2 focus:ring-upgradYellow focus:outline-none transition-all duration-150" accept=".txt,.pdf,.doc,.docx">
-          <div class="mt-2">
-            <label>
-              <input type="checkbox" name="use_lxp_context" value="yes" class="mr-2">
-              <span class="text-xs font-bold text-upgradRed">Use LXP related context</span>
-            </label>
-          </div>
-          <div class="flex gap-2 mt-3" id="btnGroupTestcase">
-            <input type="hidden" name="ai_mode" id="aiModeTestcase" value="testcases">
-            <button type="submit" id="testcaseBtn" class="px-4 py-2 bg-upgradYellow hover:bg-upgradAccent text-upgradRed border border-upgradAccent text-xs font-semibold rounded shadow">🧪 Generate Test Cases</button>
-          </div>
+        <div id="jiraValidationMsg" class="text-xs font-semibold mb-2"></div>
+        <textarea name="story_text" class="block w-full rounded-lg border border-upgradAccent bg-white px-3 py-2 text-sm shadow-sm focus:border-upgradRed focus:ring-2 focus:ring-upgradYellow focus:outline-none transition-all duration-150" rows="4" placeholder="Or paste the story/epic/bug here..."></textarea>
+        <label class="block text-xs font-medium text-upgradRed mb-1">Or Upload a Document</label>
+        <input type="file" name="story_doc" class="block w-full rounded-lg border border-upgradAccent bg-white px-3 py-2 text-sm shadow-sm focus:border-upgradRed focus:ring-2 focus:ring-upgradYellow focus:outline-none transition-all duration-150" accept=".txt,.pdf,.doc,.docx">
+        <div class="mt-2">
+          <label>
+            <input type="checkbox" name="use_lxp_context" value="yes" class="mr-2">
+            <span class="text-xs font-bold text-upgradRed">Use LXP related context</span>
+          </label>
+        </div>
+        <div class="flex gap-2 mt-3" id="btnGroupTestcase">
+          <input type="hidden" name="ai_mode" id="aiModeTestcase" value="testcases">
+          <button type="submit" id="testcaseBtn" class="px-4 py-2 bg-upgradYellow hover:bg-upgradAccent text-upgradRed border border-upgradAccent text-xs font-semibold rounded shadow">🧪 Generate Test Cases</button>
         </div>
       </div>
 
@@ -162,9 +161,28 @@
       const type = inputType.value;
       if (type === 'testcase_story') {
         const jiraIdInput = document.getElementById('jiraIdInput');
-        if (!jiraIdInput) {
-          console.error('jiraIdInput not found');
-          return true;
+        const jiraValidationMsg = document.getElementById('jiraValidationMsg');
+        if (jiraIdInput && jiraValidationMsg) {
+          const jiraId = jiraIdInput.value.trim();
+          jiraValidationMsg.textContent = '';
+          if (jiraId) {
+            // Only validate if Jira ID is entered
+            try {
+              const resp = await fetch(`/get-jira-description?jira_id=${encodeURIComponent(jiraId)}`);
+              const data = await resp.json();
+              if (!data.description || data.error || data.description.toLowerCase().startsWith('error')) {
+                jiraValidationMsg.textContent = data.error || data.description || 'Invalid or inaccessible Jira ID.';
+                jiraValidationMsg.className = 'text-xs font-semibold mb-2 text-upgradRed';
+                e.preventDefault();
+                return false;
+              }
+            } catch (err) {
+              jiraValidationMsg.textContent = 'Error validating Jira ID.';
+              jiraValidationMsg.className = 'text-xs font-semibold mb-2 text-upgradRed';
+              e.preventDefault();
+              return false;
+            }
+          }
         }
       }
     });

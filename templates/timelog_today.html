@@ -44,8 +44,8 @@
           </select>
         </div>
         <div>
-          <label class="block text-xs font-bold text-upgradRed mb-1">Search User:</label>
-          <input type="text" id="userSearch" x-model="userFilter" class="block w-40 rounded-md border-upgradAccent shadow-sm focus:border-upgradRed focus:ring focus:ring-upgradYellow focus:ring-opacity-50 text-sm" placeholder="Type to filter users...">
+          <label class="block text-xs font-bold text-upgradRed mb-1">Search User (Name):</label>
+          <input type="text" id="userSearch" x-model="userFilter" class="block w-40 rounded-md border-upgradAccent shadow-sm focus:border-upgradRed focus:ring focus:ring-upgradYellow focus:ring-opacity-50 text-sm" placeholder="Type to filter users by name...">
         </div>
         <div class="flex items-center mt-2">
           <!-- Only Reds checkbox removed -->
@@ -88,7 +88,7 @@
           {% for row in summary_data %}
           {% set ns.total_logged = ns.total_logged + (row.total_hours | float) %}
           {% set ns.total_expected = ns.total_expected + 8 %}
-          <tr class="border-t border-upgradAccent">
+          <tr class="border-t border-upgradAccent" x-show="userVisible('{{ row.user|lower }}')">
             <td class="py-2 px-3 text-left font-bold text-upgradPurple">
               <a href="#user-{{ loop.index }}" class="hover:underline font-bold" @click.prevent="expandAndScrollToUser('user-{{ loop.index }}', {{ loop.index }})">{{ row.user }}</a>
             </td>
@@ -109,6 +109,9 @@
   <!-- User pagination controls (distinct, below date navigation) -->
   {% if user_page and (next_user_page or prev_user_page) %}
     <form method="POST" class="flex items-center justify-center gap-2 mt-2 mb-4">
+      {# Preserve filters on pagination #}
+      <input type="hidden" name="date" value="{{ start }}">
+      <input type="hidden" name="work_function" value="{{ selected_function }}">
       {% if prev_user_page %}
         <input type="hidden" name="user_page" value="{{ prev_user_page }}">
         <button type="submit" class="px-2 py-1 rounded bg-upgradRed text-white font-bold text-xs">Previous</button>
@@ -234,7 +237,7 @@
         window.dispatchEvent(new CustomEvent('collapse-all'));
       },
       userVisible(name) {
-        return !this.userFilter || name.includes(this.userFilter.toLowerCase());
+        return !this.userFilter || (name && name.includes(this.userFilter.toLowerCase()));
       },
       expandAndScrollToUser(id, idx) {
         const el = document.getElementById(id);

@@ -5,9 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Team Management Tool</title>
 
-  <!-- Tailwind CSS CDN -->
+  <!-- Performance: Minify and defer JS, use CDN for Alpine.js -->
+  <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
   <script src="https://cdn.tailwindcss.com"></script>
-  
   <!-- upGrad theme Tailwind config -->
   <script>
     tailwind.config = {
@@ -26,7 +26,8 @@
       },
     }
   </script>
-
+  <link rel="stylesheet" href="/static/main.min.css" />
+  
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/5.2.0/github-markdown-light.min.css" />
 
   <style>

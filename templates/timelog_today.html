@@ -10,18 +10,11 @@
   <!-- Date navigation (distinct from user pagination) -->
   <div class="flex justify-between items-center mb-4">
     <div>
-      {% if previous_date %}
-        {% if user_email %}
-          <a href="{{ url_for('timelog_today', user_email=user_email) }}?date={{ previous_date }}" class="px-3 py-1 rounded bg-upgradRed text-white font-bold text-xs">Previous Day</a>
-        {% else %}
-          <a href="{{ url_for('timelog_today') }}?date={{ previous_date }}&work_function={{ selected_function }}" class="px-3 py-1 rounded bg-upgradRed text-white font-bold text-xs">Previous Day</a>
-        {% endif %}
-      {% endif %}
       {% if next_date %}
         {% if user_email %}
-          <a href="{{ url_for('timelog_today', user_email=user_email) }}?date={{ next_date }}" class="px-3 py-1 rounded bg-upgradRed text-white font-bold text-xs ml-2">Next Day</a>
+          <a href="{{ url_for('timelog_today', user_email=user_email) }}?date={{ next_date }}" class="px-3 py-1 rounded bg-upgradRed text-white font-bold text-xs ml-2" data-timelog-nav>Next Day</a>
         {% else %}
-          <a href="{{ url_for('timelog_today') }}?date={{ next_date }}&work_function={{ selected_function }}" class="px-3 py-1 rounded bg-upgradRed text-white font-bold text-xs ml-2">Next Day</a>
+          <a href="{{ url_for('timelog_today') }}?date={{ next_date }}&work_function={{ selected_function }}" class="px-3 py-1 rounded bg-upgradRed text-white font-bold text-xs ml-2" data-timelog-nav>Next Day</a>
         {% endif %}
       {% endif %}
     </div>
@@ -33,7 +26,7 @@
   {% if not is_user_specific %}
   <div class="bg-white rounded-xl shadow p-6 mb-8 border border-upgradAccent">
     <div class="flex flex-wrap gap-4 items-end mb-4">
-      <form method="POST" class="flex flex-wrap gap-4 items-end">
+      <form id="timelog-filter-form" method="POST" class="flex flex-wrap gap-4 items-end">
         <div>
           <label for="functionFilter" class="block text-xs font-bold text-upgradRed mb-1">Function</label>
           <select class="block w-40 rounded-md border-upgradAccent shadow-sm focus:border-upgradRed focus:ring focus:ring-upgradYellow focus:ring-opacity-50 text-sm" id="functionFilter" name="work_function">
@@ -56,6 +49,12 @@
   </div>
   {% endif %}
 
+  <div id="overall-totals" class="flex flex-row gap-4 justify-end items-center mb-4"></div>
+
+  <div id="timelog-summary-section">
+    {% include 'timelog_today_summary.html' ignore missing %}
+  </div>
+
   {% if is_holiday %}
     <div class="bg-green-100 border border-green-400 text-green-800 rounded p-4 mt-8 mb-8 text-center font-semibold">
       <span class="text-xl">🎉</span> Capacity is zero today due to <b>{{ holiday_name }}</b>! Take a break and celebrate!
@@ -70,41 +69,6 @@
       <span>Please ensure you and your team enter your daily timelogs to maintain accurate records and enable effective tracking.</span>
     </div>
   {% endif %}
-
-  {% if summary_data %}
-  <div id="summary-table" class="bg-white rounded-xl shadow p-6 mb-4">
-    <h2 class="mb-4 text-lg font-bold text-blue-800">Summary</h2>
-    <div class="overflow-x-auto">
-      <table class="min-w-[500px] w-full bg-white rounded-lg border border-upgradAccent text-xs text-center">
-        <thead class="bg-upgradPurple text-white">
-          <tr>
-            <th class="py-2 px-3 font-bold">User</th>
-            <th class="py-2 px-3 font-bold">Logged</th>
-            <th class="py-2 px-3 font-bold">Expected</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% set ns = namespace(total_logged=0, total_expected=0) %}
-          {% for row in summary_data %}
-          {% set ns.total_logged = ns.total_logged + (row.total_hours | float) %}
-          {% set ns.total_expected = ns.total_expected + 8 %}
-          <tr class="border-t border-upgradAccent" x-show="userVisible('{{ row.user|lower }}')">
-            <td class="py-2 px-3 text-left font-bold text-upgradPurple">
-              <a href="#user-{{ loop.index }}" class="hover:underline font-bold" @click.prevent="expandAndScrollToUser('user-{{ loop.index }}', {{ loop.index }})">{{ row.user }}</a>
-            </td>
-            <td class="py-2 px-3 font-bold text-upgradTeal">{{ row.total_hours | round_half }}</td>
-            <td class="py-2 px-3 text-black">{{ row.expected | round_half }}</td>
-          </tr>
-          {% endfor %}
-          <tr class="border-t border-upgradAccent font-bold bg-upgradLight">
-            <td class="py-2 px-3 text-end">TOTAL</td>
-            <td class="py-2 px-3">{{ ns.total_logged | round_half }}</td>
-            <td class="py-2 px-3">{{ ns.total_expected }}</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
 
   <!-- User pagination controls (distinct, below date navigation) -->
   {% if user_page and (next_user_page or prev_user_page) %}
@@ -129,72 +93,132 @@
     <button @click="collapseAll()" class="px-3 py-1 bg-upgradAccent hover:bg-upgradRed text-white text-xs font-bold rounded shadow border border-upgradAccent transition">Collapse All</button>
   </div>
 
-  <div class="space-y-6 mt-6">
-    {% for row in summary_data %}
-    <div :id="'user-{{ loop.index }}'" class="bg-white rounded-xl shadow p-6 border border-upgradAccent" x-data="userLogCard(false, {{ loop.index }})" x-ref="'userCard' + {{ loop.index }}" x-show="userVisible('{{ row.user|lower }}')" @expand-all.window="open = true" @collapse-all.window="open = false" @expand-user-{{ loop.index }}.window="open = true">
-      <div class="flex justify-end mb-2">
-        <button @click="backToTop()" class="text-xs text-upgradRed hover:text-upgradPurple bg-upgradPink rounded px-2 py-1 border border-upgradAccent">Back to Top</button>
-      </div>
-      <button type="button" class="w-full flex justify-between items-center text-left text-upgradPurple hover:text-upgradRed font-bold text-xs focus:outline-none py-1" @click="open = !open">
-        <span class="flex items-center gap-2">
-          {{ row.user }}
-          {% set is_red = (row.total_hours is number and row.expected is number and row.total_hours < row.expected) %}
-          <span class="inline-block text-base font-extrabold {{ 'text-upgradRed' if is_red else 'text-upgradTeal' }} ml-2">
-            {% if row.total_hours is string and ('On Leave' in row.total_hours or 'Leave' in row.total_hours or 'Holiday' in row.total_hours) %}
-              {{ row.total_hours }}
-            {% else %}
-              {{ row.total_hours | round_half }} hrs
-            {% endif %}
-          </span>
-        </span>
-        <svg :class="{'rotate-180': open}" class="w-3 h-3 ml-2 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
-      </button>
-      <div x-show="open" x-transition x-cloak class="mt-4 border-t pt-4">
-        {% set logs_by_date = {} %}
-        {% for item in detailed_data[row.user] %}
-          {% set date = item.started if item.started else 'Unknown' %}
-          {% set _ = logs_by_date.setdefault(date, []).append(item) %}
-        {% endfor %}
-        {% for log_date, items in logs_by_date.items() | sort %}
-        <div class="mb-4">
-          <h6 class="text-xs text-gray-500 font-semibold mb-2">{{ display_date_str }}</h6>
-          <div class="overflow-x-auto">
-            <table class="min-w-[500px] w-full bg-white rounded-lg border border-upgradAccent text-xs text-center mb-2">
-              <thead>
-                <tr class="bg-upgradPurple text-white">
-                  <th class="py-2 px-3">Issue</th>
-                  <th class="py-2 px-3">Parent Summary</th>
-                  <th class="py-2 px-3">Task Summary</th>
-                  <th class="py-2 px-3">Hours</th>
-                </tr>
-              </thead>
-              <tbody>
-                {% for item in items %}
-                <tr>
-                  <td class="text-upgradPurple font-bold">
-                    <a href="https://upgrad-jira.atlassian.net/browse/{{ item.issue_key }}"
-                       onclick="event.preventDefault(); openJiraModal('https://upgrad-jira.atlassian.net/browse/{{ item.issue_key }}')"
-                       class="text-upgradPurple underline hover:text-upgradRed font-bold cursor-pointer">
-                       {{ item.issue_key }}
-                    </a>
-                  </td>
-                  <td>{{ item.parent_summary }}</td>
-                  <td>{{ item.summary }}</td>
-                  <td>{{ item.hours }}</td>
-                </tr>
-                {% endfor %}
-              </tbody>
-            </table>
-          </div>
-        </div>
-        {% endfor %}
-      </div>
-    </div>
-    {% endfor %}
-  </div>
+  <script>
+  // --- AJAX Timelog Loader ---
+  function renderTotals(overall_total_logged, overall_total_expected) {
+    document.getElementById('overall-totals').innerHTML = `
+      <div class="rounded bg-upgradYellow text-upgradRed font-bold px-4 py-2">Total Logged: ${overall_total_logged}</div>
+      <div class="rounded bg-upgradAccent text-white font-bold px-4 py-2">Total Expected: ${overall_total_expected}</div>
+    `;
+  }
+
+  function renderSummaryAndDetails(data) {
+    // Build summary table HTML (similar to your Jinja template)
+    let html = '';
+    if (!data.summary_data || data.summary_data.length === 0) {
+      html += `<div class='bg-yellow-100 border border-yellow-400 text-yellow-800 rounded p-4 mt-8 mb-8 text-center font-semibold'>
+        <span class='text-xl'>📝</span> No timelogs have been entered for today.<br>
+        <span>Please ensure you and your team enter your daily timelogs to maintain accurate records and enable effective tracking.</span>
+      </div>`;
+      document.getElementById('timelog-summary-section').innerHTML = html;
+      return;
+    }
+    // Summary Table
+    html += `<div id='summary-table' class='bg-white rounded-xl shadow p-6 mb-4'>
+      <h2 class='mb-4 text-lg font-bold text-blue-800'>Summary</h2>
+      <div class='overflow-x-auto'>
+        <table class='min-w-[500px] w-full bg-white rounded-lg border border-upgradAccent text-xs text-center'>
+          <thead class='bg-upgradPurple text-white'>
+            <tr><th class='py-2 px-3 font-bold'>User</th><th class='py-2 px-3 font-bold'>Logged</th><th class='py-2 px-3 font-bold'>Expected</th></tr>
+          </thead>
+          <tbody>`;
+    let total_logged = 0, total_expected = 0;
+    for (const row of data.summary_data) {
+      html += `<tr><td class='py-2 px-3'>${row.user}</td><td class='py-2 px-3 font-bold text-upgradTeal'>${row.total_hours}</td><td class='py-2 px-3 text-black'>${row.expected}</td></tr>`;
+      total_logged += row.total_hours;
+      total_expected += row.expected;
+    }
+    html += `<tr class='border-t border-upgradAccent font-bold bg-upgradLight'><td class='py-2 px-3 text-end'>TOTAL</td><td class='py-2 px-3'>${total_logged}</td><td class='py-2 px-3'>${total_expected}</td></tr>`;
+    html += `</tbody></table></div></div>`;
+
+    // User Details
+    html += `<div class='space-y-6 mt-6'>`;
+    for (const row of data.summary_data) {
+      html += `<div class='bg-white rounded-xl shadow p-6 border border-upgradAccent'>
+        <div class='flex justify-end mb-2'><button onclick='window.scrollTo({top:0,behavior:"smooth"})' class='text-xs text-upgradRed hover:text-upgradPurple bg-upgradPink rounded px-2 py-1 border border-upgradAccent'>Back to Top</button></div>
+        <button type='button' class='w-full flex justify-between items-center text-left text-upgradPurple hover:text-upgradRed font-bold text-xs focus:outline-none py-1' onclick='this.nextElementSibling.classList.toggle("hidden")'>
+          <span class='flex items-center gap-2'>${row.user} <span class='font-bold'>${row.total_hours} hrs</span></span>
+          <svg class='w-3 h-3 ml-2 transition-transform' fill='none' stroke='currentColor' viewBox='0 0 24 24'><path stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'/></svg>
+        </button>
+        <div class='mt-4 border-t pt-4 hidden'>`;
+      let logs = data.detailed_data[row.user] || [];
+      if (logs.length === 0) {
+        html += `<div class='italic'>No logs for this user.</div>`;
+      } else {
+        html += `<div class='mb-4'><h6 class='text-xs text-gray-500 font-semibold mb-2'>${data.display_date_str}</h6><div class='overflow-x-auto'><table class='min-w-[500px] w-full bg-white rounded-lg border border-upgradAccent text-xs text-center mb-2'><thead><tr class='bg-upgradPurple text-white'><th class='py-2 px-3'>Issue</th><th class='py-2 px-3'>Parent Summary</th><th class='py-2 px-3'>Task Summary</th><th class='py-2 px-3'>Hours</th></tr></thead><tbody>`;
+        for (const item of logs) {
+          html += `<tr><td><a href='${item.link}' target='_blank' class='text-upgradPurple underline hover:text-upgradRed font-bold cursor-pointer'>${item.issue_key}</a></td><td>${item.parent_summary}</td><td>${item.summary}</td><td>${item.hours}</td></tr>`;
+        }
+        html += `</tbody></table></div></div>`;
+      }
+      html += `</div></div>`;
+    }
+    html += `</div>`;
+    document.getElementById('timelog-summary-section').innerHTML = html;
+  }
+
+  async function fetchTimelogData(params) {
+    document.getElementById('timelog-summary-section').innerHTML = `<div class='flex justify-center items-center'><span class='spinner-border'></span> Loading...</div>`;
+    try {
+      const url = new URL('/api/timelog-today-data', window.location.origin);
+      Object.keys(params).forEach(key => params[key] != null && url.searchParams.append(key, params[key]));
+      const resp = await fetch(url);
+      const data = await resp.json();
+      renderTotals(data.overall_total_logged, data.overall_total_expected);
+      renderSummaryAndDetails(data);
+      // Update navigation date
+      document.querySelector('.px-4.py-2.bg-gray-200.rounded').textContent = data.display_date_str;
+    } catch (err) {
+      document.getElementById('timelog-summary-section').innerHTML = `<div class='text-red-500 font-bold'>Failed to load data. Please try again.</div>`;
+    }
+  }
+
+  // Intercept navigation and filter events
+  function setupTimelogAjaxNav() {
+    // Navigation buttons
+    document.querySelectorAll('a[data-timelog-nav]').forEach(btn => {
+      btn.addEventListener('click', function(e) {
+        e.preventDefault();
+        const date = this.getAttribute('data-date');
+        const work_function = document.getElementById('functionFilter')?.value || 'All';
+        fetchTimelogData({date, work_function});
+      });
+    });
+    // Filter form
+    const filterForm = document.querySelector('form#timelog-filter-form');
+    if (filterForm) {
+      filterForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        const work_function = document.getElementById('functionFilter')?.value || 'All';
+        fetchTimelogData({work_function});
+      });
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', function() {
+    setupTimelogAjaxNav();
+  });
+  </script>
+
+  <!-- Spinner CSS -->
+  <style>
+  .spinner-border {
+    display: inline-block;
+    width: 1.5rem;
+    height: 1.5rem;
+    vertical-align: text-bottom;
+    border: 0.15em solid currentColor;
+    border-right-color: transparent;
+    border-radius: 50%;
+    animation: spinner-border .75s linear infinite;
+  }
+  @keyframes spinner-border {
+    100% { transform: rotate(360deg); }
+  }
+  </style>
 
   <!-- Modal for Jira iframe -->
-  <div x-show="showModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+  <div x-show="showModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50" style="display:none !important;">
     <div class="bg-white rounded-lg shadow-lg w-11/12 max-w-2xl relative">
       <button @click="showModal=false" class="absolute top-2 right-2 text-upgradRed font-bold">&times;</button>
       <iframe :src="modalUrl" x-ref="jiraFrame" class="w-full h-[600px] rounded-b-lg border-0"></iframe>
@@ -202,7 +226,7 @@
   </div>
 
   <!-- Jira Modal (iframe) with zoom and styled close button -->
-  <div id="jiraModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 hidden">
+  <div id="jiraModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 hidden" style="display:none !important;">
     <div class="relative bg-white rounded shadow-xl scale-95 transition-transform duration-200 flex flex-col" style="max-width:90vw;max-height:90vh;">
       <button onclick="closeJiraModal()" class="absolute top-2 right-2 bg-red-600 hover:bg-red-800 text-white font-bold py-1 px-4 rounded shadow text-lg z-10">Close</button>
       <iframe id="jiraIframe" src="" class="rounded" style="width:80vw;height:70vh;border:none;"></iframe>
@@ -290,9 +314,6 @@
   }
   </style>
 
-  {% else %}
-  <p class="text-muted">No worklogs found for today.</p>
-  {% endif %}
 </div>
 
 {% endblock %}

@@ -13,6 +13,7 @@ python-docx
 alembic==1.15.2
 redis
 rq
+Flask-Caching
 
 # --- Add any other missing libraries used in the codebase ---
 # (No evidence of markdown2 or other new packages in codebase)

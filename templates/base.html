@@ -112,7 +112,7 @@
         {% else %}
         <li><a href="{{ url_for('mytimelogs') }}" class="block px-3 py-2 rounded text-white hover:bg-upgradAccent font-semibold"><span x-show="open">My Timelogs</span></a></li>
         <li><a href="{{ url_for('HelperQA_AI') }}" class="block px-3 py-2 rounded text-white hover:bg-upgradAccent font-semibold"><i class="bi bi-robot mr-1"></i><span x-show="open">AI-Utility-Helper</span></a></li>
-        <li><a href="/login" class="block px-3 py-2 rounded text-upgradYellow bg-upgradRed hover:bg-upgradAccent font-semibold text-center"><i class="bi bi-box-arrow-in-right mr-1"></i><span x-show="open">Login as Admin</span></a></li>
+        <li><a href="/login" class="block px-3 py-2 rounded text-upgradYellow bg-upgradRed hover:bg-upgradAccent font-semibold text-center"><i class="bi bi-box-arrow-in-right mr-1"></i><span x-show="open">Login</span></a></li>
         {% endif %}
       </ul>
     </nav>
@@ -120,6 +120,14 @@
   <!-- Main Content: flex-1 for side-by-side layout -->
   <div class="flex-1 pt-8 transition-all duration-300 min-h-screen">
     <div class="max-w-7xl mx-auto px-2 sm:px-6 lg:px-8 mt-6">
+      {% if not session.get('logged_in') and request.path == '/login' %}
+        <div class="bg-white rounded-lg shadow p-4 my-6 text-center text-gray-700 border border-upgradAccent max-w-xl mx-auto">
+          <div class="mb-2 font-semibold">Welcome!</div>
+          <div class="mb-1">You can use <span class="font-semibold text-upgradRed">My Timelogs</span> to view your logs without logging in.</div>
+          <div class="mb-2">You can also try our <span class="font-semibold text-upgradRed">AI-Utility-Helper</span> for UI analysis and test case generation.</div>
+          <div class="text-sm text-gray-600">Tap the <span class="inline-block align-middle"><svg class="inline w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" /></svg></span> menu button to access these options.</div>
+        </div>
+      {% endif %}
       {% block content %}{% endblock %}
     </div>
   </div>

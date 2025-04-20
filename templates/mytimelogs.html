@@ -12,7 +12,13 @@
     <p><b>Name:</b> {{ user.name }}</p>
     <p><b>Email:</b> {{ user.email }}</p>
     <p><b>Designation:</b> {{ user.designation }}</p>
-    <p><b>Total Hours Logged This Month:</b> <span class="font-bold text-upgradTeal">{{ total_hours_month }}</span></p>
+    <p><b>Total Hours Logged This Month:</b> <span class="font-bold text-upgradTeal">
+      {% if total_hours_month < expected_hours_month and not is_weekend and not is_holiday and not is_on_leave %}
+        <a href="#" class="underline text-upgradRed hover:text-upgradPurple" onclick="fetchAndShowMissedDaysModal(); return false;">{{ total_hours_month }}</a>
+      {% else %}
+        {{ total_hours_month }}
+      {% endif %}
+    </span></p>
     <p><b>Expected Hours This Month:</b> <span class="font-bold text-upgradRed">{{ expected_hours_month }}</span></p>
     {% if total_hours_month < expected_hours_month %}
       <div class="mt-2 p-2 bg-yellow-100 border-l-4 border-yellow-500 text-yellow-800 rounded">
@@ -25,6 +31,70 @@
     {% endif %}
     <a href="{{ url_for('user_timelog', user_email=user.email) }}" class="mt-4 inline-block bg-upgradTeal hover:bg-upgradPurple text-white px-4 py-2 rounded text-xs font-bold transition">View Today's Timelog</a>
   </div>
+  <!-- Missed Days Modal -->
+  <div id="missedDaysModal" style="display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.4);z-index:9999;align-items:center;justify-content:center;">
+    <div style="background:white;padding:1.5rem 2rem;border-radius:12px;max-width:90vw;max-height:90vh;overflow:auto;box-shadow:0 0 20px #0002;">
+      <button onclick="document.getElementById('missedDaysModal').style.display='none'" style="float:right;background:#b91c1c;color:white;border:none;border-radius:4px;padding:0.25rem 0.75rem;margin-bottom:0.5rem;font-weight:bold;">Close</button>
+      <h3 class="text-lg font-bold mb-2 text-upgradRed">Days with Less than Expected Hours</h3>
+      <div id="missedDaysMsg" class="mb-2 text-gray-700" style="display:none;">Loading missed days. Please wait...</div>
+      <ul class="list-disc ml-6" id="missedDaysList" style="display:none;"></ul>
+      <div class="text-green-700 mt-2" id="noMissedDaysMsg" style="display:none;">No days with less than expected hours!</div>
+    </div>
+  </div>
+  <!-- Loading Overlay -->
+  <div id="timelogLoadingOverlay" style="display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(255,255,255,0.7);z-index:99999;align-items:center;justify-content:center;">
+    <div style="background:white;padding:1.5rem 2rem;border-radius:12px;box-shadow:0 0 20px #0002;font-size:1.1rem;font-weight:500;">
+      Loading missed days. Please wait...
+    </div>
+  </div>
+  <script>
+    function fetchAndShowMissedDaysModal() {
+      // Show loading overlay
+      const overlay = document.getElementById('timelogLoadingOverlay');
+      overlay.style.display = 'flex';
+      // Fetch data
+      fetch('/underlogged-days?user_email={{ user.email }}')
+        .then(resp => resp.json())
+        .then(data => {
+          showMissedDaysModal(data);
+          overlay.style.display = 'none';
+        })
+        .catch(() => {
+          showMissedDaysModal(null, true);
+          overlay.style.display = 'none';
+        });
+    }
+    function showMissedDaysModal(data, failed) {
+      document.getElementById('missedDaysModal').style.display = 'flex';
+      const list = document.getElementById('missedDaysList');
+      const noMsg = document.getElementById('noMissedDaysMsg');
+      const msg = document.getElementById('missedDaysMsg');
+      list.innerHTML = '';
+      list.style.display = 'none';
+      noMsg.style.display = 'none';
+      msg.style.display = '';
+      if (failed) {
+        msg.textContent = 'Failed to load data.';
+        return;
+      }
+      if (!data || data.length === 0) {
+        msg.style.display = 'none';
+        noMsg.style.display = '';
+        return;
+      }
+      msg.textContent = 'Click on the hours to view your detailed timelog for that day.';
+      list.style.display = '';
+      data.forEach(day => {
+        const li = document.createElement('li');
+        li.innerHTML = `${day.date_display}: <a href=\"${makeTimelogUrl(day.date)}\" target=\"_blank\" class=\"text-upgradTeal underline font-bold\">${day.hours}</a> hours`;
+        list.appendChild(li);
+      });
+    }
+    function makeTimelogUrl(dateStr) {
+      // dateStr is YYYY-MM-DD
+      return `/user-timelog/${encodeURIComponent('{{ user.email }}')}?date=${dateStr}`;
+    }
+  </script>
   {% elif email_checked %}
   <div class="mt-4 text-upgradRed font-semibold">No user found with that email.</div>
   {% endif %}

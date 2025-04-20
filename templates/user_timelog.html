@@ -1,14 +1,22 @@
 {% extends 'base.html' %}
 {% block content %}
 <div class="w-full max-w-full sm:max-w-5xl mx-auto px-2 sm:px-4">
-  <div class="flex flex-col sm:flex-row items-center justify-center gap-2 mb-4">
-    {% if previous_date %}
-      <a href="{{ url_for('user_timelog', user_email=user.email, date=previous_date) }}" class="bg-red-400 hover:bg-red-600 text-white px-3 py-2 rounded min-w-[44px] min-h-[44px]">Previous Day</a>
-    {% endif %}
-    {% if next_date %}
-      <a href="{{ url_for('user_timelog', user_email=user.email, date=next_date) }}" class="bg-blue-400 hover:bg-blue-600 text-white px-3 py-2 rounded min-w-[44px] min-h-[44px]">Next Day</a>
-    {% endif %}
-    <span class="bg-gray-200 text-gray-800 px-4 py-2 rounded w-full sm:w-auto text-center ml-0 sm:ml-2">{{ display_date_str }}</span>
+  <div class="flex flex-col sm:flex-row items-center justify-center gap-2 mb-4 w-full">
+    <div class="flex flex-col sm:flex-row w-full items-center gap-2">
+      <div class="flex-1 w-full">
+        {% if previous_date %}
+          <a href="{{ url_for('user_timelog', user_email=user.email, date=previous_date) }}" class="bg-red-400 hover:bg-red-600 text-white px-4 py-2 rounded font-semibold w-full block text-center">Previous Day</a>
+        {% endif %}
+      </div>
+      <div class="flex-1 w-full my-2 sm:my-0">
+        <span class="bg-gray-200 text-gray-800 px-4 py-2 rounded font-semibold w-full block text-center border border-gray-300">{{ display_date_str }}</span>
+      </div>
+      <div class="flex-1 w-full">
+        {% if next_date %}
+          <a href="{{ url_for('user_timelog', user_email=user.email, date=next_date) }}" class="bg-blue-400 hover:bg-blue-600 text-white px-4 py-2 rounded font-semibold w-full block text-center">Next Day</a>
+        {% endif %}
+      </div>
+    </div>
   </div>
   <div class="mb-2 sm:mb-4 text-base sm:text-lg font-semibold">Total Logged Hours: {{ total_logged_hours }}</div>
   <h3 class="text-lg sm:text-xl font-bold mb-2 sm:mb-4">📅 Timelog for {{ user.name }} ({{ user.email }}) on {{ display_date_str }}</h3>

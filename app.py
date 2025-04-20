@@ -213,11 +213,13 @@ def round_half(value):
 
 @app.before_request
 def require_login():
+    # Add 'underlogged_days' to the allowlist so it does NOT require login
     if 'logged_in' not in session and request.endpoint not in [
         'login', 'static', 'HelperQA_AI', 'generate_testcases', 'generate_testcases_auth',
         'timelog_today', 'users', 'export_users', 'export_timelog_links', 'mytimelogs',
         'user_timelog', 'HelperQA_AI', 'generate_testcases', 'get_jira_description',
-        'analyseui', 'testcases_result', 'generate_testcases', 'generate_testcases_auth'  # Allow test case results page and test case generator from util-ai-zone and HelperQA-AI without login
+        'analyseui', 'testcases_result', 'generate_testcases', 'generate_testcases_auth',
+        'underlogged_days'  # <-- add this line
     ]:
         return redirect('/login')
 
@@ -1236,6 +1238,63 @@ def get_jira_description():
     if err:
         return jsonify({'description': f'Error: {err}'})
     return jsonify({'description': desc})
+
+@app.route('/underlogged-days')
+def underlogged_days():
+    email = request.args.get('user_email')
+    if not email:
+        return jsonify([])
+    underlogged = get_underlogged_days_for_user(email)
+    # Format for frontend: date (YYYY-MM-DD), date_display (e.g. 20 Apr 2025), hours
+    formatted = [{
+        'date': d['date'].strftime('%Y-%m-%d'),
+        'date_display': d['date'].strftime('%d %b %Y'),
+        'hours': d['hours']
+    } for d in underlogged]
+    return jsonify(formatted)
+
+def get_underlogged_days_for_user(email):
+    """
+    Returns a list of dictionaries for each working day this month where the user logged less than 8 hours.
+    Skips weekends, holidays, and full-day leaves.
+    Each dict: {'date': date_obj, 'hours': hours_logged}
+    """
+    user = User.query.filter_by(email=email).first()
+    if not user or not user.jira_account_id:
+        return []
+    ist = pytz.timezone('Asia/Kolkata')
+    now = datetime.now(ist)
+    start_date = now.replace(day=1).date()
+    end_date = now.date()
+    # Get all holidays this month
+    holidays = set(h.date for h in Holiday.query.filter(Holiday.date >= start_date, Holiday.date <= end_date).all())
+    # Get all full-day leaves for user this month
+    leaves = set(l.start_date for l in Leave.query.filter(Leave.user_id == user.id, Leave.start_date >= start_date, Leave.start_date <= end_date, Leave.leave_type == 'FD').all())
+    # Fetch all worklogs for user this month
+    from jira_worklog_batch import get_epoch_ms, fetch_worklog_ids_updated_since, fetch_worklogs_by_ids
+    since_epoch = get_epoch_ms(start_date.strftime('%Y-%m-%d'))
+    worklog_ids = fetch_worklog_ids_updated_since(JIRA_BASE_URL, headers, auth, since_epoch)
+    all_worklogs = fetch_worklogs_by_ids(JIRA_BASE_URL, headers, auth, worklog_ids)
+    # Aggregate hours per day
+    hours_per_day = {}
+    for wl in all_worklogs:
+        author = wl.get('author', {}).get('accountId')
+        if author == user.jira_account_id:
+            started = wl.get('started', '')
+            if started:
+                dt = datetime.strptime(started[:10], '%Y-%m-%d').date()
+                if start_date <= dt <= end_date:
+                    hours_per_day[dt] = hours_per_day.get(dt, 0) + wl.get('timeSpentSeconds', 0) / 3600
+    # Now check each working day
+    missed = []
+    for i in range((end_date - start_date).days + 1):
+        day = start_date + timedelta(days=i)
+        if day.weekday() >= 5 or day in holidays or day in leaves:
+            continue
+        hours = round(hours_per_day.get(day, 0), 2)
+        if hours < 8:
+            missed.append({'date': day, 'hours': hours})
+    return missed
 
 app.register_blueprint(testcase_bp)
 

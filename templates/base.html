@@ -66,22 +66,22 @@
 <!-- Top Navbar: Brand + User Actions only -->
 <nav class="bg-gradient-to-r from-upgradRed to-upgradAccent shadow border-b border-upgradAccent">
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-    <div class="flex justify-between h-16 items-center">
-      <div class="flex items-center" style="margin-left: 0;">
+    <div class="flex items-center w-full justify-between">
+      <!-- Logo Left -->
+      <div class="flex items-center">
         <img src="https://img.icons8.com/color/48/000000/teamwork--v2.png" alt="Team Management Logo" class="h-9 w-9 mr-2 inline-block align-middle" style="object-fit:contain;" />
-        <span class="text-white font-bold text-xl md:text-2xl tracking-wide whitespace-nowrap">Team Management Tool</span>
+        <span class="text-white font-bold text-xl tracking-wide whitespace-nowrap hidden md:inline">Team Management Tool</span>
       </div>
-      <div class="flex items-center gap-4">
-        <!-- Hamburger for mobile -->
-        <button id="nav-toggle" class="md:hidden ml-2 text-white focus:outline-none text-2xl" aria-label="Toggle navigation" @click="open = !open">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" class="w-7 h-7">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
-          </svg>
-        </button>
-        {% if session.get('logged_in') %}
-          <span class="text-white font-semibold hidden sm:inline">Welcome, {{ session.get('username', 'admin') }}</span>
-        {% endif %}
-      </div>
+      <!-- Hamburger Right (mobile only) -->
+      <button id="nav-toggle" class="md:hidden text-white focus:outline-none text-2xl" aria-label="Toggle navigation" @click="open = !open">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" class="w-7 h-7">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+        </svg>
+      </button>
+      <!-- User greeting (desktop only) -->
+      {% if session.get('logged_in') %}
+        <span class="text-white font-semibold hidden md:inline ml-4">Welcome, {{ session.get('username', 'admin') }}</span>
+      {% endif %}
     </div>
   </div>
 </nav>

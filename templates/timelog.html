@@ -2,17 +2,17 @@
 {% block content %}
 <!-- Banner messages for holiday, weekend, no timelogs -->
 {% if not start or not end %}
-  <!-- Sparkly Today's Timelog Button Top Right, aligned with filter section -->
-  <div class="max-w-4xl mx-auto flex justify-end items-center mb-2 pr-6">
-    <button onclick="window.location.href='{{ url_for('timelog_today') }}'" class="relative bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 text-white px-6 py-2 rounded font-bold shadow-lg hover:scale-105 transition-transform duration-150 flex items-center sparkle-btn">
+  <div class="max-w-4xl mx-auto flex flex-row items-center justify-between mb-2 pr-6">
+    <div class="flex items-center w-full">
+      <div class="msg-banner bg-blue-100 border border-blue-400 text-blue-800 rounded p-2 text-left font-semibold shadow flex items-center w-full text-xs md:text-sm lg:text-base">
+        <span class="text-xl mr-2">🔎</span>
+        <span class="text-left align-middle whitespace-nowrap">Please select a <b>start date</b> and <b>end date</b>, then click <b>Fetch Logs</b> to view timelogs for your team.</span>
+      </div>
+    </div>
+    <button onclick="window.location.href='{{ url_for('timelog_today') }}'" class="relative bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 text-white px-6 py-2 rounded font-bold shadow-lg hover:scale-105 transition-transform duration-150 flex items-center sparkle-btn ml-4">
       <svg class="w-5 h-5 mr-2 animate-spin-slow text-yellow-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 2v2m0 16v2m10-10h-2M4 12H2m15.36 6.36l-1.42-1.42M6.34 6.34L4.92 4.92m12.02 0l-1.42 1.42M6.34 17.66l-1.42 1.42"/></svg>
       <span class="drop-shadow-lg">Today's Timelog ✨</span>
     </button>
-  </div>
-  <div class="max-w-4xl mx-auto flex justify-center mb-4">
-    <div class="msg-banner bg-blue-100 border border-blue-400 text-blue-800 rounded p-4 text-center font-semibold shadow flex items-center">
-      <span class="text-xl mr-2">🔎</span> Please select a start and end date, then click&nbsp;<b>Fetch Logs</b>&nbsp;to view timelogs for your team.
-    </div>
   </div>
 {% elif is_holiday %}
   <div class="msg-banner bg-green-100 border border-green-400 text-green-800 rounded p-4 mt-8 mb-8 text-center font-semibold">
@@ -97,8 +97,13 @@
     </div>
   </div>
 
-  <!-- Overall Summary Card -->
-  {% if summary_data or overall_total_logged %}
+  {% if start and end and summary_data and summary_data|length > 0 %}
+  <div class="max-w-4xl mx-auto flex flex-row items-center justify-between mb-2 pr-6">
+    <button onclick="window.location.href='{{ url_for('timelog_today') }}'" class="relative bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 text-white px-6 py-2 rounded font-bold shadow-lg hover:scale-105 transition-transform duration-150 flex items-center sparkle-btn ml-4">
+      <svg class="w-5 h-5 mr-2 animate-spin-slow text-yellow-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 2v2m0 16v2m10-10h-2M4 12H2m15.36 6.36l-1.42-1.42M6.34 6.34L4.92 4.92m12.02 0l-1.42 1.42M6.34 17.66l-1.42 1.42"/></svg>
+      <span class="drop-shadow-lg">Today's Timelog ✨</span>
+    </button>
+  </div>
   <div id="summary-table" class="bg-white rounded-xl shadow p-6 mb-4 border border-upgradAccent">
     <div class="flex flex-wrap items-center justify-between mb-2">
       <h2 class="text-lg font-bold text-upgradYellow mb-0">Overall Timelog Summary</h2>
@@ -370,4 +375,22 @@ document.addEventListener('alpine:init', () => {
   });
 });
 </script>
+
+<script>
+// Only allow past to today for date pickers
+const today = new Date().toISOString().split('T')[0];
+document.addEventListener('DOMContentLoaded', function() {
+  document.getElementById('start').setAttribute('max', today);
+  document.getElementById('end').setAttribute('max', today);
+});
+// Force full page reload on sidebar navigation
+window.addEventListener('DOMContentLoaded', function() {
+  document.querySelectorAll('.sidebar a').forEach(function(link) {
+    link.addEventListener('click', function(e) {
+      window.location = link.href;
+    });
+  });
+});
+</script>
+
 {% endblock %}

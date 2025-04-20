@@ -6,52 +6,52 @@
   [x-cloak] { display: none !important; }
 </style>
 
-<div class="max-w-5xl mx-auto px-2" x-data="timelogPage()">
+<div class="w-full max-w-full sm:max-w-5xl mx-auto px-2 sm:px-4" x-data="timelogPage()">
   <!-- Date navigation (distinct from user pagination) -->
-  <div class="flex justify-between items-center mb-4">
-    <div>
+  <div class="flex flex-col sm:flex-row justify-between items-center mb-4 gap-2">
+    <div class="w-full sm:w-auto flex flex-row gap-2 justify-between">
       {% if next_date %}
         {% if user_email %}
-          <a href="{{ url_for('timelog_today', user_email=user_email) }}?date={{ next_date }}" class="px-3 py-1 rounded bg-upgradRed text-white font-bold text-xs ml-2" data-timelog-nav>Next Day</a>
+          <a href="{{ url_for('timelog_today', user_email=user_email) }}?date={{ next_date }}" class="px-3 py-2 rounded bg-upgradRed text-white font-bold text-xs min-w-[44px] min-h-[44px]" data-timelog-nav>Next Day</a>
         {% else %}
-          <a href="{{ url_for('timelog_today') }}?date={{ next_date }}&work_function={{ selected_function }}" class="px-3 py-1 rounded bg-upgradRed text-white font-bold text-xs ml-2" data-timelog-nav>Next Day</a>
+          <a href="{{ url_for('timelog_today') }}?date={{ next_date }}&work_function={{ selected_function }}" class="px-3 py-2 rounded bg-upgradRed text-white font-bold text-xs min-w-[44px] min-h-[44px]" data-timelog-nav>Next Day</a>
         {% endif %}
       {% endif %}
     </div>
-    <span class="px-4 py-2 bg-gray-200 rounded">{{ display_date_str }}</span>
+    <span class="px-4 py-2 bg-gray-200 rounded w-full sm:w-auto text-center">{{ display_date_str }}</span>
   </div>
 
-  <h3 class="text-xl font-bold">📅 Timelog for {{ display_date_str }}</h3>
+  <h3 class="text-lg sm:text-xl font-bold mb-2 sm:mb-4">📅 Timelog for {{ display_date_str }}</h3>
 
   {% if not is_user_specific %}
-  <div class="bg-white rounded-xl shadow p-6 mb-8 border border-upgradAccent">
-    <div class="flex flex-wrap gap-4 items-end mb-4">
-      <form id="timelog-filter-form" method="POST" class="flex flex-wrap gap-4 items-end">
-        <div>
+  <div class="bg-white rounded-xl shadow p-4 sm:p-6 mb-6 sm:mb-8 border border-upgradAccent">
+    <div class="flex flex-col sm:flex-row flex-wrap gap-2 sm:gap-4 items-end mb-4">
+      <form id="timelog-filter-form" method="POST" class="flex flex-col sm:flex-row flex-wrap gap-2 sm:gap-4 items-end w-full">
+        <div class="w-full sm:w-auto">
           <label for="functionFilter" class="block text-xs font-bold text-upgradRed mb-1">Function</label>
-          <select class="block w-40 rounded-md border-upgradAccent shadow-sm focus:border-upgradRed focus:ring focus:ring-upgradYellow focus:ring-opacity-50 text-sm" id="functionFilter" name="work_function">
+          <select class="block w-full sm:w-40 rounded-md border-upgradAccent shadow-sm focus:border-upgradRed focus:ring focus:ring-upgradYellow focus:ring-opacity-50 text-sm" id="functionFilter" name="work_function">
             <option value="All" {% if selected_function == 'All' %}selected{% endif %}>All Functions</option>
             {% for wf in work_functions %}
               <option value="{{ wf }}" {% if selected_function == wf %}selected{% endif %}>{{ wf }}</option>
             {% endfor %}
           </select>
         </div>
-        <div>
+        <div class="w-full sm:w-auto">
           <label class="block text-xs font-bold text-upgradRed mb-1">Search User (Name):</label>
-          <input type="text" id="userSearch" x-model="userFilter" class="block w-40 rounded-md border-upgradAccent shadow-sm focus:border-upgradRed focus:ring focus:ring-upgradYellow focus:ring-opacity-50 text-sm" placeholder="Type to filter users by name...">
+          <input type="text" id="userSearch" x-model="userFilter" class="block w-full sm:w-40 rounded-md border-upgradAccent shadow-sm focus:border-upgradRed focus:ring focus:ring-upgradYellow focus:ring-opacity-50 text-sm" placeholder="Type to filter users by name...">
         </div>
-        <div class="flex items-center mt-2">
+        <div class="flex items-center mt-2 w-full sm:w-auto">
           <!-- Only Reds checkbox removed -->
         </div>
       </form>
-      <a href="{{ url_for('timelog', user_email=user_email) }}" class="inline-flex items-center px-4 py-2 bg-upgradPurple hover:bg-upgradAccent text-white text-xs font-bold rounded shadow focus:outline-none transition ml-auto">Back to Timelog</a>
+      <a href="{{ url_for('timelog', user_email=user_email) }}" class="inline-flex items-center px-4 py-2 bg-upgradPurple hover:bg-upgradAccent text-white text-xs font-bold rounded shadow focus:outline-none transition ml-auto min-w-[44px] min-h-[44px] mt-2 sm:mt-0">Back to Timelog</a>
     </div>
   </div>
   {% endif %}
 
-  <div id="overall-totals" class="flex flex-row gap-4 justify-end items-center mb-4"></div>
+  <div id="overall-totals" class="flex flex-col sm:flex-row gap-2 sm:gap-4 justify-end items-center mb-4"></div>
 
-  <div id="timelog-summary-section">
+  <div id="timelog-summary-section" class="overflow-x-auto w-full">
     {% include 'timelog_today_summary.html' ignore missing %}
   </div>
 

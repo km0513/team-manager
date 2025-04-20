@@ -1,8 +1,8 @@
 {% extends 'base.html' %}
 {% block content %}
-<div class="max-w-4xl mx-auto px-4 py-6">
-  <h3 class="mb-6 text-2xl font-bold text-upgradRed">AI-Utility-Helper</h3>
-  <div class="mb-6 p-4 rounded-lg bg-upgradYellow border border-upgradAccent text-upgradRed text-sm">
+<div class="w-full max-w-full sm:max-w-4xl mx-auto px-2 sm:px-4 py-4 sm:py-6">
+  <h3 class="mb-4 sm:mb-6 text-xl sm:text-2xl font-bold text-upgradRed">AI-Utility-Helper</h3>
+  <div class="mb-4 sm:mb-6 p-3 sm:p-4 rounded-lg bg-upgradYellow border border-upgradAccent text-upgradRed text-xs sm:text-sm">
     <strong class="block mb-2 text-upgradRed">AI-Utility-Helper Guide:</strong>
     <ul class="mb-2 list-disc list-inside">
       <li><strong>📷 Upload Screenshot</strong>: Performs UI analysis like layout issues or suggestions.</li>
@@ -12,11 +12,11 @@
     <span class="block">The result will appear below with options to expand requirements or view Jira directly in-app.</span>
   </div>
 
-  <form method="POST" enctype="multipart/form-data" id="feedbackForm" class="space-y-4">
+  <form method="POST" enctype="multipart/form-data" id="feedbackForm" class="space-y-3 sm:space-y-4">
     <div>
       <label for="inputType" class="block text-xs font-medium text-upgradRed mb-1">Choose Input Type</label>
       <div class="relative">
-        <select class="block w-full rounded-lg border border-upgradAccent bg-white px-3 py-2 text-sm shadow-sm focus:border-upgradRed focus:ring-2 focus:ring-upgradYellow focus:outline-none transition-all duration-150 appearance-none pr-8" id="inputType" name="input_type" required>
+        <select class="block w-full rounded-lg border border-upgradAccent bg-white px-3 py-2 text-xs sm:text-sm shadow-sm focus:border-upgradRed focus:ring-2 focus:ring-upgradYellow focus:outline-none transition-all duration-150 appearance-none pr-8" id="inputType" name="input_type" required>
           <option value="">-- Select --</option>
           <option value="upload">📷 Upload Screenshot</option>
           <option value="url">🌐 Enter Web Page URL</option>
@@ -31,25 +31,25 @@
     <!-- Screenshot Upload -->
     <div class="hidden" id="uploadGroup">
       <label class="block text-xs font-medium text-upgradRed mb-1">Upload Image</label>
-      <input type="file" name="screenshot" class="block w-full rounded-lg border border-upgradAccent bg-white px-3 py-2 text-sm shadow-sm focus:border-upgradRed focus:ring-2 focus:ring-upgradYellow focus:outline-none transition-all duration-150" accept="image/*">
+      <input type="file" name="screenshot" class="block w-full rounded-lg border border-upgradAccent bg-white px-3 py-2 text-xs sm:text-sm shadow-sm focus:border-upgradRed focus:ring-2 focus:ring-upgradYellow focus:outline-none transition-all duration-150" accept="image/*">
     </div>
 
     <!-- URL Input -->
     <div class="hidden" id="urlGroup">
       <label class="block text-xs font-medium text-upgradRed mb-1">Enter Page URL</label>
-      <input type="url" name="page_url" class="block w-full rounded-lg border border-upgradAccent bg-white px-3 py-2 text-sm shadow-sm focus:border-upgradRed focus:ring-2 focus:ring-upgradYellow focus:outline-none transition-all duration-150" placeholder="https://example.com">
+      <input type="url" name="page_url" class="block w-full rounded-lg border border-upgradAccent bg-white px-3 py-2 text-xs sm:text-sm shadow-sm focus:border-upgradRed focus:ring-2 focus:ring-upgradYellow focus:outline-none transition-all duration-150" placeholder="https://example.com">
     </div>
 
     <!-- Test Case Generator Section -->
     <div id="testcaseGroup" class="hidden mt-2">
       <label class="block text-xs font-medium text-upgradRed mb-1">Enter Jira Ticket ID (optional)</label>
       <div class="flex gap-2 items-center mb-2">
-        <input type="text" name="jira_id" id="jiraIdInput" class="block w-full rounded-lg border border-upgradAccent bg-white px-3 py-2 text-sm shadow-sm focus:border-upgradRed focus:ring-2 focus:ring-upgradYellow focus:outline-none transition-all duration-150" placeholder="e.g. ABC-123">
+        <input type="text" name="jira_id" id="jiraIdInput" class="block w-full rounded-lg border border-upgradAccent bg-white px-3 py-2 text-xs sm:text-sm shadow-sm focus:border-upgradRed focus:ring-2 focus:ring-upgradYellow focus:outline-none transition-all duration-150" placeholder="e.g. ABC-123">
       </div>
       <div id="jiraValidationMsg" class="text-xs font-semibold mb-2"></div>
-      <textarea name="story_text" class="block w-full rounded-lg border border-upgradAccent bg-white px-3 py-2 text-sm shadow-sm focus:border-upgradRed focus:ring-2 focus:ring-upgradYellow focus:outline-none transition-all duration-150" rows="4" placeholder="Or paste the story/epic/bug here..."></textarea>
+      <textarea name="story_text" class="block w-full rounded-lg border border-upgradAccent bg-white px-3 py-2 text-xs sm:text-sm shadow-sm focus:border-upgradRed focus:ring-2 focus:ring-upgradYellow focus:outline-none transition-all duration-150" rows="4" placeholder="Or paste the story/epic/bug here..."></textarea>
       <label class="block text-xs font-medium text-upgradRed mb-1">Or Upload a Document</label>
-      <input type="file" name="story_doc" class="block w-full rounded-lg border border-upgradAccent bg-white px-3 py-2 text-sm shadow-sm focus:border-upgradRed focus:ring-2 focus:ring-upgradYellow focus:outline-none transition-all duration-150" accept=".txt,.pdf,.doc,.docx">
+      <input type="file" name="story_doc" class="block w-full rounded-lg border border-upgradAccent bg-white px-3 py-2 text-xs sm:text-sm shadow-sm focus:border-upgradRed focus:ring-2 focus:ring-upgradYellow focus:outline-none transition-all duration-150" accept=".txt,.pdf,.doc,.docx">
       <div class="mt-2">
         <label>
           <input type="checkbox" name="use_lxp_context" value="yes" class="mr-2">
@@ -58,29 +58,29 @@
       </div>
       <div class="flex gap-2 mt-3" id="btnGroupTestcase">
         <input type="hidden" name="ai_mode" id="aiModeTestcase" value="testcases">
-        <button type="submit" id="testcaseBtn" class="px-4 py-2 bg-upgradYellow hover:bg-upgradAccent text-upgradRed border border-upgradAccent text-xs font-semibold rounded shadow">🧪 Generate Test Cases</button>
+        <button type="submit" id="testcaseBtn" class="px-4 py-2 bg-upgradYellow hover:bg-upgradAccent text-upgradRed border border-upgradAccent text-xs sm:text-sm font-semibold rounded shadow">🧪 Generate Test Cases</button>
       </div>
     </div>
 
     <!-- Button Groups -->
     <div class="flex gap-2 mt-3 hidden" id="btnGroup">
       <input type="hidden" name="ai_mode" id="aiMode" value="review">
-      <button type="submit" id="analyzeBtn" class="px-4 py-2 bg-upgradRed hover:bg-upgradAccent text-white text-xs font-semibold rounded shadow">🔍 Analyze UI</button>
+      <button type="submit" id="analyzeBtn" class="px-4 py-2 bg-upgradRed hover:bg-upgradAccent text-white text-xs sm:text-sm font-semibold rounded shadow">🔍 Analyze UI</button>
     </div>
   </form>
 
   {% if image_url %}
-  <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 mt-6">
     <div>
       {% if page_url %}
-      <h5 class="text-base font-semibold mb-1 text-upgradRed">Analyzed URL</h5>
-      <code class="block mb-2 text-xs text-upgradRed bg-upgradYellow rounded px-2 py-1">{{ page_url }}</code>
+      <h5 class="text-sm sm:text-base font-semibold mb-1 text-upgradRed">Analyzed URL</h5>
+      <code class="block mb-2 text-xs sm:text-sm text-upgradRed bg-upgradYellow rounded px-2 py-1">{{ page_url }}</code>
       {% endif %}
       <img src="{{ image_url }}" class="w-full rounded-lg shadow border border-upgradAccent" alt="Screenshot">
     </div>
     <div>
-      <h5 class="text-base font-semibold mb-1 text-upgradRed">Analysis / Testcases</h5>
-      <div class="p-4 bg-upgradYellow border border-upgradAccent rounded-lg min-h-[200px] prose prose-sm max-w-none">
+      <h5 class="text-sm sm:text-base font-semibold mb-1 text-upgradRed">Analysis / Testcases</h5>
+      <div class="p-3 sm:p-4 bg-upgradYellow border border-upgradAccent rounded-lg min-h-[120px] sm:min-h-[200px] prose prose-xs sm:prose-sm max-w-none">
         {{ feedback | safe if feedback else "No analysis found." }}
       </div>
     </div>

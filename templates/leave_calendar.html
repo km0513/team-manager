@@ -70,16 +70,16 @@
               {% set leave_type = leaves.get((user.id, day.day)) %}
               <div class="flex justify-center gap-1">
                 <label class="cursor-pointer flex flex-col items-center">
-                  <input type="radio" name="leave-{{ user.id }}-{{ day.day }}" value="P" {% if leave_type is none or leave_type == 'P' %}checked{% endif %} class="hidden">
-                  <span class="inline-block w-7 h-7 flex items-center justify-center rounded-full bg-[#E0F2F1] border border-[#00695C] text-[#00695C] font-bold">P</span>
+                  <input type="radio" name="leave_{{ user.id }}_{{ day.day }}" value="P" {% if leave_type is none or leave_type == 'P' %}checked{% endif %} class="hidden">
+                  <span class="inline-block w-7 h-7 flex items-center justify-center rounded-full font-bold border border-[#00695C] {% if leave_type is none or leave_type == 'P' %}bg-[#E0F2F1] text-[#00695C]{% else %}bg-gray-100 text-gray-300{% endif %}">P</span>
                 </label>
                 <label class="cursor-pointer flex flex-col items-center">
-                  <input type="radio" name="leave-{{ user.id }}-{{ day.day }}" value="L" {% if leave_type == 'L' %}checked{% endif %} class="hidden">
-                  <span class="inline-block w-7 h-7 flex items-center justify-center rounded-full bg-[#FFCDD2] border border-[#B71C1C] text-[#B71C1C] font-bold">L</span>
+                  <input type="radio" name="leave_{{ user.id }}_{{ day.day }}" value="FD" {% if leave_type == 'FD' %}checked{% endif %} class="hidden">
+                  <span class="inline-block w-7 h-7 flex items-center justify-center rounded-full font-bold border border-[#B71C1C] {% if leave_type == 'FD' %}bg-[#FFCDD2] text-[#B71C1C]{% else %}bg-gray-100 text-gray-300{% endif %}">L</span>
                 </label>
                 <label class="cursor-pointer flex flex-col items-center">
-                  <input type="radio" name="leave-{{ user.id }}-{{ day.day }}" value="H" {% if leave_type == 'H' %}checked{% endif %} class="hidden">
-                  <span class="inline-block w-7 h-7 flex items-center justify-center rounded-full bg-[#FFE082] border border-[#FFAB00] text-[#B71C1C] font-bold">1/2</span>
+                  <input type="radio" name="leave_{{ user.id }}_{{ day.day }}" value="HD" {% if leave_type == 'HD' %}checked{% endif %} class="hidden">
+                  <span class="inline-block w-7 h-7 flex items-center justify-center rounded-full font-bold border border-[#FFAB00] {% if leave_type == 'HD' %}bg-[#FFE082] text-[#B71C1C]{% else %}bg-gray-100 text-gray-300{% endif %}">1/2</span>
                 </label>
               </div>
             {% elif day.weekday() == 5 %}
@@ -100,6 +100,7 @@
       </tbody>
     </table>
   </form>
+  <button type="button" id="sticky-save-btn" style="display:none;position:fixed;bottom:24px;right:24px;z-index:1000;" class="bg-green-600 hover:bg-green-700 text-white font-semibold px-6 py-2 rounded shadow transition">Save Changes</button>
   <div id="sticky-bottom-scroller" class="sticky bottom-0 left-0 w-full bg-[#FFF3E0] border-t border-[#FFAB91] z-50 overflow-x-auto" style="min-height: 32px;">
     <div style="width: 100%; min-width: 900px; height: 24px;" class="flex items-center justify-center">
       <span class="text-xs text-[#B71C1C] font-semibold">Scroll for more dates &rarr;</span>

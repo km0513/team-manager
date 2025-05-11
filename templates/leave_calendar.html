@@ -19,7 +19,7 @@
 <div class="flex flex-wrap gap-2 mb-4 items-center">
   <a href="/leave-calendar?year={{ prev_year }}&month={{ prev_month }}" class="px-3 py-1 bg-[#FBE9E7] hover:bg-[#FFCCBC] text-[#B71C1C] text-xs font-bold rounded shadow">← Prev</a>
   <a href="/leave-calendar?year={{ next_year }}&month={{ next_month }}" class="px-3 py-1 bg-[#FBE9E7] hover:bg-[#FFCCBC] text-[#B71C1C] text-xs font-bold rounded shadow">Next →</a>
-  <a href="/leave-calendar-export?year={{ year }}&month={{ month }}" class="px-3 py-1 bg-[#FFD600] hover:bg-[#FFAB00] text-[#B71C1C] text-xs font-bold rounded shadow">Export CSV</a>
+
   <select id="userFilter" class="rounded border border-[#B71C1C] px-3 py-1 text-xs focus:ring-2 focus:ring-[#FFD600]" style="width: 180px;">
     <option value="all">Show All Users</option>
     {% for user in users %}
@@ -44,14 +44,16 @@
   </div>
 </div>
 
-<div id="calendar-scroll-wrapper" class="overflow-x-auto rounded-xl border border-[#B71C1C] bg-white shadow max-w-7xl mx-auto w-full relative" style="scrollbar-gutter: stable;">
-  <form method="POST" class="leave-calendar-form min-w-[900px]">
-    <table class="min-w-full w-full text-xs text-center">
+<div id="calendar-scroll-wrapper" class="overflow-x-auto border border-[#B71C1C] bg-white shadow mx-auto" style="scrollbar-gutter: stable; width:75vw; max-width:75vw; min-width:900px;">
+  <form method="POST" class="leave-calendar-form">
+    <!-- Save button always visible and submits form -->
+    <button type="submit" id="sticky-save-btn" style="position:fixed;bottom:32px;right:32px;z-index:2000;box-shadow:0 2px 16px #0002;" class="bg-green-600 hover:bg-green-700 text-white font-semibold px-6 py-2 rounded-full shadow-lg transition">Save Changes</button>
+    <table class="min-w-max text-[11px] text-center" style="table-layout:auto;">
       <thead>
         <tr>
-          <th class="sticky left-0 bg-[#B71C1C] z-10 py-2 px-3 font-extrabold text-left">User</th>
+          <th class="sticky left-0 bg-[#B71C1C] z-10 py-1 px-1 font-extrabold text-left">User</th>
           {% for day in dates %}
-            <th class="py-2 px-3 font-bold {% if day.date() == current_date.date() %}bg-[#FFD600] text-[#B71C1C] today-cell{% endif %}" id="{% if day.date() == current_date.date() %}today-col{% endif %}">
+            <th class="py-1 px-1 font-bold {% if day.date() == current_date.date() %}bg-[#FFD600] text-[#B71C1C] today-cell{% endif %}" id="{% if day.date() == current_date.date() %}today-col{% endif %}">
               <div class="text-[10px]" {% if day.date() == current_date.date() %}style="color:#111;"{% endif %}>{{ day.strftime('%a') }}</div>
               <div class="text-xs font-bold">{{ day.day }}</div>
             </th>
@@ -63,25 +65,29 @@
         <tr class="user-row border-t-4 border-[#0288D1]" data-user-id="{{ user.id }}">
           <td class="text-left sticky left-0 bg-white z-10 font-bold px-3 py-2">{{ user.name }}</td>
           {% for day in dates %}
-          <td class="px-2 py-1 border-l-2 border-[#FFAB91] {% if day.weekday() >= 5 %}bg-[#B3E5FC]{% endif %} {% if day.date() == current_date.date() %}today-cell{% endif %}">
+          <td class="px-1 py-1 border-l-2 border-[#FFAB91] {% if day.weekday() >= 5 %}bg-[#B3E5FC]{% endif %} {% if day.date() == current_date.date() %}today-cell{% endif %}">
             {% if day.date() in holidays %}
               <span class="inline-block px-2 py-1 rounded bg-[#E1BEE7] text-[#4A148C] font-bold" title="{{ holidays[day.date()] }}">H</span>
             {% elif day.weekday() < 5 %}
               {% set leave_type = leaves.get((user.id, day.day)) %}
-              <div class="flex justify-center gap-1">
-                <label class="cursor-pointer flex flex-col items-center">
-                  <input type="radio" name="leave_{{ user.id }}_{{ day.day }}" value="P" {% if leave_type is none or leave_type == 'P' %}checked{% endif %} class="hidden">
-                  <span class="inline-block w-7 h-7 flex items-center justify-center rounded-full font-bold border border-[#00695C] {% if leave_type is none or leave_type == 'P' %}bg-[#E0F2F1] text-[#00695C]{% else %}bg-gray-100 text-gray-300{% endif %}">P</span>
-                </label>
-                <label class="cursor-pointer flex flex-col items-center">
-                  <input type="radio" name="leave_{{ user.id }}_{{ day.day }}" value="FD" {% if leave_type == 'FD' %}checked{% endif %} class="hidden">
-                  <span class="inline-block w-7 h-7 flex items-center justify-center rounded-full font-bold border border-[#B71C1C] {% if leave_type == 'FD' %}bg-[#FFCDD2] text-[#B71C1C]{% else %}bg-gray-100 text-gray-300{% endif %}">L</span>
-                </label>
-                <label class="cursor-pointer flex flex-col items-center">
-                  <input type="radio" name="leave_{{ user.id }}_{{ day.day }}" value="HD" {% if leave_type == 'HD' %}checked{% endif %} class="hidden">
-                  <span class="inline-block w-7 h-7 flex items-center justify-center rounded-full font-bold border border-[#FFAB00] {% if leave_type == 'HD' %}bg-[#FFE082] text-[#B71C1C]{% else %}bg-gray-100 text-gray-300{% endif %}">1/2</span>
-                </label>
-              </div>
+              <div class="flex justify-center">
+  {% if day.date() in holidays %}
+    <span class="inline-block w-6 h-6 flex items-center justify-center rounded font-bold text-[13px] bg-[#E1BEE7] text-[#4A148C]" title="Holiday">H</span>
+  {% else %}
+    <span class="leave-value-display inline-block w-6 h-6 flex items-center justify-center rounded font-bold text-[13px] cursor-pointer
+      {% if leave_type is none or leave_type == 'P' %}bg-green-100 text-green-800{% elif leave_type == 'FD' %}bg-red-100 text-red-700{% elif leave_type == 'HD' %}bg-yellow-100 text-yellow-800{% else %}bg-gray-100 text-gray-400{% endif %}"
+      data-user-id="{{ user.id }}" data-day="{{ day.day }}" title="Click to change">
+      {% if leave_type is none or leave_type == 'P' %}P{% elif leave_type == 'FD' %}L{% elif leave_type == 'HD' %}1/2{% endif %}
+    </span>
+    <select class="leave-value-select hidden w-14 text-[13px] px-1 py-0.5 rounded border border-gray-300" data-user-id="{{ user.id }}" data-day="{{ day.day }}">
+      <option value="P" {% if leave_type is none or leave_type == 'P' %}selected{% endif %}>P</option>
+      <option value="FD" {% if leave_type == 'FD' %}selected{% endif %}>L</option>
+      <option value="HD" {% if leave_type == 'HD' %}selected{% endif %}>1/2</option>
+    </select>
+    <input type="hidden" name="leave_{{ user.id }}_{{ day.day }}" value="{% if leave_type is none or leave_type == 'P' %}P{% elif leave_type == 'FD' %}FD{% elif leave_type == 'HD' %}HD{% endif %}" class="leave-hidden-input" data-user-id="{{ user.id }}" data-day="{{ day.day }}">
+    <span class="leave-update-msg hidden text-green-600 text-xs ml-1">Leave updated!</span>
+  {% endif %}
+</div>
             {% elif day.weekday() == 5 %}
               <span class="inline-block w-7 h-7 flex items-center justify-center rounded-full bg-[#B3E5FC] border border-[#0288D1] mx-auto" title="Saturday">
                 <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 20 20" fill="none"><path d="M3 17l4.5-11 6 6L3 17z" fill="#0288D1"/><circle cx="14.5" cy="5.5" r="1.5" fill="#FFD600"/><circle cx="10" cy="3" r="1" fill="#FFAB00"/><circle cx="17" cy="9" r="1" fill="#FF7043"/></svg>
@@ -100,12 +106,25 @@
       </tbody>
     </table>
   </form>
-  <button type="button" id="sticky-save-btn" style="display:none;position:fixed;bottom:24px;right:24px;z-index:1000;" class="bg-green-600 hover:bg-green-700 text-white font-semibold px-6 py-2 rounded shadow transition">Save Changes</button>
+
+  <!-- Scroll-to-end button inside scroll area -->
   <div id="sticky-bottom-scroller" class="sticky bottom-0 left-0 w-full bg-[#FFF3E0] border-t border-[#FFAB91] z-50 overflow-x-auto" style="min-height: 32px;">
-    <div style="width: 100%; min-width: 900px; height: 24px;" class="flex items-center justify-center">
-      <span class="text-xs text-[#B71C1C] font-semibold">Scroll for more dates &rarr;</span>
+    <div style="width: 100%; min-width: 900px; height: 24px; position:relative;" class="flex items-center justify-center">
+      <button type="button" id="scroll-to-end-btn" title="Scroll to last date" style="position:middle; right:12px; top:2px; background:#B71C1C; color:white; border:none; border-radius:16px; padding:2px 12px; font-size:13px; font-weight:bold; cursor:pointer; box-shadow:0 1px 4px #0001;">→</button>
     </div>
   </div>
+  <script>
+    // Scroll to end of calendar table
+    document.addEventListener('DOMContentLoaded', function() {
+      var scrollBtn = document.getElementById('scroll-to-end-btn');
+      var wrapper = document.querySelector('.overflow-x-auto');
+      if(scrollBtn && wrapper) {
+        scrollBtn.addEventListener('click', function() {
+          wrapper.scrollLeft = wrapper.scrollWidth;
+        });
+      }
+    });
+  </script>
 </div>
 
 <style>
@@ -203,32 +222,144 @@ document.getElementById('userFilter').addEventListener('change', function () {
 
 const saveBtn = document.getElementById('sticky-save-btn');
 const leaveForm = document.querySelector('.leave-calendar-form');
-if (leaveForm && saveBtn) {
-  let isDirty = false;
-  leaveForm.addEventListener('change', function() {
-    isDirty = true;
-    saveBtn.style.display = 'block';
+// Enhanced dropdown logic for leave calendar with persistent update message
+(function() {
+  document.addEventListener('DOMContentLoaded', function() {
+    // Store original values for all hidden inputs
+    var originalValues = {};
+    document.querySelectorAll('.leave-hidden-input').forEach(function(input) {
+      var key = input.getAttribute('data-user-id') + '_' + input.getAttribute('data-day');
+      originalValues[key] = input.value;
+    });
+    var saveBtn = document.getElementById('sticky-save-btn');
+    // Update Save button visibility based on leave changes
+    function updateDirtyState() {
+      var dirty = false;
+      document.querySelectorAll('.leave-hidden-input').forEach(function(input) {
+        var key = input.getAttribute('data-user-id') + '_' + input.getAttribute('data-day');
+        if (input.value !== originalValues[key]) dirty = true;
+      });
+      if (saveBtn) {
+        if (dirty) {
+          saveBtn.style.display = 'block';
+        } else {
+          saveBtn.style.display = 'none';
+        }
+      }
+    }
+    document.querySelectorAll('.leave-value-display').forEach(function(span) {
+      span.addEventListener('click', function(e) {
+        var userId = span.getAttribute('data-user-id');
+        var day = span.getAttribute('data-day');
+        var select = document.querySelector('.leave-value-select[data-user-id="' + userId + '"][data-day="' + day + '"]');
+        if (select) {
+          span.classList.add('hidden');
+          select.classList.remove('hidden');
+          select.focus();
+        }
+      });
+    });
+    document.querySelectorAll('.leave-value-select').forEach(function(select) {
+      select.addEventListener('blur', function(e) {
+        select.classList.add('hidden');
+        var userId = select.getAttribute('data-user-id');
+        var day = select.getAttribute('data-day');
+        var span = document.querySelector('.leave-value-display[data-user-id="' + userId + '"][data-day="' + day + '"]');
+        if (span) {
+          span.classList.remove('hidden');
+        }
+      });
+      select.addEventListener('change', function(e) {
+        var val = select.value;
+        var userId = select.getAttribute('data-user-id');
+        var day = select.getAttribute('data-day');
+        var span = document.querySelector('.leave-value-display[data-user-id="' + userId + '"][data-day="' + day + '"]');
+        var hiddenInput = document.querySelector('.leave-hidden-input[data-user-id="' + userId + '"][data-day="' + day + '"]');
+        var msg = document.querySelector('.leave-update-msg[data-user-id="' + userId + '"][data-day="' + day + '"]');
+        if (span) {
+          span.textContent = (val === 'P') ? 'P' : (val === 'FD' ? 'L' : '1/2');
+          span.className = 'leave-value-display inline-block w-6 h-6 flex items-center justify-center rounded font-bold text-[13px] cursor-pointer';
+          if (val === 'P') {
+            span.classList.add('bg-green-100', 'text-green-800');
+          } else if (val === 'FD') {
+            span.classList.add('bg-red-100', 'text-red-700');
+          } else if (val === 'HD') {
+            span.classList.add('bg-yellow-100', 'text-yellow-800');
+          } else {
+            span.classList.add('bg-gray-100', 'text-gray-400');
+          }
+        }
+        if (hiddenInput) {
+          hiddenInput.value = val;
+        }
+        select.classList.add('hidden');
+        if (span) span.classList.remove('hidden');
+        // Show update message until save
+        if (msg) {
+          msg.classList.remove('hidden');
+        }
+        updateDirtyState();
+      });
+    });
+    // Hide all update messages on save
+    if (saveBtn && document.querySelector('.leave-calendar-form')) {
+      saveBtn.addEventListener('click', function() {
+        document.querySelectorAll('.leave-update-msg').forEach(function(msg) {
+          msg.classList.add('hidden');
+        });
+        // Update originals
+        document.querySelectorAll('.leave-hidden-input').forEach(function(input) {
+          var key = input.getAttribute('data-user-id') + '_' + input.getAttribute('data-day');
+          originalValues[key] = input.value;
+        });
+        updateDirtyState();
+      });
+    }
   });
-  saveBtn.addEventListener('click', function() {
-    isDirty = false;
-    saveBtn.style.display = 'none';
-    leaveForm.submit();
-  });
-  window.addEventListener('beforeunload', function() {
-    isDirty = false;
-    saveBtn.style.display = 'none';
-  });
-}
+})();
 
+// Live highlight for radio selection
 const radios = document.querySelectorAll('.leave-calendar-form input[type=radio]');
 radios.forEach(radio => {
   radio.addEventListener('change', function() {
     const group = this.name;
+    // Remove highlight from all in group
     document.querySelectorAll(`input[name='${group}']`).forEach(r => {
-      r.parentElement.querySelector('.tick').style.display = 'none';
+      const span = r.parentElement.querySelector('span');
+      span.classList.remove('ring-2','ring-[#00695C]','ring-[#B71C1C]','ring-[#FFAB00]');
+      // Reset background/text color if needed
+      if (r.value === 'P') span.classList.remove('bg-[#E0F2F1]','text-[#00695C]');
+      if (r.value === 'FD') span.classList.remove('bg-[#FFCDD2]','text-[#B71C1C]');
+      if (r.value === 'HD') span.classList.remove('bg-[#FFE082]','text-[#B71C1C]');
+      span.classList.add('bg-gray-100','text-gray-300');
     });
-    this.parentElement.querySelector('.tick').style.display = 'inline';
+    // Add highlight to selected
+    let span = this.parentElement.querySelector('span');
+    let ringClass = '';
+    if (this.value === 'P') {
+      ringClass = 'ring-2 ring-[#00695C]';
+      span.classList.remove('bg-gray-100','text-gray-300');
+      span.classList.add('bg-[#E0F2F1]','text-[#00695C]');
+    }
+    if (this.value === 'FD') {
+      ringClass = 'ring-2 ring-[#B71C1C]';
+      span.classList.remove('bg-gray-100','text-gray-300');
+      span.classList.add('bg-[#FFCDD2]','text-[#B71C1C]');
+    }
+    if (this.value === 'HD') {
+      ringClass = 'ring-2 ring-[#FFAB00]';
+      span.classList.remove('bg-gray-100','text-gray-300');
+      span.classList.add('bg-[#FFE082]','text-[#B71C1C]');
+    }
+    span.classList.add(...ringClass.split(' '));
+    // Dirty state logic
+    let dirty = false;
+    document.querySelectorAll('.leave-calendar-form input[type=radio]:checked').forEach(radio => {
+      if (originalValues[radio.name] !== radio.value) dirty = true;
+    });
+    saveBtn.style.display = dirty ? 'block' : 'none';
   });
 });
+
 </script>
 {% endblock %}

@@ -1,0 +1,203 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="max-w-2xl mx-auto mt-10">
+  <h1 class="text-2xl font-bold mb-4">JQL Work In Progress</h1>
+  <form method="post" class="mb-8 bg-gray-50 border border-gray-200 rounded-lg shadow-sm p-6">
+    <label for="jql" class="block font-semibold mb-1">Enter JQL:</label>
+    <input type="text" id="jql" name="jql" value="{{ jql }}" class="w-full border rounded px-3 py-2 mb-2 focus:ring-2 focus:ring-blue-400" placeholder="project = DEMO AND ...">
+    <label for="group_by" class="block font-semibold mb-1 mt-2">Group By:</label>
+    <select id="group_by" name="group_by" class="w-full border rounded px-3 py-2 mb-2 focus:ring-2 focus:ring-blue-400">
+      <option value="assignee" {% if group_by == 'assignee' %}selected{% endif %}>Assignee</option>
+      <option value="creator" {% if group_by == 'creator' %}selected{% endif %}>Creator</option>
+      <option value="status" {% if group_by == 'status' %}selected{% endif %}>Status</option>
+      <option value="priority" {% if group_by == 'priority' %}selected{% endif %}>Priority</option>
+    </select>
+    <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded shadow font-semibold transition">Submit</button>
+  </form>
+
+  {% if error %}
+    <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-2 rounded mb-4">{{ error }}</div>
+  {% endif %}
+
+  {% if grouped_issues %}
+    <div class="mb-6 flex flex-wrap items-center gap-4 bg-white border border-gray-200 rounded-lg shadow-sm px-4 py-3">
+      <label for="filterField" class="font-semibold mr-2">Filter Field:</label>
+      <select id="filterField" class="border rounded px-2 py-1 focus:ring-2 focus:ring-blue-400">
+        <option value="assignee">Assignee</option>
+        <option value="creator">Creator</option>
+        <option value="status">Status</option>
+        <option value="priority">Priority</option>
+      </select>
+      <label for="filterValue" class="font-semibold mx-2">Value:</label>
+      <select id="filterValue" class="border rounded px-2 py-1 focus:ring-2 focus:ring-blue-400">
+        <option value="">All</option>
+      </select>
+    </div>
+    <script>
+      // Filter arrays are now passed from Flask context. Use unique_values from backend for all fields.
+      var allGroups = {{ unique_values|tojson }};
+      document.addEventListener('DOMContentLoaded', function() {
+        var filterField = document.getElementById('filterField');
+        var filterValue = document.getElementById('filterValue');
+        var groupSections = document.querySelectorAll('.group-section');
+        // Set initial field (from server group_by)
+        filterField.value = '{{ group_by }}';
+        // Populate value dropdown
+        function updateValueDropdown() {
+          var field = filterField.value;
+          var values = allGroups[field] || [];
+          filterValue.innerHTML = '<option value="">All</option>';
+          values.forEach(function(val) {
+            var opt = document.createElement('option');
+            opt.value = val;
+            opt.textContent = val || 'Unassigned';
+            filterValue.appendChild(opt);
+          });
+        }
+        updateValueDropdown();
+        filterField.addEventListener('change', function() {
+          updateValueDropdown();
+          filterValue.value = '';
+          // Show all groups on field change
+          groupSections.forEach(function(sec) { sec.style.display = ''; });
+        });
+        filterValue.addEventListener('change', function() {
+          var val = this.value;
+          var field = filterField.value;
+          groupSections.forEach(function(sec) {
+            var groupLabel = sec.querySelector('h2').textContent.split(':')[1].trim();
+            // Only show if group value matches selected value, or show all
+            if (!val || groupLabel === val) {
+              sec.style.display = '';
+            } else {
+              sec.style.display = 'none';
+            }
+          });
+        });
+      });
+    </script>
+
+    <div id="groupedResults" class="grid grid-cols-1 md:grid-cols-2 gap-8">
+      {% for group, issues in grouped_issues.items() %}
+        <div class="group-section bg-white rounded-xl shadow-md border border-gray-200 p-5 mb-4 transition hover:shadow-lg" data-group="{{ group }}">
+          <h2 class="text-xl font-bold mb-4 text-upgradRed tracking-wide border-b pb-2">{{ group_by|capitalize }}: {{ group }}</h2>
+          <ul class="divide-y divide-gray-100">
+            {% for issue in issues %}
+              <li class="py-3">
+                <a href="#" class="jira-modal-link text-blue-700 underline font-bold hover:text-blue-900 transition" data-issue-key="{{ issue.key }}">{{ issue.key }}</a>
+                <span class="ml-2 font-medium text-gray-800">{{ issue.summary }}</span>
+                <div class="text-xs text-gray-500 mt-1">
+                  (Creator: {{ issue.creator }}, Assignee: {{ issue.assignee }}, Status: {{ issue.status }}, Priority: {{ issue.priority }})
+                </div>
+              </li>
+            {% endfor %}
+          </ul>
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    var filter = document.getElementById('groupFilter');
+    if (filter) {
+      filter.addEventListener('change', function() {
+        var val = this.value;
+        document.querySelectorAll('.group-section').forEach(function(sec) {
+          if (!val || sec.getAttribute('data-group') === val) {
+            sec.style.display = '';
+          } else {
+            sec.style.display = 'none';
+          }
+        });
+      });
+    }
+  });
+</script>
+
+</div>
+
+
+<!-- Jira Issue Details Modal -->
+<div id="jiraIssueModal" style="display:none;position:fixed;z-index:9999;left:0;top:0;width:100vw;height:100vh;background:rgba(0,0,0,0.4);align-items:center;justify-content:center;">
+  <div style="background:white;max-width:600px;width:95vw;margin:auto;position:relative;box-shadow:0 0 30px #0006;border-radius:10px;display:flex;flex-direction:column;">
+    <button id="closeJiraIssueModal" style="position:absolute;top:10px;right:14px;font-size:1.5rem;background:none;border:none;color:#d00;cursor:pointer;z-index:2;">&times;</button>
+    <div id="jiraIssueModalContent" style="padding:2rem 1.5rem 1.5rem 1.5rem;max-height:80vh;overflow:auto;">
+      <div id="jiraIssueLoading" style="display:none;text-align:center;padding:2rem;">Loading...</div>
+      <div id="jiraIssueError" style="display:none;color:#d00;text-align:center;padding:1rem;"></div>
+      <div id="jiraIssueFields" style="display:none;">
+        <h2 id="jiraIssueSummary" class="text-lg font-bold mb-2"></h2>
+        <div class="mb-2"><span class="font-semibold">Key:</span> <span id="jiraIssueKey"></span></div>
+        <div class="mb-2"><a id="jiraIssueOpenInJira" href="#" class="bg-blue-600 hover:bg-blue-800 text-white px-3 py-1 rounded text-xs font-semibold" target="_blank" rel="noopener">Open in Jira</a></div>
+        <div class="mb-2"><span class="font-semibold">Status:</span> <span id="jiraIssueStatus"></span></div>
+        <div class="mb-2"><span class="font-semibold">Priority:</span> <span id="jiraIssuePriority"></span></div>
+        <div class="mb-2"><span class="font-semibold">Assignee:</span> <span id="jiraIssueAssignee"></span></div>
+        <div class="mb-2"><span class="font-semibold">Reporter:</span> <span id="jiraIssueReporter"></span></div>
+        <div class="mb-2"><span class="font-semibold">Description:</span>
+          <div id="jiraIssueDescription" style="white-space:pre-line;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    var modal = document.getElementById('jiraIssueModal');
+    var closeBtn = document.getElementById('closeJiraIssueModal');
+    var loading = document.getElementById('jiraIssueLoading');
+    var errorDiv = document.getElementById('jiraIssueError');
+    var fieldsDiv = document.getElementById('jiraIssueFields');
+    var summary = document.getElementById('jiraIssueSummary');
+    var keySpan = document.getElementById('jiraIssueKey');
+    var statusSpan = document.getElementById('jiraIssueStatus');
+    var prioritySpan = document.getElementById('jiraIssuePriority');
+    var assigneeSpan = document.getElementById('jiraIssueAssignee');
+    var reporterSpan = document.getElementById('jiraIssueReporter');
+    var descDiv = document.getElementById('jiraIssueDescription');
+
+    document.querySelectorAll('.jira-modal-link').forEach(function(link) {
+      link.addEventListener('click', function(e) {
+        e.preventDefault();
+        var issueKey = this.getAttribute('data-issue-key');
+        loading.style.display = 'block';
+        errorDiv.style.display = 'none';
+        fieldsDiv.style.display = 'none';
+        modal.style.display = 'flex';
+        fetch('/api/jira_issue/' + issueKey)
+          .then(resp => resp.json())
+          .then(data => {
+            loading.style.display = 'none';
+            if (data.error) {
+              errorDiv.textContent = data.error;
+              errorDiv.style.display = 'block';
+            } else {
+              summary.textContent = data.summary || '';
+              keySpan.textContent = data.key || '';
+              statusSpan.textContent = data.status || '';
+              prioritySpan.textContent = data.priority || '';
+              assigneeSpan.textContent = data.assignee || '';
+              reporterSpan.textContent = data.reporter || '';
+              descDiv.textContent = data.description || '';
+              // Set Open in Jira link
+              var openInJira = document.getElementById('jiraIssueOpenInJira');
+              openInJira.href = "{{ jira_base_url }}/browse/" + (data.key || issueKey);
+              fieldsDiv.style.display = 'block';
+            }
+          })
+          .catch(err => {
+            loading.style.display = 'none';
+            errorDiv.textContent = 'Error loading issue details.';
+            errorDiv.style.display = 'block';
+          });
+      });
+    });
+    closeBtn.addEventListener('click', function() {
+      modal.style.display = 'none';
+    });
+    modal.addEventListener('click', function(e) {
+      if (e.target === modal) {
+        modal.style.display = 'none';
+      }
+    });
+  });
+</script>
+{% endblock %}

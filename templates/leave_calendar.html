@@ -21,11 +21,28 @@
   <a href="/leave-calendar?year={{ next_year }}&month={{ next_month }}" class="px-3 py-1 bg-[#FBE9E7] hover:bg-[#FFCCBC] text-[#B71C1C] text-xs font-bold rounded shadow">Next →</a>
 
   <select id="userFilter" class="rounded border border-[#B71C1C] px-3 py-1 text-xs focus:ring-2 focus:ring-[#FFD600]" style="width: 180px;">
-    <option value="all">Show All Users</option>
-    {% for user in users %}
-      <option value="{{ user.id }}">{{ user.name }}</option>
-    {% endfor %}
-  </select>
+  <option value="all">Show All Users</option>
+  {% for user in users %}
+    <option value="{{ user.id }}" {% if selected_user_id and user.id|string == selected_user_id|string %}selected{% endif %}>{{ user.name }}</option>
+  {% endfor %}
+</select>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  var userFilter = document.getElementById('userFilter');
+  if (userFilter) {
+    userFilter.addEventListener('change', function() {
+      var val = this.value;
+      var url = new URL(window.location.href);
+      if (val === 'all') {
+        url.searchParams.delete('user_id');
+      } else {
+        url.searchParams.set('user_id', val);
+      }
+      window.location.href = url.toString();
+    });
+  }
+});
+</script>
   <a href="/holiday-calendar?year={{ year }}" class="px-3 py-1 bg-[#FFD600] hover:bg-[#FFAB00] text-[#B71C1C] text-xs font-bold rounded shadow flex items-center gap-1">Holiday Calendar <svg xmlns="http://www.w3.org/2000/svg" class="inline w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10m-9 4h6" /></svg></a>
 </div>
 

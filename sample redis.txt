@@ -1,0 +1,9 @@
+from redis import Redis
+r = Redis(
+    host='redis-11185.c80.us-east-1-2.ec2.redns.redis-cloud.com',
+    port=11185,
+    username='default',
+    password='YOUR_PASSWORD',
+    ssl=True
+)
+print(r.hset('testkey', mapping={'field1': 'value1', 'field2': 'value2'}))

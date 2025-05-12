@@ -207,6 +207,43 @@ def fetch_jira_sprints(board_id):
 
 # Routes
 
+from flask import jsonify
+
+@app.route('/timelog_async', methods=['POST'])
+def timelog_async():
+    """
+    Enqueue a background job to process timelog data. Expects form data with 'start', 'end', and 'work_function'.
+    Returns a job ID for polling.
+    """
+    form = request.form.to_dict()
+    job = timelog_queue.enqueue(process_timelog_report, form)
+    return jsonify({'job_id': job.get_id()}), 202
+
+@app.route('/timelog_status/<job_id>', methods=['GET'])
+def timelog_status(job_id):
+    """
+    Check the status of a background timelog job. Returns status and result if ready.
+    """
+    try:
+        import os
+        redis_conn = Redis(
+            host=os.getenv('REDIS_HOST'),
+            port=int(os.getenv('REDIS_PORT')),
+            decode_responses=True,
+            username=os.getenv('REDIS_USERNAME'),
+            password=os.getenv('REDIS_PASSWORD'),
+            ssl=True
+        )
+        job = Job.fetch(job_id, connection=redis_conn)
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 404
+    if job.is_finished:
+        return jsonify({'status': 'finished', 'result': job.result})
+    elif job.is_failed:
+        return jsonify({'status': 'failed', 'message': str(job.exc_info)})
+    else:
+        return jsonify({'status': 'in_progress'})
+
 @app.template_filter('round_half')
 def round_half(value):
     return round(float(value) * 2) / 2
@@ -219,7 +256,7 @@ def require_login():
         'timelog_today', 'users', 'export_users', 'export_timelog_links', 'mytimelogs',
         'user_timelog', 'HelperQA_AI', 'generate_testcases', 'get_jira_description',
         'analyseui', 'testcases_result', 'generate_testcases', 'generate_testcases_auth',
-        'underlogged_days'  # <-- add this line
+        'underlogged_days', 'jql_wip'  # <-- allow jql_wip without login
     ]:
         return redirect('/login')
 
@@ -395,13 +432,89 @@ def manage_holidays():
         # Avoid duplicates
         if not Holiday.query.filter_by(date=holiday_date).first():
             db.session.add(Holiday(date=holiday_date, description=description))
-            db.session.commit()
-
-    holidays = Holiday.query.order_by(Holiday.date).all()
-    return render_template('holidays.html', holidays=holidays)
-
 @app.route('/leave-calendar', methods=['GET', 'POST'])
 def leave_calendar():
+    from flask import render_template, request
+    user_id = request.args.get('user_id')
+    modal = request.args.get('modal') == '1'
+    # ... existing logic to get users, leaves, etc. ...
+    if user_id:
+        selected_user = User.query.filter_by(id=user_id).first()
+        users = [selected_user] if selected_user else []
+    else:
+        users = User.query.all()
+    # Calculate year and month
+    year = int(request.args.get('year', datetime.now().year))
+    month = int(request.args.get('month', datetime.now().month))
+    month_days = calendar.monthrange(year, month)[1]
+    dates = [datetime(year, month, day) for day in range(1, month_days + 1)]
+
+    # Handle saving leave data
+    if request.method == 'POST':
+        for user in users:
+            Leave.query.filter(
+                Leave.user_id == user.id,
+                Leave.start_date >= datetime(year, month, 1),
+                Leave.start_date <= datetime(year, month, month_days)
+            ).delete()
+            for day in dates:
+                leave_type = request.form.get(f'leave_{user.id}_{day.day}')
+                if leave_type and leave_type in ["FD", "HD"]:
+                    existing_leave = Leave.query.filter_by(user_id=user.id, start_date=day).first()
+                    if not existing_leave:
+                        db.session.add(Leave(user_id=user.id, start_date=day, leave_type=leave_type))
+                    else:
+                        existing_leave.leave_type = leave_type
+        db.session.commit()
+        return redirect(f'/leave-calendar?year={year}&month={month}')
+
+    # Load existing leaves
+    leaves = {(leave.user_id, leave.start_date.day): leave.leave_type
+              for leave in Leave.query.filter(
+                  Leave.start_date >= datetime(year, month, 1),
+                  Leave.start_date <= datetime(year, month, month_days)
+              ).all()}
+
+    # Previous & next month/year values for navigation
+    prev_month = month - 1 if month > 1 else 12
+    next_month = month + 1 if month < 12 else 1
+    prev_year = year if month > 1 else year - 1
+    next_year = year if month < 12 else year + 1
+
+    # Group dates by ISO week
+    weeks = {}
+    for date in dates:
+        week_key = f"{date.isocalendar()[0]}-W{date.isocalendar()[1]}"
+        weeks.setdefault(week_key, []).append(date)
+
+    # Provide a dictionary of date: description for holidays
+    holiday_dict = {h.date: h.description for h in Holiday.query.filter(
+        Holiday.date >= datetime(year, month, 1).date(),
+        Holiday.date <= datetime(year, month, month_days).date()
+    ).all()}
+
+    context = dict(
+        users=users,
+        dates=dates,
+        leaves=leaves,
+        year=year,
+        month=month,
+        current_date=datetime.today(),
+        prev_month=prev_month,
+        next_month=next_month,
+        prev_year=prev_year,
+        next_year=next_year,
+        weeks=weeks,
+        holidays=holiday_dict,
+        selected_user_id=user_id
+    )
+    if modal:
+        context['user'] = users[0] if users else None
+        context['modal'] = True
+        return render_template('leave_calendar_modal.html', **context)
+    else:
+        return render_template('leave_calendar.html', **context)
+
     users = User.query.all()
     year = int(request.args.get('year', datetime.now().year))
     month = int(request.args.get('month', datetime.now().month))
@@ -1313,6 +1426,162 @@ def get_underlogged_days_for_user(email):
 
 app.register_blueprint(testcase_bp)
 
+@app.route('/jql-wip', methods=['GET', 'POST'])
+def jql_wip():
+    import os
+    import requests
+    from flask import current_app
+    from collections import defaultdict
+
+    jql = ''
+    group_by = 'assignee'  # default
+    grouped_issues = {}
+    error = None
+
+    # Jira config from environment or config
+    JIRA_BASE_URL = os.environ.get('JIRA_BASE_URL')
+    JIRA_EMAIL = os.environ.get('JIRA_EMAIL')
+    JIRA_API_TOKEN = os.environ.get('JIRA_API_TOKEN')
+    if not (JIRA_BASE_URL and JIRA_EMAIL and JIRA_API_TOKEN):
+        error = 'Jira credentials are not set in environment.'
+        return render_template('jql_wip.html', jql=jql, grouped_issues={}, group_by=group_by, error=error, jira_base_url=JIRA_BASE_URL)
+
+    headers = {
+        "Accept": "application/json",
+        "Content-Type": "application/json"
+    }
+    auth = (JIRA_EMAIL, JIRA_API_TOKEN)
+
+    if request.method == 'POST':
+        jql = request.form.get('jql', '')
+        group_by = request.form.get('group_by', 'assignee')
+        if jql.strip():
+            # Always fetch these fields + group_by
+            filterable_fields = ["assignee", "creator", "status", "priority"]
+            fields = ["summary", "creator", "assignee", "status", "priority"]
+            if group_by not in fields:
+                fields.append(group_by)
+            fields_param = ','.join(fields)
+            url = f"{JIRA_BASE_URL}/rest/api/3/search"
+            params = {
+                "jql": jql,
+                "fields": fields_param,
+                "maxResults": 100
+            }
+            grouped_issues = {}
+            try:
+                resp = requests.get(url, headers=headers, params=params, auth=auth)
+                if resp.ok:
+                    data = resp.json()
+                    issues = data.get('issues', [])
+                    grouped = defaultdict(list)
+                    for issue in issues:
+                        key = issue.get('key')
+                        f = issue.get('fields', {})
+                        summary = f.get('summary', '')
+                        creator = f.get('creator', {}).get('displayName', '')
+                        assignee = f.get('assignee', {}).get('displayName', '')
+                        status = f.get('status', {}).get('name', '')
+                        priority = f.get('priority', {}).get('name', '')
+                        issue_data = {
+                            'key': key,
+                            'summary': summary,
+                            'creator': creator,
+                            'assignee': assignee,
+                            'status': status,
+                            'priority': priority
+                        }
+                        # Group by selected field
+                        group_val = issue_data.get(group_by) or 'Unassigned'
+                        grouped[group_val].append(issue_data)
+                    grouped_issues = dict(grouped)
+                else:
+                    error = f"Jira API error: {resp.status_code} {resp.text}"
+            except Exception as e:
+                error = f"Jira API exception: {e}"
+            # Flatten issues for filter value extraction (move outside try)
+            all_issues = [issue for group in grouped_issues.values() for issue in group]
+            # Dynamically collect unique values for all filterable fields
+            unique_values = {}
+            for field in filterable_fields:
+                unique_values[field] = sorted(set(issue.get(field, '') or 'Unassigned' for issue in all_issues if issue.get(field, '') != ''))   
+            # Pass dynamic filter fields and their unique values to template
+            filterable_fields = ["assignee", "creator", "status", "priority", "originalestimate", "remainingestimate"]
+            # If unique_values is not defined (GET or error), set as empty dict
+            unique_values = locals().get('unique_values', {field: [] for field in filterable_fields})
+    return render_template(
+        'jql_wip.html',
+        jql=jql,
+        grouped_issues=grouped_issues,
+        group_by=group_by,
+        error=error,
+        jira_base_url=JIRA_BASE_URL,
+        filterable_fields=filterable_fields,
+        unique_values=unique_values
+    )
+
+@app.route('/api/jira_issue/<issue_key>')
+def api_jira_issue(issue_key):
+    import os
+    import requests
+    from flask import jsonify
+    JIRA_BASE_URL = os.environ.get('JIRA_BASE_URL')
+    JIRA_EMAIL = os.environ.get('JIRA_EMAIL')
+    JIRA_API_TOKEN = os.environ.get('JIRA_API_TOKEN')
+    if not (JIRA_BASE_URL and JIRA_EMAIL and JIRA_API_TOKEN):
+        return jsonify({'error': 'Jira credentials not set'}), 500
+    headers = {
+        "Accept": "application/json",
+        "Content-Type": "application/json"
+    }
+    auth = (JIRA_EMAIL, JIRA_API_TOKEN)
+    url = f"{JIRA_BASE_URL}/rest/api/3/issue/{issue_key}"
+    params = {"fields": "summary,description,status,assignee,reporter,priority"}
+    try:
+        resp = requests.get(url, headers=headers, params=params, auth=auth)
+        if resp.ok:
+            data = resp.json()
+            f = data.get('fields', {})
+            def extract_adf_text(adf):
+                if isinstance(adf, str):
+                    return adf
+                if not isinstance(adf, dict):
+                    return ''
+                text = ''
+                if adf.get('type') == 'text':
+                    text += adf.get('text', '')
+                if 'content' in adf:
+                    for item in adf['content']:
+                        text += extract_adf_text(item)
+                    if adf.get('type') == 'paragraph':
+                        text += '\n'
+                return text
+
+            adf_desc = f.get('description', '')
+            desc_text = ''
+            if isinstance(adf_desc, dict):
+                desc_text = extract_adf_text(adf_desc).strip()
+            else:
+                desc_text = adf_desc or ''
+            result = {
+                'key': issue_key,
+                'summary': f.get('summary', ''),
+                'description': desc_text,
+                'status': f.get('status', {}).get('name', ''),
+                'assignee': f.get('assignee', {}).get('displayName', ''),
+                'reporter': f.get('reporter', {}).get('displayName', ''),
+                'priority': f.get('priority', {}).get('name', ''),
+            }
+            return jsonify(result)
+
+        else:
+            return jsonify({'error': f'Jira API error: {resp.status_code} {resp.text}'}), 500
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+print("Registered routes:")
+for rule in app.url_map.iter_rules():
+    print(rule)
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()

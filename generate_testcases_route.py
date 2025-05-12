@@ -25,6 +25,7 @@ ai_util = AIUtility(
 
 testcase_bp = Blueprint('testcase_bp', __name__)
 
+
 # Fetch from Jira 
 def fetch_jira_description(issue_key):
     url = f"{os.getenv('JIRA_BASE_URL')}/rest/api/3/issue/{issue_key}"

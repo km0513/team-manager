@@ -103,4 +103,30 @@
     {% endif %}
   </div>
 {% endif %}
+<!-- Leave Calendar Modal Container -->
+<div id="leaveCalendarModalContainer"></div>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  document.querySelectorAll('.open-leave-modal').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var userId = btn.getAttribute('data-user-id');
+      // Show loading spinner
+      var modalContainer = document.getElementById('leaveCalendarModalContainer');
+      modalContainer.innerHTML = '<div class="fixed inset-0 flex items-center justify-center z-50"><div class="bg-white p-8 rounded shadow text-center">Loading...</div></div>';
+      // Fetch modal content
+      fetch(`/leave-calendar?user_id=${userId}&modal=1`, { credentials: 'same-origin' })       .then(response => response.text())
+        .then(html => {
+          modalContainer.innerHTML = html;
+          // Add close on background click
+          var modal = document.getElementById('leaveModal');
+          if (modal) {
+            modal.addEventListener('click', function(e) {
+              if (e.target === modal) modal.style.display = 'none';
+            });
+          }
+        });
+    });
+  });
+});
+</script>
 {% endblock %}

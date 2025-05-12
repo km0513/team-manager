@@ -1,0 +1,11 @@
+{% set modal = True %}
+<div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" id="leaveModal" style="display:block;">
+  <div class="bg-white rounded-lg shadow-lg max-w-5xl w-full p-6 relative overflow-auto" style="max-height:90vh;">
+    <button class="absolute top-2 right-2 text-2xl font-bold text-gray-500 hover:text-red-600" onclick="document.getElementById('leaveModal').style.display='none'">&times;</button>
+    <h2 class="text-xl font-bold mb-4 text-[#B71C1C] flex items-center gap-2">
+      <svg xmlns="http://www.w3.org/2000/svg" class="inline w-6 h-6 text-[#B71C1C]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 17l4 4 4-4m0-5V3m-8 4h16" /></svg>
+      Leave Calendar for {{ user.name }}
+    </h2>
+    {% include 'leave_calendar.html' %}
+  </div>
+</div>

@@ -1,0 +1,43 @@
+/* Basic styles for Team Manager */
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  color: #333;
+}
+
+.text-upgradRed {
+  color: #e53e3e;
+}
+
+.bg-upgradRed {
+  background-color: #e53e3e;
+}
+
+.text-upgradYellow {
+  color: #ecc94b;
+}
+
+.bg-upgradYellow {
+  background-color: #ecc94b;
+}
+
+.text-upgradAccent {
+  color: #d69e2e;
+}
+
+.bg-upgradAccent {
+  background-color: #d69e2e;
+}
+
+/* Utility classes */
+.hidden {
+  display: none;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .responsive-container {
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+  }
+}

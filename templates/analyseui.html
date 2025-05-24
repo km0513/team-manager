@@ -1,5 +1,11 @@
 {% extends 'base.html' %}
 {% block content %}
+<!-- html2canvas CDN -->
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<!-- Screenshot logic -->
+<script src="/static/screenshot.js"></script>
+<!-- Screenshot preview area will be injected by JS -->
+
 <div class="max-w-2xl mx-auto bg-upgradLight rounded-xl shadow p-8 mt-10 border border-upgradAccent">
   <h2 class="text-3xl font-bold text-upgradRed mb-4 text-center">AI UI Analysis Result</h2>
   <div class="mb-8">

@@ -61,7 +61,7 @@
     }
   </style>
 </head>
-<body x-data="sidebar()" class="bg-upgradLight min-h-screen overflow-x-hidden">
+<body x-data="{sidebarOpen: window.innerWidth >= 768}" class="bg-upgradLight min-h-screen overflow-x-hidden">
 
 <!-- Top Navbar: Brand + User Actions only -->
 <nav class="bg-gradient-to-r from-upgradRed to-upgradAccent shadow border-b border-upgradAccent">
@@ -73,7 +73,7 @@
         <span class="text-white font-bold text-xl tracking-wide whitespace-nowrap hidden md:inline">Team Management Tool</span>
       </div>
       <!-- Hamburger Right (mobile only) -->
-      <button id="nav-toggle" class="md:hidden text-white focus:outline-none text-2xl" aria-label="Toggle navigation" @click="open = !open">
+      <button id="nav-toggle" class="md:hidden text-white focus:outline-none text-2xl" aria-label="Toggle navigation" @click="sidebarOpen = !sidebarOpen">
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" class="w-7 h-7">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
         </svg>
@@ -85,35 +85,52 @@
     </div>
   </div>
 </nav>
+
 <!-- Layout Wrapper: flex on desktop, block on mobile -->
 <div class="md:flex">
   <!-- Sidebar (collapsible, overlays on mobile, pushes content on desktop) -->
   <div id="sidebar"
        class="flex-shrink-0"
        :class="[
-         open ? 'md:w-56 w-4/5 sm:w-2/3 md:static fixed left-0 top-0 min-h-screen bg-gradient-to-b from-upgradRed to-upgradAccent shadow z-40 transition-all duration-300' : 'md:w-16 w-0 md:static fixed left-0 top-0 min-h-screen bg-gradient-to-b from-upgradRed to-upgradAccent shadow z-40 transition-all duration-300',
-         window.innerWidth < 768 && !open ? 'hidden' : ''
-       ]"
-       style="z-index:40;">
-    <button @click="open = !open" class="absolute top-2 right-2 bg-upgradAccent text-white rounded p-1 z-50 focus:outline-none md:hidden block" aria-label="Toggle sidebar">
-      <svg x-show="open" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" class="w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
-      <svg x-show="!open" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" class="w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" /></svg>
+         sidebarOpen ? 'w-56 md:w-64 p-4 md:block' : 'w-16 p-2 md:block',
+         'bg-upgradRed text-white h-screen sticky top-0 transition-all duration-300'
+       ]">
+    <!-- Toggle button for both mobile and desktop -->
+    <button class="absolute right-2 top-2 text-white" @click="sidebarOpen = !sidebarOpen">
+      <svg x-show="sidebarOpen" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" class="w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+      <svg x-show="!sidebarOpen" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" class="w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" /></svg>
     </button>
-    <nav class="flex-1 px-2 py-6" :class="open ? '' : 'px-0 py-2'">
-      <ul class="space-y-2" :class="open ? '' : 'space-y-0'">
+    <nav class="flex-1 px-2 py-6" :class="sidebarOpen ? '' : 'px-0 py-2'">
+      <ul class="space-y-2" :class="sidebarOpen ? '' : 'space-y-0'">
         {% if session.get('logged_in') %}
-        <li><a href="/dashboard" class="block px-3 py-2 rounded text-white hover:bg-upgradAccent {{ 'bg-upgradRed' if request.path.startswith('/dashboard') else '' }} font-semibold"><i class="bi bi-house-fill mr-1"></i><span x-show="open">Dashboard</span></a></li>
-        <li><a href="/users" class="block px-3 py-2 rounded text-white hover:bg-upgradAccent {{ 'bg-upgradRed' if request.path.startswith('/users') else '' }} font-semibold"><i class="bi bi-people-fill mr-1"></i><span x-show="open">User Management</span></a></li>
-        <li><a href="/leave-calendar" class="block px-3 py-2 rounded text-white hover:bg-upgradAccent {{ 'bg-upgradRed' if request.path.startswith('/leave-calendar') else '' }} font-semibold"><i class="bi bi-calendar2-week mr-1"></i><span x-show="open">Leaves</span></a></li>
-        <li><a href="/timelog" class="block px-3 py-2 rounded text-white hover:bg-upgradAccent {{ 'bg-upgradRed' if request.path.startswith('/timelog') and not request.path.startswith('/timelog-today') else '' }} font-semibold"><i class="bi bi-clock-history mr-1"></i><span x-show="open">Timelog</span></a></li>
-        <li><a href="/jql-wip" class="block px-3 py-2 rounded text-white hover:bg-upgradAccent {{ 'bg-upgradRed' if request.path.startswith('/jql-wip') else '' }} font-semibold"><i class="bi bi-search mr-1"></i><span x-show="open">JQL Work In Progress</span></a></li>
-        <li><a href="/capacity" class="block px-3 py-2 rounded text-white hover:bg-upgradAccent {{ 'bg-upgradRed' if request.path.startswith('/capacity') else '' }} font-semibold"><i class="bi bi-bar-chart-line mr-1"></i><span x-show="open">Capacity</span></a></li>
-        <li><a href="{{ url_for('HelperQA_AI') }}" class="block px-3 py-2 rounded text-white hover:bg-upgradAccent font-semibold"><i class="bi bi-robot mr-1"></i><span x-show="open">AI-Utility-Helper</span></a></li>
-        <li><a href="/logout" class="block px-3 py-2 rounded text-upgradYellow hover:text-white font-semibold flex items-center"><i class="bi bi-box-arrow-right mr-1"></i><span x-show="open">Logout</span></a></li>
+        <li><a href="/dashboard" class="block px-3 py-2 rounded text-white hover:bg-upgradAccent {{ 'bg-upgradRed' if request.path.startswith('/dashboard') else '' }} font-semibold"><i class="bi bi-speedometer2 mr-1"></i><span x-show="sidebarOpen">Dashboard</span></a></li>
+        <li><a href="/users" class="block px-3 py-2 rounded text-white hover:bg-upgradAccent {{ 'bg-upgradRed' if request.path.startswith('/users') else '' }} font-semibold"><i class="bi bi-people mr-1"></i><span x-show="sidebarOpen">User Management</span></a></li>
+        <li><a href="/leave-calendar" class="block px-3 py-2 rounded text-white hover:bg-upgradAccent {{ 'bg-upgradRed' if request.path.startswith('/leave-calendar') else '' }} font-semibold"><i class="bi bi-calendar-check mr-1"></i><span x-show="sidebarOpen">Leave Calendar</span></a></li>
+        <li><a href="/timelog" class="block px-3 py-2 rounded text-white hover:bg-upgradAccent {{ 'bg-upgradRed' if request.path.startswith('/timelog') and not request.path.startswith('/timelog-today') else '' }} font-semibold"><i class="bi bi-clock-history mr-1"></i><span x-show="sidebarOpen">Timelog</span></a></li>
+        <!-- Jira Related Utils Section -->
+        <li x-data="{jiraUtilsOpen: true}" class="mt-4">
+          <button @click="jiraUtilsOpen = !jiraUtilsOpen" class="w-full text-left px-3 py-2 rounded text-white hover:bg-upgradAccent font-semibold flex items-center justify-between">
+            <div class="flex items-center">
+              <i class="bi bi-gear-fill mr-2"></i>
+              <span x-show="sidebarOpen">Jira Related Utils</span>
+            </div>
+            <svg x-show="sidebarOpen" :class="{'transform -rotate-90': !jiraUtilsOpen}" class="w-4 h-4 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+            </svg>
+          </button>
+          <ul x-show="jiraUtilsOpen && sidebarOpen" x-collapse class="ml-4 mt-1 space-y-1">
+            <li><a href="/jql-wip" class="block px-3 py-2 rounded text-white hover:bg-upgradAccent {{ 'bg-upgradRed' if request.path.startswith('/jql-wip') else '' }} font-semibold text-sm"><i class="bi bi-person-badge mr-1"></i>Individual Ownership</a></li>
+            <li><a href="/jira-export-analysis" class="block px-3 py-2 rounded text-white hover:bg-upgradAccent {{ 'bg-upgradRed' if request.path.startswith('/jira-export-analysis') else '' }} font-semibold text-sm"><i class="bi bi-graph-up mr-1"></i>Release Progress</a></li>
+            <li><a href="/release-blocker-analysis" class="block px-3 py-2 rounded text-white hover:bg-upgradAccent {{ 'bg-upgradRed' if request.path.startswith('/release-blocker-analysis') else '' }} font-semibold text-sm"><i class="bi bi-bug-fill mr-1"></i>Issue Bug Analysis</a></li>
+          </ul>
+        </li>
+        <li><a href="/capacity" class="block px-3 py-2 rounded text-white hover:bg-upgradAccent {{ 'bg-upgradRed' if request.path.startswith('/capacity') else '' }} font-semibold"><i class="bi bi-bar-chart-line mr-1"></i><span x-show="sidebarOpen">Capacity</span></a></li>
+        <li><a href="{{ url_for('HelperQA_AI') }}" class="block px-3 py-2 rounded text-white hover:bg-upgradAccent font-semibold"><i class="bi bi-robot mr-1"></i><span x-show="sidebarOpen">AI-Utility-Helper</span></a></li>
+        <li><a href="/logout" class="block px-3 py-2 rounded text-upgradYellow hover:text-white font-semibold flex items-center"><i class="bi bi-box-arrow-right mr-1"></i><span x-show="sidebarOpen">Logout</span></a></li>
         {% else %}
-        <li><a href="{{ url_for('mytimelogs') }}" class="block px-3 py-2 rounded text-white hover:bg-upgradAccent font-semibold"><span x-show="open">My Timelogs</span></a></li>
-        <li><a href="{{ url_for('HelperQA_AI') }}" class="block px-3 py-2 rounded text-white hover:bg-upgradAccent font-semibold"><i class="bi bi-robot mr-1"></i><span x-show="open">AI-Utility-Helper</span></a></li>
-        <li><a href="/login" class="block px-3 py-2 rounded text-upgradYellow bg-upgradRed hover:bg-upgradAccent font-semibold text-center"><i class="bi bi-box-arrow-in-right mr-1"></i><span x-show="open">Login</span></a></li>
+        <li><a href="{{ url_for('mytimelogs') }}" class="block px-3 py-2 rounded text-white hover:bg-upgradAccent font-semibold"><span x-show="sidebarOpen">My Timelogs</span></a></li>
+        <li><a href="{{ url_for('HelperQA_AI') }}" class="block px-3 py-2 rounded text-white hover:bg-upgradAccent font-semibold"><i class="bi bi-robot mr-1"></i><span x-show="sidebarOpen">AI-Utility-Helper</span></a></li>
+        <li><a href="/login" class="block px-3 py-2 rounded text-upgradYellow bg-upgradRed hover:bg-upgradAccent font-semibold text-center"><i class="bi bi-box-arrow-in-right mr-1"></i><span x-show="sidebarOpen">Login</span></a></li>
         {% endif %}
       </ul>
     </nav>
@@ -140,10 +157,22 @@
 </div>
 
 <script>
-  document.addEventListener('alpine:init', () => {
-    Alpine.data('sidebar', () => ({
-      open: window.innerWidth >= 768 ? true : false,
-    }))
+  document.addEventListener('DOMContentLoaded', () => {
+    // Save sidebar state in localStorage
+    document.addEventListener('alpine:initialized', () => {
+      const sidebar = document.querySelector('[x-data]').__x;
+      
+      // Load saved state on init
+      const savedState = localStorage.getItem('sidebarOpen');
+      if (savedState !== null) {
+        sidebar.$data.sidebarOpen = savedState === 'true';
+      }
+      
+      // Watch for changes and save state
+      sidebar.$watch('sidebarOpen', (value) => {
+        localStorage.setItem('sidebarOpen', value);
+      });
+    });
   });
 </script>
 

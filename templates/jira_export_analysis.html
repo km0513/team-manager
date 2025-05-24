@@ -1,0 +1,1856 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+  <h1 class="text-2xl font-bold mb-4">Jira Export Analysis</h1>
+  
+  <!-- Data Input Section -->
+  <div class="mb-8 bg-gray-50 border border-gray-200 rounded-lg shadow-sm p-6" 
+       x-data="{inputType: localStorage.getItem('jira_input_type') || 'csv', isDataInputExpanded: localStorage.getItem('isDataInputExpanded') !== 'false'}" 
+       x-init="$watch('inputType', value => localStorage.setItem('jira_input_type', value)); $watch('isDataInputExpanded', value => localStorage.setItem('isDataInputExpanded', value))">
+    <div class="flex justify-between items-center cursor-pointer" @click="isDataInputExpanded = !isDataInputExpanded">
+      <h2 class="text-xl font-semibold">Jira Data Input</h2>
+      <button class="text-gray-500 hover:text-gray-700">
+        <svg x-show="!isDataInputExpanded" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+          <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+        </svg>
+        <svg x-show="isDataInputExpanded" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+          <path fill-rule="evenodd" d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z" clip-rule="evenodd" />
+        </svg>
+      </button>
+    </div>
+    <div x-show="isDataInputExpanded" class="mt-4">
+    
+    <!-- Input Type Selector -->
+    <div class="mb-6">
+      <div class="flex space-x-4">
+        <label class="inline-flex items-center">
+          <input type="radio" name="input_type" value="csv" x-model="inputType" class="form-radio h-4 w-4 text-blue-600">
+          <span class="ml-2">Upload CSV File</span>
+        </label>
+        <label class="inline-flex items-center">
+          <input type="radio" name="input_type" value="jql" x-model="inputType" class="form-radio h-4 w-4 text-blue-600">
+          <span class="ml-2">Use JQL Query</span>
+        </label>
+      </div>
+    </div>
+    
+    <!-- CSV Upload Form -->
+    <form method="POST" enctype="multipart/form-data" action="/jira-export-analysis" class="space-y-4" x-show="inputType === 'csv'">
+      <input type="hidden" name="form_type" value="csv_upload">
+      <div>
+        <label for="file" class="block font-medium text-gray-700 mb-1">Select CSV file:</label>
+        <input type="file" name="file" id="file" accept=".csv" 
+               class="block w-full text-sm text-gray-500
+                      file:mr-4 file:py-2 file:px-4
+                      file:rounded file:border-0
+                      file:text-sm file:font-semibold
+                      file:bg-blue-50 file:text-blue-700
+                      hover:file:bg-blue-100">
+        <p class="mt-1 text-sm text-gray-500">Upload a Jira export CSV file with 'Parent summary' and 'Status' columns</p>
+      </div>
+      
+      <div>
+        <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded shadow font-semibold transition">
+          Analyze CSV
+        </button>
+      </div>
+    </form>
+    
+    <!-- JQL Query Form -->
+    <form method="POST" action="/jira-export-analysis" class="space-y-4" x-show="inputType === 'jql'" id="jql-form">
+      <input type="hidden" name="form_type" value="jql_query">
+      <div>
+        <label for="jql" class="block font-medium text-gray-700 mb-1">Enter JQL Query:</label>
+        <textarea name="jql" id="jql" rows="3" 
+                  class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                  placeholder="project = ABC AND issuetype = Story"></textarea>
+        <p class="mt-1 text-sm text-gray-500">Enter a JQL query to fetch issues from Jira. The query should return issues with parent tasks.</p>
+      </div>
+      
+      <!-- We've removed the blocker JQL field from here and moved it to a modal -->
+      
+      <!-- JQL Shortcuts -->
+      <div class="mt-2">
+        <p class="text-sm font-medium text-gray-700 mb-1">Quick Shortcuts:</p>
+        <div class="flex flex-wrap gap-2">
+          <button type="button" class="jql-shortcut bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs px-2 py-1 rounded border border-gray-300 transition" 
+                  data-query='filter in ("PRISMReg - Current Release - All Issues(Stories and Bugs)") AND issuetype = Story'>
+            PRISMReg Stories
+          </button>
+          <button type="button" class="jql-shortcut bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs px-2 py-1 rounded border border-gray-300 transition" 
+                  data-query='filter in ("PRISMReg - Current Release - All Issues(Stories and Bugs)") AND issuetype = Bug'>
+            PRISMReg Bugs
+          </button>
+        </div>
+      </div>
+      
+      <div>
+        <button type="submit" id="execute-jql-btn" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded shadow font-semibold transition">
+          Execute JQL
+        </button>
+      </div>
+    </form>
+    
+    {% if error %}
+    <div class="mt-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
+      <strong class="font-bold">Error:</strong>
+      <span class="block sm:inline">{{ error }}</span>
+    </div>
+    {% endif %}
+    </div>
+  </div>
+  
+  {% if file_info %}
+  <!-- Analysis Results Section -->
+  <div class="space-y-6" id="analysis-results">
+    <div class="bg-white border border-gray-200 rounded-lg shadow-sm p-6" x-data="{isDataSourceExpanded: localStorage.getItem('isDataSourceExpanded') !== 'false'}" x-init="$watch('isDataSourceExpanded', value => localStorage.setItem('isDataSourceExpanded', value))">
+      <div class="flex justify-between items-center cursor-pointer" @click="isDataSourceExpanded = !isDataSourceExpanded">
+        <h2 class="text-xl font-semibold">Data Source Information</h2>
+        <button class="text-gray-500 hover:text-gray-700">
+          <svg x-show="!isDataSourceExpanded" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+          </svg>
+          <svg x-show="isDataSourceExpanded" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd" d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z" clip-rule="evenodd" />
+          </svg>
+        </button>
+      </div>
+      <div x-show="isDataSourceExpanded" class="mt-4 data-source-info">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {% if file_info.source == 'JQL Query' %}
+        <div class="bg-gray-50 p-4 rounded md:col-span-3 jira-base-url" data-url="{{ os.environ.get('JIRA_BASE_URL') }}">
+          <p class="text-sm text-gray-500">JQL Query</p>
+          <p class="font-medium break-words">{{ file_info.query }}</p>
+        </div>
+        {% else %}
+        <div class="bg-gray-50 p-4 rounded">
+          <p class="text-sm text-gray-500">Filename</p>
+          <p class="font-medium">{{ file_info.filename }}</p>
+        </div>
+        {% endif %}
+        <div class="bg-gray-50 p-4 rounded">
+          <p class="text-sm text-gray-500">Total Issues</p>
+          <p class="font-medium">{{ file_info.total_rows }}</p>
+        </div>
+        <div class="bg-gray-50 p-4 rounded">
+          <p class="text-sm text-gray-500">Data Source</p>
+          <p class="font-medium">{{ file_info.source if file_info.source else 'CSV Upload' }}</p>
+        </div>
+        </div>
+      </div>
+    </div>
+    
+
+
+    <!-- Action Buttons -->
+    <div class="bg-white border border-gray-200 rounded-lg shadow-sm p-6">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-xl font-semibold">Analysis Actions</h2>
+        <div class="flex space-x-3">
+          <button type="button" id="release-blocker-btn" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded shadow font-semibold transition">
+            Release Blocker Analysis
+          </button>
+          <button type="button" id="download-html-btn" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded shadow font-semibold transition">
+            Download as HTML
+          </button>
+        </div>
+      </div>
+      <p class="text-sm text-gray-500 mb-2">Analyze release blockers or download the analysis results as an HTML file for sharing or offline viewing.</p>
+    </div>
+    
+    <!-- Release Blocker Analysis section has been moved to a modal -->
+    
+    <!-- Overall Progress -->
+    <div class="bg-white border border-gray-200 rounded-lg shadow-sm p-6">
+      <h2 class="text-xl font-semibold mb-4">Overall Completion</h2>
+      
+      <div class="w-full bg-gray-200 rounded-full h-6 mb-4">
+        <div class="bg-green-600 h-6 rounded-full text-center text-white text-sm font-medium leading-6" 
+             style="width: {{ overall['Completion %'] }}%">
+          {{ overall['Completion %'] }}%
+        </div>
+      </div>
+      
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
+        <div class="bg-gray-50 p-4 rounded">
+          <p class="text-sm text-gray-500">Total Issues</p>
+          <p class="font-medium">{{ overall.Total }}</p>
+        </div>
+        <div class="bg-yellow-50 p-4 rounded cursor-pointer hover:shadow-md transition status-card" data-status="Dev Ownership">
+          <p class="text-sm text-yellow-700">Dev Ownership</p>
+          <p class="font-medium text-yellow-800">{{ overall['Dev Ownership'] }}</p>
+        </div>
+        <div class="bg-blue-50 p-4 rounded cursor-pointer hover:shadow-md transition status-card" data-status="QA Ownership">
+          <p class="text-sm text-blue-700">QA Ownership</p>
+          <p class="font-medium text-blue-800">{{ overall['QA Ownership'] }}</p>
+        </div>
+        <div class="bg-green-50 p-4 rounded cursor-pointer hover:shadow-md transition status-card" data-status="Closed">
+          <p class="text-sm text-green-700">Closed</p>
+          <p class="font-medium text-green-800">{{ overall.Closed }}</p>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Per Feature Progress -->
+    <div class="bg-white border border-gray-200 rounded-lg shadow-sm p-6">
+      <h2 class="text-xl font-semibold mb-4">Feature-wise Completion</h2>
+      
+      <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200">
+          <thead class="bg-gray-50">
+            <tr>
+              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Parent Feature
+              </th>
+              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Total
+              </th>
+              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Dev Ownership
+              </th>
+              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                QA Ownership
+              </th>
+              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Closed
+              </th>
+              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Completion %
+              </th>
+              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Actions
+              </th>
+            </tr>
+          </thead>
+          <tbody class="bg-white divide-y divide-gray-200">
+            {% for row in results %}
+            <tr>
+              <td class="px-6 py-4 whitespace-normal text-sm font-medium text-gray-900">
+                <button 
+                  type="button" 
+                  class="text-left hover:text-blue-600 focus:outline-none focus:text-blue-600 transition parent-feature-btn"
+                  data-parent="{{ row['Parent summary'] }}"
+                >
+                  <span class="parent-text">{{ row['Parent summary'] or 'Unassigned' }}</span>
+                </button>
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                {{ row.Total }}
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-yellow-600">
+                {{ row['Dev Ownership'] }}
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-blue-600">
+                {{ row['QA Ownership'] }}
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-green-600">
+                {{ row.Closed }}
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap">
+                <div class="w-full bg-gray-200 rounded-full h-4">
+                  <div class="bg-green-600 h-4 rounded-full text-center text-white text-xs font-medium leading-4" 
+                       style="width: {{ row['Completion %'] }}%">
+                    {{ row['Completion %'] }}%
+                  </div>
+                </div>
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                <button 
+                  type="button" 
+                  class="text-blue-600 hover:text-blue-800 focus:outline-none transition feature-analysis-btn"
+                  data-feature="{{ row['Parent summary'] }}"
+                >
+                  <span class="inline-flex items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                    </svg>
+                    Analyze
+                  </span>
+                </button>
+              </td>
+            </tr>
+            {% endfor %}
+            <!-- Overall row -->
+            <tr class="bg-gray-50 font-semibold">
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                {{ overall['Parent summary'] }}
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                {{ overall.Total }}
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-yellow-800">
+                {{ overall['Dev Ownership'] }}
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-blue-800">
+                {{ overall['QA Ownership'] }}
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-green-800">
+                {{ overall.Closed }}
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap">
+                <div class="w-full bg-gray-200 rounded-full h-4">
+                  <div class="bg-green-800 h-4 rounded-full text-center text-white text-xs font-medium leading-4" style="width: {{ overall['Completion %'] }}%">{{ overall['Completion %'] }}%</div>
+                </div>
+              </td>
+              <td></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Add JavaScript for HTML download -->
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    const downloadHtmlBtn = document.getElementById('download-html-btn');
+    
+    if (downloadHtmlBtn) {
+      downloadHtmlBtn.addEventListener('click', function() {
+        // Show loading state
+        downloadHtmlBtn.disabled = true;
+        downloadHtmlBtn.innerHTML = '<svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Preparing...';
+        
+        // Get all the analysis sections
+        const analysisResults = document.getElementById('analysis-results');
+        
+        // Make sure we have content to export
+        if (!analysisResults) {
+          alert('No analysis results found to download.');
+          downloadHtmlBtn.disabled = false;
+          downloadHtmlBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd" /></svg> Download as HTML';
+          return;
+        }
+        
+        // Get all the sections we want to include
+        const dataSourceInfo = document.querySelector('.data-source-info');
+        const overallCompletion = document.querySelector('.bg-white:nth-of-type(3)');
+        const featureWiseCompletion = document.querySelector('.bg-white:nth-of-type(4)');
+        
+        // Get the Jira base URL for creating hyperlinks
+        let jiraBaseUrl = '';
+        const jiraUrlElement = document.querySelector('.jira-base-url');
+        if (jiraUrlElement) {
+          jiraBaseUrl = jiraUrlElement.getAttribute('data-url') || '';
+        }
+        
+        // Create a clone of the feature-wise completion section to modify
+        const featureWiseCompletionClone = featureWiseCompletion ? featureWiseCompletion.cloneNode(true) : null;
+        
+        // Add hyperlinks to issue keys if they exist
+        if (featureWiseCompletionClone && jiraBaseUrl) {
+          // Find all issue keys in the table
+          const issueElements = featureWiseCompletionClone.querySelectorAll('.issue-key');
+          issueElements.forEach(element => {
+            const issueKey = element.textContent.trim();
+            if (issueKey) {
+              element.innerHTML = `<a href="${jiraBaseUrl}/browse/${issueKey}" target="_blank" style="color: #2563eb; text-decoration: underline;">${issueKey}</a>`;
+            }
+          });
+          
+          // Fix progress bars in the cloned element
+          const progressBars = featureWiseCompletionClone.querySelectorAll('.bg-green-600');
+          progressBars.forEach(progressBar => {
+            // Make sure the width style is preserved
+            const widthStyle = progressBar.style.width;
+            if (widthStyle) {
+              // Ensure the style is explicitly set as an inline style
+              progressBar.setAttribute('style', `width: ${widthStyle}; height: 100%;`);
+            }
+          });
+        }
+        
+        // Create a new HTML document with enhanced styling
+        const htmlContent = `
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Jira Analysis Report - ${new Date().toLocaleDateString()}</title>
+          <style>
+            body { 
+              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; 
+              margin: 0; 
+              padding: 30px; 
+              background-color: #f9fafb; 
+              color: #1f2937;
+            }
+            .container { 
+              max-width: 1200px; 
+              margin: 0 auto; 
+              background-color: white;
+              border-radius: 10px;
+              box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05), 0 1px 3px rgba(0, 0, 0, 0.1);
+              overflow: hidden;
+              padding: 30px;
+            }
+            .header {
+              border-bottom: 1px solid #e5e7eb;
+              padding-bottom: 20px;
+              margin-bottom: 30px;
+            }
+            h1 { 
+              color: #111827; 
+              margin-top: 0;
+              margin-bottom: 10px; 
+              font-size: 28px;
+              font-weight: 700;
+            }
+            .timestamp {
+              color: #6b7280;
+              font-size: 14px;
+              margin-bottom: 0;
+            }
+            .section { 
+              background-color: white; 
+              border-radius: 8px; 
+              border: 1px solid #e5e7eb;
+              box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05); 
+              padding: 24px; 
+              margin-bottom: 24px; 
+            }
+            h2 { 
+              color: #111827; 
+              margin-top: 0; 
+              margin-bottom: 16px;
+              font-size: 20px;
+              font-weight: 600;
+            }
+            h3 {
+              color: #374151;
+              font-size: 16px;
+              margin-top: 0;
+              margin-bottom: 12px;
+              font-weight: 600;
+            }
+            table { 
+              width: 100%; 
+              border-collapse: collapse; 
+              margin-top: 16px; 
+              margin-bottom: 16px;
+              font-size: 14px;
+            }
+            th, td { 
+              padding: 12px 16px; 
+              text-align: left; 
+              border-bottom: 1px solid #e5e7eb; 
+            }
+            th { 
+              background-color: #f9fafb; 
+              font-weight: 600; 
+              color: #374151;
+            }
+            tr:last-child td {
+              border-bottom: none;
+            }
+            .progress-bar, .w-full.bg-gray-200.rounded-full.h-4 { 
+              height: 24px !important; 
+              background-color: #e5e7eb !important; 
+              border-radius: 6px !important; 
+              overflow: hidden !important; 
+              margin-top: 8px !important;
+              margin-bottom: 8px !important;
+              width: 100% !important;
+              display: block !important;
+            }
+            .progress-bar div, .bg-green-600.h-4.rounded-full { 
+              height: 100% !important; 
+              background-color: #10b981 !important; 
+              text-align: center !important; 
+              color: white !important; 
+              line-height: 24px !important; 
+              font-size: 14px !important; 
+              font-weight: 500 !important;
+              border-radius: 6px !important;
+            }
+            .info-grid { 
+              display: grid; 
+              grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); 
+              gap: 16px; 
+              margin-bottom: 16px;
+            }
+            .info-item { 
+              background-color: #f9fafb; 
+              padding: 16px; 
+              border-radius: 6px; 
+              border: 1px solid #e5e7eb;
+            }
+            .info-label { 
+              color: #6b7280; 
+              font-size: 14px; 
+              margin-bottom: 4px; 
+            }
+            .info-value { 
+              font-weight: 500; 
+              color: #111827;
+            }
+            .overall-row { 
+              background-color: #f3f4f6; 
+              font-weight: 600; 
+            }
+            .dev-cell { color: #d97706; }
+            .qa-cell { color: #2563eb; }
+            .closed-cell { color: #059669; }
+            .footer {
+              text-align: center;
+              margin-top: 40px;
+              color: #6b7280;
+              font-size: 14px;
+              border-top: 1px solid #e5e7eb;
+              padding-top: 20px;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1>Jira Analysis Report</h1>
+              <p class="timestamp">Generated on ${new Date().toLocaleString()}</p>
+            </div>
+            
+            <!-- Data Source Information -->
+            <div class="section">
+              <h2>Data Source Information</h2>
+              ${dataSourceInfo ? dataSourceInfo.innerHTML : '<p>No data source information available</p>'}
+            </div>
+            
+            <!-- Overall Completion -->
+            <div class="section">
+              <h2>Overall Completion</h2>
+              ${overallCompletion ? overallCompletion.innerHTML.replace(/<h2[^>]*>.*?<\/h2>/g, '') : '<p>No overall completion data available</p>'}
+            </div>
+            
+            <!-- Feature-wise Completion -->
+            <div class="section">
+              <h2>Feature-wise Completion</h2>
+              ${featureWiseCompletionClone ? featureWiseCompletionClone.innerHTML.replace(/<h2[^>]*>.*?<\/h2>/g, '') : '<p>No feature-wise completion data available</p>'}
+            </div>
+            
+            <div class="footer">
+              Team Manager - Jira Analysis Report<br>
+              Generated on ${new Date().toLocaleString()}
+            </div>
+          </div>
+        </body>
+        </html>
+        `;
+        
+        // Create a Blob with the HTML content
+        const blob = new Blob([htmlContent], {type: 'text/html'});
+        
+        // Create a download link
+        const url = URL.createObjectURL(blob);
+        const downloadLink = document.createElement('a');
+        downloadLink.href = url;
+        
+        // Generate filename with date
+        const date = new Date();
+        const formattedDate = date.toISOString().split('T')[0];
+        const filename = `jira-analysis-${formattedDate}.html`;
+        
+        downloadLink.download = filename;
+        document.body.appendChild(downloadLink);
+        downloadLink.click();
+        document.body.removeChild(downloadLink);
+        
+        // Clean up
+        URL.revokeObjectURL(url);
+        
+        // Reset button state
+        setTimeout(() => {
+          downloadHtmlBtn.disabled = false;
+          downloadHtmlBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd" /></svg> Download as HTML';
+        }, 1000);
+      });
+    }
+  });
+</script>
+
+<!-- Add JavaScript for JQL form submission -->
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    const jqlForm = document.getElementById('jql-form');
+    const jqlButton = document.getElementById('execute-jql-btn');
+    const jqlTextarea = document.getElementById('jql');
+    
+    if (jqlForm && jqlButton && jqlTextarea) {
+      // Handle JQL shortcuts
+      const jqlShortcuts = document.querySelectorAll('.jql-shortcut');
+      jqlShortcuts.forEach(shortcut => {
+        shortcut.addEventListener('click', function() {
+          const query = this.getAttribute('data-query');
+          jqlTextarea.value = query;
+          // Focus on the textarea to make it clear the query was inserted
+          jqlTextarea.focus();
+        });
+      });
+      
+      jqlForm.addEventListener('submit', function(e) {
+        const jqlQuery = jqlTextarea.value.trim();
+        
+        if (!jqlQuery) {
+          e.preventDefault();
+          alert('Please enter a JQL query');
+          return false;
+        }
+        
+        // Show loading state
+        jqlButton.disabled = true;
+        jqlButton.innerHTML = '<svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Executing...';
+        
+        // Show the page loader
+        document.getElementById('pageLoader').style.display = 'flex';
+        
+        // Allow form submission
+        return true;
+      });
+    }
+  });
+</script>
+
+<!-- Modal for displaying child issues -->
+<div id="issueModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50 hidden">
+  <div class="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] flex flex-col">
+    <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+      <h3 id="modalTitle" class="text-lg font-semibold text-gray-900">Feature Details</h3>
+      <button id="closeModal" class="text-gray-400 hover:text-gray-500">
+        <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
+    </div>
+    <div class="px-6 py-4 overflow-y-auto flex-grow">
+      <div id="modalContent" class="space-y-4">
+        <!-- Content will be populated by JavaScript -->
+      </div>
+    </div>
+    <div class="px-6 py-3 bg-gray-50 border-t border-gray-200 flex justify-end">
+      <button id="closeModalBtn" class="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded shadow font-medium transition">
+        Close
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Status Modal -->
+<div id="statusModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+  <div class="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] flex flex-col">
+    <div class="flex justify-between items-center p-4 border-b">
+      <h3 id="statusModalTitle" class="text-xl font-semibold"></h3>
+      <button id="closeStatusModal" class="text-gray-500 hover:text-gray-700">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
+    </div>
+    <div id="statusModalContent" class="p-4 overflow-y-auto flex-grow"></div>
+    <div class="p-4 border-t flex justify-end">
+      <button id="closeStatusModalBtn" class="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded shadow transition">
+        Close
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    // Issue Modal elements
+    const modal = document.getElementById('issueModal');
+    const modalTitle = document.getElementById('modalTitle');
+    const modalContent = document.getElementById('modalContent');
+    const closeModal = document.getElementById('closeModal');
+    const closeModalBtn = document.getElementById('closeModalBtn');
+    
+    // Status Modal elements
+    const statusModal = document.getElementById('statusModal');
+    const statusModalTitle = document.getElementById('statusModalTitle');
+    const statusModalContent = document.getElementById('statusModalContent');
+    const closeStatusModal = document.getElementById('closeStatusModal');
+    const closeStatusModalBtn = document.getElementById('closeStatusModalBtn');
+    
+    // Feature Analysis Modal elements
+    const featureAnalysisModal = document.getElementById('feature-analysis-modal');
+    const featureAnalysisTitle = document.getElementById('feature-analysis-title');
+    const featureAnalysisContent = document.getElementById('feature-analysis-content');
+    const closeFeatureAnalysisModal = document.getElementById('close-feature-analysis-modal');
+    const closeFeatureAnalysisBtn = document.getElementById('close-feature-analysis-btn');
+    const featureSummary = document.getElementById('feature-summary');
+    const statusDistribution = document.getElementById('status-distribution');
+    const featureIssuesTable = document.getElementById('feature-issues-table');
+    const featureAnalysisLoading = document.getElementById('feature-analysis-loading');
+    
+    // Get Jira base URL from the server
+    const JIRA_BASE_URL = '{{ jira_base_url if jira_base_url else "https://jira.atlassian.com" }}';
+    
+    // Get all parent feature buttons
+    const parentFeatureButtons = document.querySelectorAll('.parent-feature-btn');
+    
+    // Store issue details from the server
+    const issueDetails = {};
+    
+    // Manually populate issue details from server data
+    {% if issue_details %}
+      {% for parent, issues in issue_details.items() %}
+        // Create an array for this parent
+        issueDetails[{{ parent|tojson }}] = [];
+        
+        // Add each issue to the array
+        {% for issue in issues %}
+          issueDetails[{{ parent|tojson }}].push({
+            key: {{ issue.key|tojson }},
+            summary: {{ issue.summary|tojson }},
+            status: {{ issue.status|tojson }}
+          });
+        {% endfor %}
+      {% endfor %}
+    {% endif %}
+    
+    // Add click event to parent feature buttons
+    parentFeatureButtons.forEach(button => {
+      button.addEventListener('click', function() {
+        const parentName = this.getAttribute('data-parent');
+        // Use the exact text content as the key
+        const parentText = this.querySelector('.parent-text').textContent.trim();
+        console.log('Button clicked:', parentName);
+        console.log('Parent text:', parentText);
+        showModal(parentText);
+      });
+    });
+    
+    // Function to show modal with issue details
+    function showModal(parentName) {
+      // Set modal title
+      modalTitle.textContent = parentName;
+      
+      // Clear previous content
+      modalContent.innerHTML = '';
+      
+      // Debug the parent name we're looking for
+      console.log('Looking for parent:', parentName);
+      console.log('Available parents:', Object.keys(issueDetails));
+      
+      // Get issues for this parent
+      const issues = issueDetails[parentName] || [];
+      console.log('Found issues:', issues);
+      
+      if (issues.length === 0) {
+        modalContent.innerHTML = '<p class="text-gray-500">No issues found for this feature.</p>';
+      } else {
+        // Create status counters
+        const statusCounts = {
+          'Dev Ownership': 0,
+          'QA Ownership': 0,
+          'Closed': 0
+        };
+        
+        // Function to categorize status
+        function categorizeStatus(status) {
+          const devStatuses = ["OPEN", "Reopen", "ToDo", "To Do", "Reopened", "Dev Inprogress", "Dev - Building",
+            "Build Broken", "Ready for Development", "Dev - Frontend - InProgress",
+            "Dev - Backend - InProgress", "Dev - Backend - Todo", "Dev - Frontend - Todo",
+            "Dev- UI - InProgress", "Dev- UI - Todo", "Backlog Item", "Open (migrated)", "Open",
+            "QA - Building", "QA Progress - Blocked", "Groomed"];
+            
+          const qaStatuses = ["Ready for QA", "QA-Ready", "QA Progress - Blocked",
+            "Resolved", "QA In Progress", "QA Inprogress", "Ready for UAT"];
+            
+          if (devStatuses.includes(status)) {
+            return "Dev Ownership";
+          } else if (qaStatuses.includes(status)) {
+            return "QA Ownership";
+          } else {
+            return "Closed";
+          }
+        }
+        
+        // Count issues by status
+        issues.forEach(issue => {
+          const category = categorizeStatus(issue.status);
+          statusCounts[category]++;
+        });
+        
+        // Create status summary
+        const statusSummary = document.createElement('div');
+        statusSummary.className = 'grid grid-cols-3 gap-4 mb-6';
+        statusSummary.innerHTML = `
+          <div class="bg-yellow-50 p-4 rounded">
+            <p class="text-sm text-yellow-700">Dev Ownership</p>
+            <p class="font-medium text-yellow-800">${statusCounts['Dev Ownership']}</p>
+          </div>
+          <div class="bg-blue-50 p-4 rounded">
+            <p class="text-sm text-blue-700">QA Ownership</p>
+            <p class="font-medium text-blue-800">${statusCounts['QA Ownership']}</p>
+          </div>
+          <div class="bg-green-50 p-4 rounded">
+            <p class="text-sm text-green-700">Closed</p>
+            <p class="font-medium text-green-800">${statusCounts['Closed']}</p>
+          </div>
+        `;
+        modalContent.appendChild(statusSummary);
+        
+        // Create table for issues
+        const table = document.createElement('table');
+        table.className = 'min-w-full divide-y divide-gray-200';
+        
+        // Create table header
+        const thead = document.createElement('thead');
+        thead.className = 'bg-gray-50';
+        thead.innerHTML = `
+          <tr>
+            <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Key</th>
+            <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Summary</th>
+            <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+          </tr>
+        `;
+        table.appendChild(thead);
+        
+        // Create table body
+        const tbody = document.createElement('tbody');
+        tbody.className = 'bg-white divide-y divide-gray-200';
+        
+        // Add rows for each issue
+        issues.forEach(issue => {
+          const category = categorizeStatus(issue.status);
+          const statusColorClass = 
+            category === 'Dev Ownership' ? 'text-yellow-600' : 
+            category === 'QA Ownership' ? 'text-blue-600' : 'text-green-600';
+          
+          const row = document.createElement('tr');
+          row.innerHTML = `
+            <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-blue-600">
+              <a href="${JIRA_BASE_URL}/browse/${issue.key}" target="_blank" class="hover:underline">${issue.key}</a>
+            </td>
+            <td class="px-4 py-3 text-sm text-gray-900">${issue.summary}</td>
+            <td class="px-4 py-3 whitespace-nowrap text-sm ${statusColorClass}">${issue.status}</td>
+          `;
+          tbody.appendChild(row);
+        });
+        
+        table.appendChild(tbody);
+        modalContent.appendChild(table);
+      }
+      
+      // Show modal
+      modal.classList.remove('hidden');
+      
+      // Prevent scrolling on the body
+      document.body.style.overflow = 'hidden';
+    }
+    
+    // Close modal when clicking the close button
+    closeModal.addEventListener('click', function() {
+      modal.classList.add('hidden');
+      document.body.style.overflow = '';
+    });
+    
+    // Close modal when clicking the close button at the bottom
+    closeModalBtn.addEventListener('click', function() {
+      modal.classList.add('hidden');
+      document.body.style.overflow = '';
+    });
+    
+    // Close modal when clicking outside the modal content
+    modal.addEventListener('click', function(event) {
+      if (event.target === modal) {
+        modal.classList.add('hidden');
+        document.body.style.overflow = '';
+      }
+    });
+    
+    // Close modal when pressing Escape key
+    document.addEventListener('keydown', function(event) {
+      if (event.key === 'Escape' && !modal.classList.contains('hidden')) {
+        modal.classList.add('hidden');
+        document.body.style.overflow = '';
+      }
+      if (event.key === 'Escape' && !statusModal.classList.contains('hidden')) {
+        statusModal.classList.add('hidden');
+        document.body.style.overflow = '';
+      }
+      if (event.key === 'Escape' && !featureAnalysisModal.classList.contains('hidden')) {
+        featureAnalysisModal.classList.add('hidden');
+        document.body.style.overflow = '';
+      }
+    });
+    
+    // Feature Analysis Button Click Handler
+    const featureAnalysisBtns = document.querySelectorAll('.feature-analysis-btn');
+    featureAnalysisBtns.forEach(btn => {
+      btn.addEventListener('click', function() {
+        const featureName = this.getAttribute('data-feature');
+        showFeatureAnalysis(featureName);
+      });
+    });
+    
+    // Close Feature Analysis Modal
+    if (closeFeatureAnalysisModal) {
+      closeFeatureAnalysisModal.addEventListener('click', function() {
+        featureAnalysisModal.classList.add('hidden');
+        document.body.style.overflow = '';
+      });
+    }
+    
+    if (closeFeatureAnalysisBtn) {
+      closeFeatureAnalysisBtn.addEventListener('click', function() {
+        featureAnalysisModal.classList.add('hidden');
+        document.body.style.overflow = '';
+      });
+    }
+    
+    // Close modal when clicking outside
+    if (featureAnalysisModal) {
+      featureAnalysisModal.addEventListener('click', function(event) {
+        if (event.target === featureAnalysisModal) {
+          featureAnalysisModal.classList.add('hidden');
+          document.body.style.overflow = '';
+        }
+      });
+    }
+    
+    // Function to show feature analysis
+    function showFeatureAnalysis(featureName) {
+      console.log('Showing feature analysis for:', featureName);
+      console.log('Available features:', Object.keys(issueDetails));
+      
+      // Set modal title
+      featureAnalysisTitle.textContent = `Feature Analysis: ${featureName}`;
+      
+      // Show modal
+      featureAnalysisModal.classList.remove('hidden');
+      document.body.style.overflow = 'hidden';
+      
+      // Clear previous content
+      featureSummary.innerHTML = '';
+      statusDistribution.innerHTML = '';
+      featureIssuesTable.innerHTML = '';
+      
+      // Special case for PI Enhancements
+      if (featureName === 'PI Enhancements' && issueDetails['PI Enhancements ']) {
+        console.log('Found PI Enhancements with trailing space');
+        var featureIssues = issueDetails['PI Enhancements '];
+      } else {
+        // Check for exact match first
+        var featureIssues = issueDetails[featureName] || [];
+        
+        // If no exact match, try to find a close match (case insensitive or with/without trailing space)
+        if (featureIssues.length === 0) {
+          console.log('No exact match found, trying to find a close match...');
+          const normalizedFeatureName = featureName.trim();
+          
+          for (const key in issueDetails) {
+            const normalizedKey = key.trim();
+            console.log(`Comparing '${normalizedFeatureName}' with '${normalizedKey}'`);
+            
+            if (normalizedKey === normalizedFeatureName ||
+                normalizedKey.toLowerCase() === normalizedFeatureName.toLowerCase()) {
+              console.log('Found a match:', key);
+              featureIssues = issueDetails[key];
+              break;
+            }
+          }
+        }
+      }
+      
+      if (featureIssues.length === 0) {
+        featureSummary.innerHTML = '<p class="text-gray-500">No issues found for this feature.</p>';
+        return;
+      }
+      
+      // Count status categories
+      let devCount = 0;
+      let qaCount = 0;
+      let closedCount = 0;
+      
+      featureIssues.forEach(issue => {
+        const category = categorizeStatus(issue.status);
+        if (category === 'Dev Ownership') devCount++;
+        else if (category === 'QA Ownership') qaCount++;
+        else closedCount++;
+      });
+      
+      // Calculate percentages
+      const total = featureIssues.length;
+      const devPercent = Math.round((devCount / total) * 100);
+      const qaPercent = Math.round((qaCount / total) * 100);
+      const closedPercent = Math.round((closedCount / total) * 100);
+      
+      // Create feature summary
+      featureSummary.innerHTML = `
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div>
+            <p class="text-sm text-gray-500">Total Issues</p>
+            <p class="font-medium text-gray-900">${total}</p>
+          </div>
+          <div>
+            <p class="text-sm text-yellow-600">Dev Ownership</p>
+            <p class="font-medium text-yellow-700">${devCount} (${devPercent}%)</p>
+          </div>
+          <div>
+            <p class="text-sm text-blue-600">QA Ownership</p>
+            <p class="font-medium text-blue-700">${qaCount} (${qaPercent}%)</p>
+          </div>
+          <div>
+            <p class="text-sm text-green-600">Closed</p>
+            <p class="font-medium text-green-700">${closedCount} (${closedPercent}%)</p>
+          </div>
+        </div>
+        <div class="mt-4">
+          <p class="text-sm text-gray-500 mb-2">Completion Progress</p>
+          <div class="w-full bg-gray-200 rounded-full h-4">
+            <div class="bg-green-600 h-4 rounded-full text-center text-white text-xs font-medium leading-4" 
+                 style="width: ${closedPercent}%">
+              ${closedPercent}%
+            </div>
+          </div>
+        </div>
+      `;
+      
+      // Create status distribution cards
+      const statusCards = [
+        { label: 'Dev Ownership', count: devCount, percent: devPercent, class: 'bg-yellow-100 text-yellow-800' },
+        { label: 'QA Ownership', count: qaCount, percent: qaPercent, class: 'bg-blue-100 text-blue-800' },
+        { label: 'Closed', count: closedCount, percent: closedPercent, class: 'bg-green-100 text-green-800' }
+      ];
+      
+      statusCards.forEach(card => {
+        const cardElement = document.createElement('div');
+        cardElement.className = 'bg-white rounded-lg border border-gray-200 p-4';
+        cardElement.innerHTML = `
+          <div class="flex items-center">
+            <div class="flex-shrink-0 ${card.class} rounded-md p-3">
+              <svg class="h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+            </div>
+            <div class="ml-4">
+              <h4 class="text-lg font-semibold">${card.count} (${card.percent}%)</h4>
+              <p class="text-sm text-gray-500">${card.label}</p>
+            </div>
+          </div>
+        `;
+        statusDistribution.appendChild(cardElement);
+      });
+      
+      // Populate issues table
+      featureIssues.forEach(issue => {
+        const category = categorizeStatus(issue.status);
+        const statusColorClass = 
+          category === 'Dev Ownership' ? 'text-yellow-600' : 
+          category === 'QA Ownership' ? 'text-blue-600' : 'text-green-600';
+        
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td class="px-6 py-4 whitespace-nowrap">
+            <div class="flex items-center">
+              <div>
+                <div class="text-sm font-medium text-blue-600">
+                  <a href="${JIRA_BASE_URL}/browse/${issue.key}" target="_blank" class="hover:underline">${issue.key}</a>
+                </div>
+                <div class="text-sm text-gray-900">${issue.summary}</div>
+              </div>
+            </div>
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm ${statusColorClass}">${issue.status}</td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm">
+            <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full 
+              ${category === 'Dev Ownership' ? 'bg-yellow-100 text-yellow-800' : 
+                category === 'QA Ownership' ? 'bg-blue-100 text-blue-800' : 
+                'bg-green-100 text-green-800'}"
+            >
+              ${category}
+            </span>
+          </td>
+        `;
+        
+        featureIssuesTable.appendChild(row);
+      });
+    }
+    
+    // Get all status cards
+    const statusCards = document.querySelectorAll('.status-card');
+    console.log('Found status cards:', statusCards.length);
+    
+    // Store all issues from all parents
+    const allIssues = [];
+    {% if issue_details %}
+      {% for parent, issues in issue_details.items() %}
+        {% for issue in issues %}
+          allIssues.push({
+            key: {{ issue.key|tojson }},
+            summary: {{ issue.summary|tojson }},
+            status: {{ issue.status|tojson }},
+            parent: {{ parent|tojson }}
+          });
+        {% endfor %}
+      {% endfor %}
+    {% endif %}
+    
+    // Function to categorize status
+    function categorizeStatus(status) {
+      const devStatuses = ["OPEN", "Reopen", "ToDo", "To Do", "Reopened", "Dev Inprogress", "Dev - Building",
+        "Build Broken", "Ready for Development", "Dev - Frontend - InProgress",
+        "Dev - Backend - InProgress", "Dev - Backend - Todo", "Dev - Frontend - Todo",
+        "Dev- UI - InProgress", "Dev- UI - Todo", "Backlog Item", "Open (migrated)", "Open",
+        "QA - Building", "QA Progress - Blocked", "Groomed"];
+        
+      const qaStatuses = ["QA Inprogress", "QA - Testing", "QA - Retesting", "QA - Blocked", "QA - Todo", 
+        "QA - Frontend - Todo", "QA - Backend - Todo", "QA - Frontend - InProgress", "QA - Backend - InProgress", 
+        "Ready for QA", "QA-Ready", "QA In Progress", "QA Progress - Blocked", "Resolved", "Ready for UAT", 
+        "QA - UI - Todo", "QA - UI - InProgress"];
+        
+      if (devStatuses.includes(status)) {
+        return "Dev Ownership";
+      } else if (qaStatuses.includes(status)) {
+        return "QA Ownership";
+      } else {
+        return "Closed";
+      }
+    }
+    
+    // Function to show status modal with filtered issues
+    function showStatusModal(status) {
+      console.log('Showing status modal for:', status);
+      
+      // Set modal title
+      statusModalTitle.textContent = status + ' Issues';
+      
+      // Clear previous content
+      statusModalContent.innerHTML = '';
+      
+      // Filter issues by status category
+      const filteredIssues = allIssues.filter(issue => {
+        if (status === 'Dev Ownership') {
+          return categorizeStatus(issue.status) === 'Dev Ownership';
+        } else if (status === 'QA Ownership') {
+          return categorizeStatus(issue.status) === 'QA Ownership';
+        } else if (status === 'Closed') {
+          return categorizeStatus(issue.status) === 'Closed';
+        }
+        return false;
+      });
+      
+      console.log('Filtered issues:', filteredIssues.length);
+      
+      if (filteredIssues.length === 0) {
+        statusModalContent.innerHTML = '<p class="text-gray-500">No issues found in this category.</p>';
+      } else {
+        // Create table for issues
+        const table = document.createElement('table');
+        table.className = 'min-w-full divide-y divide-gray-200';
+        
+        // Create table header
+        const thead = document.createElement('thead');
+        thead.className = 'bg-gray-50';
+        thead.innerHTML = `
+          <tr>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Issue Key</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Summary</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Parent Feature</th>
+          </tr>
+        `;
+        table.appendChild(thead);
+        
+        // Create table body
+        const tbody = document.createElement('tbody');
+        tbody.className = 'bg-white divide-y divide-gray-200';
+        
+        // Add status color classes
+        filteredIssues.forEach(issue => {
+          const category = categorizeStatus(issue.status);
+          const statusColorClass = 
+            category === 'Dev Ownership' ? 'text-yellow-600' : 
+            category === 'QA Ownership' ? 'text-blue-600' : 'text-green-600';
+          
+          const row = document.createElement('tr');
+          row.innerHTML = `
+            <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-blue-600">
+              <a href="${JIRA_BASE_URL}/browse/${issue.key}" target="_blank" class="hover:underline">${issue.key}</a>
+            </td>
+            <td class="px-4 py-3 text-sm text-gray-900">${issue.summary}</td>
+            <td class="px-4 py-3 whitespace-nowrap text-sm ${statusColorClass}">${issue.status}</td>
+            <td class="px-4 py-3 text-sm text-gray-900">${issue.parent}</td>
+          `;
+          tbody.appendChild(row);
+        });
+        
+        table.appendChild(tbody);
+        statusModalContent.appendChild(table);
+      }
+      
+      // Show modal
+      statusModal.classList.remove('hidden');
+      document.body.style.overflow = 'hidden';
+    }
+    
+    // Add click event to status cards
+    statusCards.forEach(card => {
+      console.log('Adding click listener to card:', card.getAttribute('data-status'));
+      card.addEventListener('click', function() {
+        const status = this.getAttribute('data-status');
+        console.log('Status card clicked:', status);
+        showStatusModal(status);
+      });
+    });
+    
+    // Close status modal when clicking the close button
+    closeStatusModal.addEventListener('click', function() {
+      statusModal.classList.add('hidden');
+      document.body.style.overflow = '';
+    });
+    
+    // Close status modal when clicking the close button at the bottom
+    closeStatusModalBtn.addEventListener('click', function() {
+      statusModal.classList.add('hidden');
+      document.body.style.overflow = '';
+    });
+    
+    // Close status modal when clicking outside the modal content
+    statusModal.addEventListener('click', function(event) {
+      if (event.target === statusModal) {
+        statusModal.classList.add('hidden');
+        document.body.style.overflow = '';
+      }
+    });
+    
+    // Release Blocker Analysis Modal Functionality
+    const releaseblockerBtn = document.getElementById('release-blocker-btn');
+    const releaseblockerModal = document.getElementById('release-blocker-modal');
+    const closeblockerModal = document.getElementById('close-blocker-modal');
+    const analyzeblockerBtn = document.getElementById('analyze-blockers-btn');
+    const blockerResults = document.getElementById('blocker-results');
+    const blockerLoading = document.getElementById('blocker-loading');
+    const blockerError = document.getElementById('blocker-error');
+    const blockerErrorMessage = document.getElementById('blocker-error-message');
+    const blockerTableBody = document.getElementById('blocker-table-body');
+    const blockerCount = document.getElementById('blocker-count');
+    const timeInStatusSummary = document.getElementById('time-in-status-summary');
+    
+    // JQL Shortcut Buttons for Blocker Modal
+    const jqlShortcutBtns = document.querySelectorAll('.jql-shortcut-btn');
+    jqlShortcutBtns.forEach(btn => {
+      btn.addEventListener('click', function() {
+        const jql = this.getAttribute('data-jql');
+        document.getElementById('blocker_jql').value = jql;
+      });
+    });
+    
+    // Open Release Blocker Modal
+    if (releaseblockerBtn) {
+      console.log('Release blocker button found:', releaseblockerBtn);
+      releaseblockerBtn.addEventListener('click', function() {
+        console.log('Release blocker button clicked');
+        releaseblockerModal.classList.remove('hidden');
+        document.body.style.overflow = 'hidden';
+        // Reset previous results
+        blockerResults.classList.add('hidden');
+        blockerError.classList.add('hidden');
+        blockerTableBody.innerHTML = '';
+        timeInStatusSummary.innerHTML = '';
+      });
+    } else {
+      console.error('Release blocker button not found!');
+    }
+    
+    // Close Release Blocker Modal
+    if (closeblockerModal) {
+      closeblockerModal.addEventListener('click', function() {
+        releaseblockerModal.classList.add('hidden');
+        document.body.style.overflow = '';
+      });
+    }
+    
+    // Function to toggle status history visibility
+    function toggleStatusHistory(statusHistoryId) {
+      const historyElement = document.getElementById(statusHistoryId);
+      if (historyElement.classList.contains('hidden')) {
+        historyElement.classList.remove('hidden');
+      } else {
+        historyElement.classList.add('hidden');
+      }
+    }
+    
+    // Make toggleStatusHistory available globally
+    window.toggleStatusHistory = toggleStatusHistory;
+    
+    // Close modal when clicking outside
+    if (releaseblockerModal) {
+      releaseblockerModal.addEventListener('click', function(event) {
+        if (event.target === releaseblockerModal) {
+          releaseblockerModal.classList.add('hidden');
+          document.body.style.overflow = '';
+        }
+      });
+    }
+    
+    // Add release blocker modal to escape key handler
+    document.addEventListener('keydown', function(event) {
+      if (event.key === 'Escape' && !releaseblockerModal.classList.contains('hidden')) {
+        releaseblockerModal.classList.add('hidden');
+        document.body.style.overflow = '';
+      }
+    });
+    
+    // Analyze Blockers Button
+    if (analyzeblockerBtn) {
+      analyzeblockerBtn.addEventListener('click', function() {
+        const blockerJql = document.getElementById('blocker_jql').value.trim();
+        
+        if (!blockerJql) {
+          blockerError.classList.remove('hidden');
+          blockerErrorMessage.textContent = 'Please enter a JQL query.';
+          return;
+        }
+        
+        // Show loading
+        blockerResults.classList.remove('hidden');
+        blockerLoading.classList.remove('hidden');
+        blockerError.classList.add('hidden');
+        blockerTableBody.innerHTML = '';
+        timeInStatusSummary.innerHTML = '';
+        
+        // Call API to get blockers
+        fetch('/api/analyze-blockers', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ jql: blockerJql })
+        })
+        .then(response => {
+          if (!response.ok) {
+            throw new Error(`HTTP error! Status: ${response.status}`);
+          }
+          return response.json();
+        })
+        .then(data => {
+          // Debug logging
+          console.log('API Response received:', data);
+          console.log('Blockers count:', data.blockers ? data.blockers.length : 'undefined');
+          console.log('Time in status data:', data.time_in_status_data ? data.time_in_status_data.length : 'undefined');
+          
+          // Hide loading
+          blockerLoading.classList.add('hidden');
+          
+          // Make sure the results container is visible
+          blockerResults.classList.remove('hidden');
+          
+          // Update blocker count
+          blockerCount.textContent = `${data.blockers.length} Issues`;
+          
+          // Make blockers data global for inline expand/collapse
+          window.blockersData = data.blockers;
+          // Populate table
+          if (data.blockers.length === 0) {
+            blockerTableBody.innerHTML = `
+              <tr>
+                <td colspan="4" class="px-6 py-4 text-center text-sm text-gray-500">
+                  No blockers found matching the query.
+                </td>
+              </tr>
+            `;
+          } else {
+            data.blockers.forEach(blocker => {
+              const row = document.createElement('tr');
+              
+              // Determine status color
+              let statusClass = '';
+              if (blocker.status.toLowerCase().includes('blocked')) {
+                statusClass = 'bg-red-100 text-red-800';
+              } else {
+                statusClass = 'bg-yellow-100 text-yellow-800';
+              }
+              
+              // Determine days color
+              let daysClass = '';
+              if (blocker.days_in_status > 14) {
+                daysClass = 'text-red-600 font-semibold';
+              } else if (blocker.days_in_status > 7) {
+                daysClass = 'text-orange-600';
+              } else {
+                daysClass = 'text-gray-500';
+              }
+              
+              // Create a unique ID for this row's status history
+              const statusHistoryId = `status-history-${blocker.key.replace('-', '')}`;
+              
+              row.innerHTML = `
+                <td class="px-6 py-4 whitespace-nowrap">
+                  <div class="flex items-center">
+                    <div class="ml-4">
+                      <div class="text-sm font-medium text-blue-600">
+                        <a href="${data.jira_base_url}/browse/${blocker.key}" target="_blank" class="hover:underline">${blocker.key}</a>
+                      </div>
+                      <div class="text-sm text-gray-900">${blocker.summary}</div>
+                    </div>
+                  </div>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                  <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusClass}">
+                    ${blocker.status}
+                  </span>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                  <div class="flex flex-col">
+                    <div class="text-sm font-medium text-blue-600 cursor-pointer hover:underline" onclick="toggleTimeRanges('${blocker.key}')" id="hours-in-open-${blocker.key}">
+                      ${blocker.hours_in_open !== undefined ? `${blocker.hours_in_open} hours` : 'N/A'}
+                    </div>
+                    <div id="time-ranges-${blocker.key}" class="hidden bg-gray-50 border rounded p-2 mt-2 text-xs"></div>
+                    <div class="text-xs text-gray-500 mt-1">
+                      ${blocker.days_in_status} days in current status
+                    </div>
+                  </div>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  ${blocker.parent_summary || 'N/A'}
+                </td>
+              `;
+              
+              blockerTableBody.appendChild(row);
+            });
+          }
+          
+          // Populate time in Open status summary
+          const timeCategories = [
+            { count: 0, class: 'bg-green-100 text-green-600', label: '<12hrs' },
+            { count: 0, class: 'bg-blue-100 text-blue-600', label: '12-24hrs' },
+            { count: 0, class: 'bg-yellow-100 text-yellow-600', label: '24-48hrs' },
+            { count: 0, class: 'bg-red-100 text-red-600', label: '48+hrs' }
+          ];
+          
+          // Count issues in each category based on hours in Open status
+          data.blockers.forEach(blocker => {
+            if (!blocker.hours_in_open) return; // Skip if no hours_in_open data
+            if (blocker.status && blocker.status.trim().toLowerCase() === 'open (migrated)') return; // Exclude Open (migrated)
+            const hours = blocker.hours_in_open;
+            if (hours < 12) {
+              timeCategories[0].count++; // <12hrs
+            } else if (hours < 24) {
+              timeCategories[1].count++; // 12-24hrs
+            } else if (hours < 48) {
+              timeCategories[2].count++; // 24-48hrs
+            } else {
+              timeCategories[3].count++; // 48+hrs
+            }
+          });
+          
+          // Create summary cards for status time
+          timeInStatusSummary.innerHTML = '';
+          // Add cards for each time category
+          timeCategories.forEach(category => {
+            const card = document.createElement('div');
+            card.className = `${category.class} p-4 rounded-lg shadow-sm text-center`;
+            card.innerHTML = `
+              <h3 class="text-2xl font-bold">${category.count}</h3>
+              <div class="text-sm mt-1">${category.label}</div>
+            `;
+            timeInStatusSummary.appendChild(card);
+          });
+          
+          // Then, collect all status history data
+          const allStatusHistory = [];
+          const statusTotals = {};
+          
+          // Collect all status history entries
+          data.time_in_status_data.forEach(item => {
+            if (item.status_history && item.status_history.length > 0) {
+              item.status_history.forEach(history => {
+                if (!statusTotals[history.status]) {
+                  statusTotals[history.status] = 0;
+                }
+                statusTotals[history.status] += history.days;
+              });
+            }
+          });
+          
+          // Convert to array for sorting
+          const statusArray = Object.entries(statusTotals).map(([status, days]) => ({
+            status,
+            days
+          }));
+          
+          // Sort by total days (descending)
+          statusArray.sort((a, b) => b.days - a.days);
+          
+          // Create summary cards for current status
+          // Add a section for status history
+          if (statusArray.length > 0) {
+            // Add a divider and heading
+            const divider = document.createElement('div');
+            divider.className = 'col-span-4 border-t border-gray-200 my-4';
+            timeInStatusSummary.appendChild(divider);
+            
+            const historyHeading = document.createElement('h5');
+            historyHeading.className = 'text-md font-medium text-gray-700 col-span-4 mb-2';
+            historyHeading.textContent = 'Time Spent in Each Status';
+            timeInStatusSummary.appendChild(historyHeading);
+            
+            // Create a status history table
+            const tableContainer = document.createElement('div');
+            tableContainer.className = 'col-span-4 overflow-x-auto';
+            
+            const table = document.createElement('table');
+            table.className = 'min-w-full divide-y divide-gray-200';
+            
+            // Create table header
+            const thead = document.createElement('thead');
+            thead.className = 'bg-gray-50';
+            thead.innerHTML = `
+              <tr>
+                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Days</th>
+                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Percentage</th>
+              </tr>
+            `;
+            
+            // Create table body
+            const tbody = document.createElement('tbody');
+            tbody.className = 'bg-white divide-y divide-gray-200';
+            
+            // Calculate total days for percentage
+            const totalDays = statusArray.reduce((sum, status) => sum + status.days, 0);
+            
+            // Add rows for each status
+            statusArray.forEach(status => {
+              const percentage = totalDays > 0 ? Math.round((status.days / totalDays) * 100) : 0;
+              
+              const row = document.createElement('tr');
+              row.innerHTML = `
+                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${status.status}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${status.days}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <div class="flex items-center">
+                    <div class="w-full bg-gray-200 rounded-full h-2.5">
+                      <div class="bg-blue-600 h-2.5 rounded-full" style="width: ${percentage}%"></div>
+                    </div>
+                    <span class="ml-2">${percentage}%</span>
+                  </div>
+                </td>
+              `;
+              
+              tbody.appendChild(row);
+            });
+            
+            // Assemble the table
+            table.appendChild(thead);
+            table.appendChild(tbody);
+            tableContainer.appendChild(table);
+            
+            // Add to the summary section
+            timeInStatusSummary.appendChild(tableContainer);
+          }
+        })
+        .catch(error => {
+          console.error('Error:', error);
+          blockerLoading.classList.add('hidden');
+          blockerError.classList.remove('hidden');
+          blockerErrorMessage.textContent = `Error: ${error.message}`;
+          // Make sure the results container is visible even on error
+          blockerResults.classList.remove('hidden');
+        });
+      });
+    }
+  });
+</script>
+
+<script>
+  // Function to show status history when clicked (expand/collapse inline)
+  function toggleTimeRanges(issueKey) {
+    const detailsDiv = document.getElementById(`time-ranges-${issueKey}`);
+    if (!detailsDiv) return;
+    if (detailsDiv.classList.contains('hidden')) {
+      // Find the blocker data
+      const blocker = window.blockersData.find(b => b.key === issueKey);
+      if (!blocker || !blocker.status_history) {
+        detailsDiv.innerHTML = '<div>No status history available.</div>';
+      } else {
+        let html = '<table class="min-w-full text-xs"><thead><tr><th>From</th><th>To</th><th>Date/Time</th><th>Days</th><th>Hours</th></tr></thead><tbody>';
+        blocker.status_history.forEach(r => {
+          if (r.from_status && r.to_status && r.from_status.toLowerCase().includes('open') && r.to_status.toLowerCase() === 'resolved') {
+            html += `<tr><td>${r.from_status}</td><td>${r.to_status}</td><td>${r.datetime}</td><td>${r.days}</td><td>${Number(r.hours).toFixed(1)}</td></tr>`;
+          }
+        });
+        html += '</tbody></table>';
+        detailsDiv.innerHTML = html;
+      }
+      detailsDiv.classList.remove('hidden');
+    } else {
+      detailsDiv.classList.add('hidden');
+      const table = document.createElement('table');
+      table.className = 'min-w-full divide-y divide-gray-200';
+      
+      // Add table header
+      const thead = document.createElement('thead');
+      thead.className = 'bg-gray-50';
+      thead.innerHTML = `
+        <tr>
+          <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">From Status</th>
+          <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">To Status</th>
+          <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date/Time</th>
+          <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Days</th>
+          <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Hours</th>
+        </tr>
+      `;
+      table.appendChild(thead);
+      
+      // Add table body
+      const tbody = document.createElement('tbody');
+      tbody.className = 'bg-white divide-y divide-gray-200';
+      
+      // Add rows for each status change
+      statusHistory.forEach(status => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500">${status.from_status || 'N/A'}</td>
+          <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500">${status.to_status || 'N/A'}</td>
+          <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500">${status.datetime || 'N/A'}</td>
+          <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500">${status.days !== undefined ? status.days : 'N/A'}</td>
+          <td class="px-3 py-2 whitespace-nowrap text-sm font-medium text-blue-600">${status.hours !== undefined ? status.hours : 'N/A'}</td>
+        `;
+        tbody.appendChild(row);
+      });
+      
+      table.appendChild(tbody);
+      modalContent.appendChild(table);
+    }
+    
+    // Show modal
+    modal.classList.remove('hidden');
+  }
+  
+  // Close modal when close button is clicked
+  document.addEventListener('DOMContentLoaded', function() {
+    document.getElementById('closeModal').addEventListener('click', function() {
+      document.getElementById('timeRangesModal').classList.add('hidden');
+    });
+  });
+</script>
+
+<!-- Release Blocker Analysis Modal -->
+<div id="release-blocker-modal" class="fixed inset-0 z-50 hidden overflow-y-auto" aria-modal="true" role="dialog">
+  <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+    <!-- Background overlay -->
+    <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"></div>
+
+    <!-- Modal panel -->
+    <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full">
+      <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+        <div class="sm:flex sm:items-start">
+          <div class="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
+            <div class="flex justify-between items-center mb-4">
+              <h3 class="text-lg leading-6 font-medium text-gray-900">Release Blocker Analysis</h3>
+              <button id="close-blocker-modal" class="text-gray-400 hover:text-gray-500">
+                <svg class="h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            
+            <!-- JQL Input for Release Blockers -->
+            <div class="mb-4">
+              <label for="blocker_jql" class="block text-sm font-medium text-gray-700 mb-1">Enter JQL:</label>
+              <textarea id="blocker_jql" rows="3" 
+                      class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                      placeholder="project = ABC AND status = Blocked OR status = 'QA - Blocked'"></textarea>
+              
+            </div>
+            
+            <!-- JQL Shortcuts for Blockers -->
+            <div class="mb-4">
+              <p class="text-sm font-medium text-gray-700 mb-1">Quick Shortcuts:</p>
+<div class="flex flex-wrap gap-2">
+  <button type="button" class="jql-shortcut-btn text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 py-1 px-2 rounded"
+    data-jql='filter in ("PRISMReg - Current Release - All Issues(Stories and Bugs)") AND issuetype = Bug and issueLinkType in (blocks,"is blocked by")'>
+    Release Blockers
+  </button>
+</div>
+            </div>
+            
+            <!-- Analyze Button -->
+            <div class="mt-4">
+              <button id="analyze-blockers-btn" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded shadow font-semibold transition">
+                Analyze
+              </button>
+            </div>
+            <!-- Error Message -->
+            <div id="blocker-error" class="mt-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative hidden">
+              <strong class="font-bold">Error:</strong>
+              <span id="blocker-error-message" class="block sm:inline">An error occurred.</span>
+            </div>
+            
+            <!-- Results Section -->
+            <div id="blocker-results" class="mt-6 hidden">
+              <!-- Loading Indicator -->
+              <div id="blocker-loading" class="flex justify-center items-center py-8">
+                <svg class="animate-spin h-8 w-8 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <span class="ml-2 text-gray-600">Analyzing blockers...</span>
+              </div>
+              
+              <!-- Time in Open Status Summary -->
+              <div class="mb-6">
+                <h4 class="text-lg font-medium text-gray-900 mb-3">Summary</h4>
+                <div id="time-in-status-summary" class="grid grid-cols-1 md:grid-cols-4 gap-4"></div>
+              </div>
+              
+              <!-- Blockers Table -->
+              <div>
+                <h4 id="blocker-count" class="text-lg font-medium text-gray-900 mb-3">Blockers</h4>
+                <div class="overflow-x-auto shadow rounded-lg">
+                  <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                      <tr>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Issue</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Time in Status</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Parent Feature</th>
+                      </tr>
+                    </thead>
+                    <tbody id="blocker-table-body" class="bg-white divide-y divide-gray-200"></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Feature Analysis Modal -->
+<div id="feature-analysis-modal" class="fixed inset-0 z-50 hidden overflow-y-auto" aria-modal="true" role="dialog">
+  <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+    <!-- Background overlay -->
+    <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"></div>
+
+    <!-- Modal panel -->
+    <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full">
+      <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+        <div class="sm:flex sm:items-start">
+          <div class="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
+            <div class="flex justify-between items-center mb-4">
+              <h3 id="feature-analysis-title" class="text-lg leading-6 font-medium text-gray-900">Feature Analysis</h3>
+              <button id="close-feature-analysis-modal" class="text-gray-400 hover:text-gray-500">
+                <svg class="h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            
+            <!-- Feature Analysis Content -->
+            <div id="feature-analysis-content" class="space-y-6">
+              <!-- Loading Indicator -->
+              <div id="feature-analysis-loading" class="flex justify-center items-center py-8 hidden">
+                <svg class="animate-spin h-8 w-8 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <span class="ml-2 text-gray-600">Analyzing feature...</span>
+              </div>
+              
+              <!-- Feature Summary -->
+              <div id="feature-summary" class="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                <!-- Will be populated by JavaScript -->
+              </div>
+              
+              <!-- Status Distribution -->
+              <div>
+                <h4 class="text-lg font-medium text-gray-900 mb-3">Status Distribution</h4>
+                <div id="status-distribution" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <!-- Will be populated by JavaScript -->
+                </div>
+              </div>
+              
+              <!-- Issues Table -->
+              <div>
+                <h4 class="text-lg font-medium text-gray-900 mb-3">Issues</h4>
+                <div class="overflow-x-auto shadow rounded-lg">
+                  <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                      <tr>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Issue</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
+                      </tr>
+                    </thead>
+                    <tbody id="feature-issues-table" class="bg-white divide-y divide-gray-200">
+                      <!-- Will be populated by JavaScript -->
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+        <button id="close-feature-analysis-btn" type="button" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Feature Analysis Modal -->
+<div id="featureAnalysisModal" class="fixed inset-0 z-50 hidden overflow-y-auto" aria-modal="true" role="dialog">
+  <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+    <!-- Background overlay -->
+    <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"></div>
+
+    <!-- Modal panel -->
+    <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full">
+      <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+        <div class="sm:flex sm:items-start">
+          <div class="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
+            <div class="flex justify-between items-center mb-4">
+              <h3 id="feature-analysis-title" class="text-lg leading-6 font-medium text-gray-900">Feature Analysis</h3>
+              <button id="close-feature-analysis-modal" class="text-gray-400 hover:text-gray-500">
+                <svg class="h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            
+            <!-- Feature Summary -->
+            <div id="feature-summary" class="mb-6"></div>
+            
+            <!-- Status Distribution -->
+            <div id="status-distribution" class="mb-6 grid grid-cols-1 md:grid-cols-3 gap-4"></div>
+            
+            <!-- Loading Indicator -->
+            <div id="feature-analysis-loading" class="flex justify-center items-center py-8 hidden">
+              <svg class="animate-spin h-8 w-8 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              <span class="ml-2 text-gray-600">Loading feature data...</span>
+            </div>
+            
+            <!-- Feature Issues Table -->
+            <div class="mt-6">
+              <h4 class="text-lg font-medium text-gray-900 mb-3">Issues</h4>
+              <div class="overflow-x-auto">
+                <table id="feature-issues-table" class="min-w-full divide-y divide-gray-200"></table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+        <button id="close-feature-analysis-btn" type="button" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}

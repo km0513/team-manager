@@ -1,0 +1,1326 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto mt-10">
+  <h1 class="text-2xl font-bold mb-4">JQL Work In Progress</h1>
+  <div class="mb-8 bg-gray-50 border border-gray-200 rounded-lg shadow-sm p-6" x-data="{ open: true }">
+    <div class="flex justify-between items-center mb-4 cursor-pointer" @click="open = !open">
+      <h3 class="font-semibold text-upgradRed">JQL Query</h3>
+      <button class="text-gray-500 hover:text-upgradRed">
+        <span x-show="open">▼</span>
+        <span x-show="!open">►</span>
+      </button>
+    </div>
+    <div x-show="open">
+      <form method="POST" action="/jql-wip" id="jql-form" class="w-full">
+        <div class="mb-4">
+          <label for="jql" class="block font-semibold mb-1">Enter JQL:</label>
+          <div class="flex">
+            <textarea class="w-full border rounded px-3 py-2 focus:ring-2 focus:ring-blue-400" id="jql" name="jql" rows="3">{{ jql }}</textarea>
+          </div>
+          <!-- Add JQL suggestions and error elements for autocomplete and error display -->
+          <ul id="jql-suggestions" style="display:none; position:absolute; left:0; right:0; z-index:10; background:white; border:1px solid #ccc; border-radius:4px; max-height:180px; overflow-y:auto; margin-top:-4px;"></ul>
+          <div id="jql-error" style="display:none; color:#d00; font-size:0.9em; margin-top:2px;"></div>
+        </div>
+        
+        <!-- Jira Filters Dropdown (always visible) -->
+        <div class="mb-4" id="jira-filters-container">
+          <div class="flex items-center mb-2">
+            <label for="jira-filter-select" class="block font-semibold mr-2">Select Jira Filter:</label>
+            <!-- Load Filters button removed: filters will load automatically -->
+            <button type="button" id="apply-filter-btn" class="ml-2 px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-sm">Apply Filter</button>
+            <div id="filter-loading" class="ml-2 text-sm text-gray-500" style="display: none;">Loading...</div>
+          </div>
+          <select class="w-full border rounded px-3 py-2 focus:ring-2 focus:ring-blue-400" id="jira-filter-select">
+            <option value="">-- Select a filter --</option>
+            <!-- Filters will be loaded here -->
+          </select>
+          <div class="mt-1 text-sm text-gray-500">
+            <small>Favorites are marked with ★</small>
+          </div>
+        </div>
+        
+        <div class="mb-4">
+          <label for="group_by" class="block font-semibold mb-1">Group By:</label>
+          <select class="w-full border rounded px-3 py-2 focus:ring-2 focus:ring-blue-400" id="group_by" name="group_by">
+            <option value="assignee" {% if group_by == 'assignee' %}selected{% endif %}>Assignee</option>
+            <option value="creator" {% if group_by == 'creator' %}selected{% endif %}>Creator</option>
+            <option value="status" {% if group_by == 'status' %}selected{% endif %}>Status</option>
+            <option value="priority" {% if group_by == 'priority' %}selected{% endif %}>Priority</option>
+          </select>
+        </div>
+        <div class="flex space-x-2">
+          <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded shadow font-semibold transition">Submit</button>
+          <button type="button" id="copy-all-jql" class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded shadow font-semibold transition">Copy All JQL</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  {% if error %}
+    <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-2 rounded mb-4">{{ error }}</div>
+  {% endif %}
+
+  {% if grouped_issues %}
+    <div class="mb-6 bg-white border border-gray-200 rounded-lg shadow-sm px-4 py-3" x-data="{ open: true }">      
+      <div class="flex justify-between items-center mb-2 cursor-pointer" @click="open = !open">
+        <h3 class="font-semibold text-upgradRed">Filters</h3>
+        <button class="text-gray-500 hover:text-upgradRed">
+          <span x-show="open">▼</span>
+          <span x-show="!open">►</span>
+        </button>
+      </div>
+      <div x-show="open" class="flex flex-wrap items-center gap-4">
+      <label for="filterField" class="font-semibold mr-2">Filter Field:</label>
+      <select id="filterField" class="border rounded px-2 py-1 focus:ring-2 focus:ring-blue-400">
+        <option value="assignee">Assignee</option>
+        <option value="creator">Creator</option>
+        <option value="status">Status</option>
+        <option value="priority">Priority</option>
+      </select>
+      <label class="font-semibold mx-2">Value:</label>
+      <div class="relative">
+        <div id="filterValueCards" class="flex flex-wrap gap-2 min-h-[40px] items-center">
+          <!-- Filter value cards will be added here dynamically -->
+        </div>
+        <div id="filterCardsLoading" class="absolute inset-0 bg-white bg-opacity-70 hidden items-center justify-center">
+          <div class="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-500"></div>
+        </div>
+      </div>
+      <button id="clear-filters" class="ml-2 px-3 py-1 bg-gray-200 hover:bg-gray-300 rounded text-sm">Clear Filters</button>
+      <div class="relative inline-block ml-2">
+        <button id="quick-filters-btn" class="px-3 py-1 bg-blue-500 hover:bg-blue-600 text-white rounded text-sm">Quick Filters ▼</button>
+        <div id="quick-filters-dropdown" class="absolute hidden right-0 mt-1 bg-white border border-gray-200 rounded shadow-lg z-10 w-48">
+          <div class="py-1">
+            <a href="#" class="quick-filter block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" data-field="status" data-value="In Progress">Status: In Progress</a>
+            <a href="#" class="quick-filter block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" data-field="priority" data-value="High">Priority: High</a>
+            <a href="#" class="quick-filter block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" data-field="assignee" data-value="Unassigned">Assignee: Unassigned</a>
+          </div>
+        </div>
+      </div>
+      </div>
+    </div>
+    <script>
+      document.addEventListener('DOMContentLoaded', function() {
+      // All DOM-interacting code is now inside this handler
+        console.log('DOM fully loaded, attaching event listeners');
+        
+      // --- Variables and DOM Elements ---
+        const loadFiltersBtn = document.getElementById('load-filters-btn');
+        const applyFilterBtn = document.getElementById('apply-filter-btn');
+        const copyJqlButtons = document.querySelectorAll('.copy-jql-btn');
+        const openJiraButtons = document.querySelectorAll('.open-jira-btn');
+        const downloadGroupButtons = document.querySelectorAll('.download-group-csv');
+        const downloadAllButton = document.getElementById('download-all-csv');
+        const copyAllJqlButton = document.getElementById('copy-all-jql');
+          const filterField = document.getElementById('filterField');
+          const filterValueCards = document.getElementById('filterValueCards');
+          let currentFilterField = 'assignee';
+          let currentFilterValue = ''; // Track the currently selected filter value
+      const jqlInput = document.getElementById('jql');
+      const JIRA_BASE_URL = '{{ jira_base_url }}';
+      // For autocomplete
+      const suggestionsBox = document.getElementById('jql-suggestions');
+      const errorBox = document.getElementById('jql-error');
+      
+      // --- Helper Functions ---
+      function formatJql(baseJql, field, value) {
+        let fieldJql = '';
+        if (value === 'Unassigned' || value === '') {
+          fieldJql = `${field} IS EMPTY`;
+        } else {
+          fieldJql = `${field} = "${value}"`;
+        }
+        let orderByClause = '';
+        let mainJql = baseJql;
+        const orderByMatch = baseJql.match(/ORDER BY\s+.+$/i);
+        if (orderByMatch) {
+          orderByClause = orderByMatch[0];
+          mainJql = baseJql.replace(orderByMatch[0], '').trim();
+        }
+        let finalJql = '';
+        if (mainJql) {
+          if (!mainJql.toUpperCase().includes(field.toUpperCase())) {
+            finalJql = mainJql + ` AND ${fieldJql}`;
+          } else {
+            finalJql = mainJql;
+          }
+        } else {
+          finalJql = fieldJql;
+        }
+        if (orderByClause) {
+          finalJql = finalJql + ' ' + orderByClause;
+        }
+        return finalJql.trim();
+      }
+      
+      // --- Copy All JQL Button ---
+      if (copyAllJqlButton) {
+        copyAllJqlButton.addEventListener('click', function() {
+          if (jqlInput && jqlInput.value) {
+            navigator.clipboard.writeText(jqlInput.value).then(function() {
+              const originalText = copyAllJqlButton.textContent;
+              copyAllJqlButton.textContent = 'Copied!';
+              copyAllJqlButton.classList.add('bg-green-700');
+              setTimeout(() => {
+                copyAllJqlButton.textContent = originalText;
+                copyAllJqlButton.classList.remove('bg-green-700');
+              }, 2000);
+            }).catch(function(err) {
+              console.error('Could not copy text: ', err);
+              alert('Failed to copy JQL to clipboard');
+            });
+          }
+        });
+      }
+
+      // --- Copy JQL Button for Each Group ---
+      if (copyJqlButtons.length > 0 && jqlInput) {
+        copyJqlButtons.forEach(btn => {
+          btn.addEventListener('click', function() {
+            const field = this.getAttribute('data-field');
+            const value = this.getAttribute('data-value');
+            const finalJql = formatJql(jqlInput.value.trim(), field, value);
+            navigator.clipboard.writeText(finalJql).then(() => {
+              const originalText = this.textContent.trim();
+              this.textContent = 'Copied!';
+              this.classList.add('bg-green-100', 'text-green-700');
+              setTimeout(() => {
+                this.textContent = originalText;
+                this.classList.remove('bg-green-100', 'text-green-700');
+              }, 2000);
+            });
+          });
+        });
+      }
+      
+      // --- Open in Jira Button ---
+      if (openJiraButtons.length > 0 && jqlInput) {
+        openJiraButtons.forEach(btn => {
+          btn.addEventListener('click', function(e) {
+            e.preventDefault();
+            const field = this.getAttribute('data-field');
+            const value = this.getAttribute('data-value');
+            const finalJql = formatJql(jqlInput.value.trim(), field, value);
+            const encodedJql = encodeURIComponent(finalJql);
+            const jiraUrl = `${JIRA_BASE_URL}/issues/?jql=${encodedJql}`;
+            window.open(jiraUrl, '_blank');
+          });
+        });
+      }
+      
+      // --- Download Group CSV Button ---
+      document.querySelectorAll('.download-group-csv').forEach(button => {
+        button.addEventListener('click', function() {
+          const group = this.getAttribute('data-group');
+          const groupIssues = [];
+          const groupContainer = document.querySelector(`.sidebar-group-content[data-group="${group}"]`);
+          if (groupContainer) {
+            const issues = groupContainer.querySelectorAll('li.group-section');
+            issues.forEach(issue => {
+              const key = issue.querySelector('a')?.textContent.trim() || 'Unknown';
+              const summaryElement = issue.querySelector('div.text-base') || issue.querySelector('div.text-sm');
+              const summary = summaryElement ? summaryElement.textContent.trim() : 'Unknown';
+              const assignee = issue.getAttribute('data-assignee') || 'Unassigned';
+              const creator = issue.getAttribute('data-creator') || 'Unknown';
+              const status = issue.getAttribute('data-status') || 'Unknown';
+              const priority = issue.getAttribute('data-priority') || 'None';
+              groupIssues.push({ key, summary, assignee, creator, status, priority, group });
+            });
+          }
+          // Download the CSV with all issues in this group
+          const headers = ['Key', 'Summary', 'Assignee', 'Creator', 'Status', 'Priority', 'Group'];
+          let csvContent = headers.join(',') + '\n';
+          groupIssues.forEach(issue => {
+            const row = [
+              issue.key,
+              '"' + issue.summary.replace(/"/g, '""') + '"',
+              '"' + issue.assignee.replace(/"/g, '""') + '"',
+              '"' + issue.creator.replace(/"/g, '""') + '"',
+              '"' + issue.status.replace(/"/g, '""') + '"',
+              '"' + issue.priority.replace(/"/g, '""') + '"',
+              '"' + issue.group.replace(/"/g, '""') + '"'
+            ];
+            csvContent += row.join(',') + '\n';
+          });
+          const link = document.createElement('a');
+          link.setAttribute('href', 'data:text/csv;charset=utf-8,' + encodeURIComponent(csvContent));
+          link.setAttribute('download', `jira_issues_${group.replace(/\s+/g, '_').toLowerCase()}.csv`);
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          // Show feedback
+          const originalText = this.innerHTML;
+          this.textContent = 'Downloaded!';
+          this.classList.add('bg-green-700', 'text-white');
+          setTimeout(() => {
+            this.innerHTML = originalText;
+            this.classList.remove('bg-green-700', 'text-white');
+          }, 2000);
+        });
+      });
+      
+      // --- Download All CSV Button ---
+      if (downloadAllButton) {
+        downloadAllButton.addEventListener('click', function() {
+          const allIssueData = [];
+          const visibleGroups = document.querySelectorAll('.sidebar-group-content:not([style*="display: none"])');
+          visibleGroups.forEach(group => {
+            const groupData = [];
+            const issues = group.querySelectorAll('li.group-section');
+            issues.forEach(issue => {
+              if (issue.style.display === 'none') return;
+              const key = issue.querySelector('a')?.textContent.trim() || 'Unknown';
+              const summaryElement = issue.querySelector('div.text-sm') || issue.querySelector('div.text-base');
+              const summary = summaryElement ? summaryElement.textContent.trim() : 'Unknown';
+              const assignee = issue.getAttribute('data-assignee') || 'Unassigned';
+              const creator = issue.getAttribute('data-creator') || 'Unknown';
+              const status = issue.getAttribute('data-status') || 'Unknown';
+              const priority = issue.getAttribute('data-priority') || 'None';
+              groupData.push({ key, summary, assignee, creator, status, priority, group: group.getAttribute('data-group') });
+            });
+          });
+          allIssueData.push(...groupData);
+          const headers = ['Key', 'Summary', 'Assignee', 'Creator', 'Status', 'Priority', 'Group'];
+          let csvContent = headers.join(',') + '\n';
+          allIssueData.forEach(issue => {
+            const row = [
+              '"' + issue.key + '"',
+              '"' + issue.summary.replace(/"/g, '""') + '"',
+              '"' + issue.assignee + '"',
+              '"' + issue.creator + '"',
+              '"' + issue.status + '"',
+              '"' + issue.priority + '"',
+              '"' + issue.group + '"'
+            ];
+            csvContent += row.join(',') + '\n';
+          });
+          const filterInfo = (filterField && filterValue && filterValue.value) ? `_filtered_by_${filterField.value || 'unknown'}_${filterValue.value || 'unknown'}` : '';
+          const filename = `jira_issues${filterInfo}_${new Date().toISOString().slice(0,10)}.csv`;
+          const link = document.createElement('a');
+          link.setAttribute('href', 'data:text/csv;charset=utf-8,' + encodeURIComponent(csvContent));
+          link.setAttribute('download', filename);
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          // Show feedback
+          const originalText = this.textContent.trim();
+          this.textContent = 'Downloaded!';
+          this.classList.add('bg-green-800');
+          setTimeout(() => {
+            this.textContent = originalText;
+            this.classList.remove('bg-green-800');
+          }, 2000);
+        });
+      }
+      
+      // --- JQL Autocomplete & Validation ---
+      // (Move the autocomplete code here, only once)
+      const JQL_FIELDS = [
+        'assignee', 'reporter', 'creator', 'project', 'status', 'priority', 'summary', 'description', 'created', 'updated', 'due', 'labels', 'issuetype', 'fixVersion', 'resolution', 'comment', 'sprint', 'epic', 'parent', 'component'
+      ];
+      const JQL_OPERATORS = ['=', '!=', '~', '!~', 'IN', 'NOT IN', 'IS', 'IS NOT', '>', '<', '>=', '<='];
+      const JQL_KEYWORDS = ['AND', 'OR', 'NOT', 'ORDER BY', 'ASC', 'DESC', 'ALL'];
+      const JQL_FUNCTIONS = ['currentUser()', 'membersOf()', 'now()', 'startOfDay()', 'endOfDay()', 'startOfWeek()', 'endOfWeek()', 'startOfMonth()', 'endOfMonth()'];
+      if (jqlInput) {
+        let jqlSuggActive = -1;
+        function updateJqlSuggestions() {
+          const val = jqlInput.value;
+          const caret = jqlInput.selectionStart;
+          let lastToken = val.slice(0, caret).split(/\s|,|\(/).pop();
+          let sugg = [];
+          if (/^\s*$/.test(val)) {
+            sugg = [...JQL_FIELDS, ...JQL_KEYWORDS];
+          } else if (/\b(AND|OR|NOT)?\s*([a-zA-Z_][a-zA-Z0-9_]+)?$/i.test(lastToken)) {
+            sugg = [...JQL_FIELDS.filter(f => f.startsWith(lastToken)), ...JQL_KEYWORDS.filter(k => k.startsWith(lastToken.toUpperCase()))];
+          } else if (JQL_FIELDS.some(f => val.slice(0, caret).endsWith(f + ' '))) {
+            sugg = [...JQL_OPERATORS, ...JQL_KEYWORDS];
+          } else if (val.slice(0, caret).match(/\b(IN|NOT IN|=|!=|~|!~|IS|IS NOT)\s*$/i)) {
+            sugg = [...JQL_FUNCTIONS, ...JQL_KEYWORDS];
+          } else if (/\bORDER BY\s*$/i.test(val.slice(0, caret))) {
+            sugg = [...JQL_FIELDS, 'ASC', 'DESC'];
+          }
+          if (sugg.length > 0 && suggestionsBox) {
+            suggestionsBox.innerHTML = '';
+            sugg.forEach((s, idx) => {
+              const li = document.createElement('li');
+              li.textContent = s;
+              li.style.padding = '6px 12px';
+              li.style.cursor = 'pointer';
+              li.tabIndex = -1;
+              li.className = (idx === 0) ? 'jql-sugg-active' : '';
+              li.addEventListener('mousedown', function(ev) {
+                const before = val.slice(0, caret - lastToken.length);
+                const after = val.slice(caret);
+                jqlInput.value = before + s + after;
+                jqlInput.focus();
+                suggestionsBox.style.display = 'none';
+              });
+              suggestionsBox.appendChild(li);
+            });
+            jqlSuggActive = 0;
+            highlightJqlSugg();
+            suggestionsBox.style.display = '';
+          } else if (suggestionsBox) {
+            suggestionsBox.style.display = 'none';
+            jqlSuggActive = -1;
+          }
+        }
+        function highlightJqlSugg() {
+          const items = suggestionsBox.querySelectorAll('li');
+          items.forEach((li, idx) => {
+            if (idx === jqlSuggActive) {
+              li.style.background = '#e0eaff';
+              li.classList.add('jql-sugg-active');
+            } else {
+              li.style.background = '';
+              li.classList.remove('jql-sugg-active');
+            }
+          });
+        }
+        jqlInput.addEventListener('input', updateJqlSuggestions);
+        jqlInput.addEventListener('focus', updateJqlSuggestions);
+        jqlInput.addEventListener('click', updateJqlSuggestions);
+        jqlInput.addEventListener('keyup', function(e) {
+          if (["ArrowLeft","ArrowRight","Home","End"].includes(e.key)) {
+            updateJqlSuggestions();
+          }
+        });
+        jqlInput.addEventListener('keydown', function(e) {
+          const items = suggestionsBox ? suggestionsBox.querySelectorAll('li') : [];
+          if (suggestionsBox && suggestionsBox.style.display !== 'none' && items.length > 0) {
+            if (e.key === 'ArrowDown') {
+              e.preventDefault();
+              jqlSuggActive = (jqlSuggActive + 1) % items.length;
+              highlightJqlSugg();
+            } else if (e.key === 'ArrowUp') {
+              e.preventDefault();
+              jqlSuggActive = (jqlSuggActive - 1 + items.length) % items.length;
+              highlightJqlSugg();
+            } else if (e.key === 'Enter' || e.key === 'Tab') {
+              if (jqlSuggActive >= 0 && jqlSuggActive < items.length) {
+                e.preventDefault();
+                items[jqlSuggActive].dispatchEvent(new MouseEvent('mousedown'));
+              }
+            }
+          }
+        });
+        jqlInput.addEventListener('blur', function() {
+          setTimeout(() => { if (suggestionsBox) suggestionsBox.style.display = 'none'; }, 100);
+        });
+        jqlInput.addEventListener('focus', function() {
+          if (suggestionsBox && suggestionsBox.innerHTML) suggestionsBox.style.display = '';
+        });
+        // Style for active suggestion
+        const style = document.createElement('style');
+        style.innerHTML = `.jql-sugg-active { background: #e0eaff !important; }`;
+        document.head.appendChild(style);
+      }
+
+      // --- Modal for Jira Issue Details ---
+      const modal = document.getElementById('jiraIssueModal');
+      const closeBtn = document.getElementById('closeJiraIssueModal');
+      if (modal && closeBtn) {
+        document.querySelectorAll('.jira-modal-link').forEach(function(link) {
+          link.addEventListener('click', function(e) {
+            e.preventDefault();
+            var issueKey = this.getAttribute('data-issue-key');
+            var loading = document.getElementById('jiraIssueLoading');
+            var errorDiv = document.getElementById('jiraIssueError');
+            var fieldsDiv = document.getElementById('jiraIssueFields');
+            var summary = document.getElementById('jiraIssueSummary');
+            var keySpan = document.getElementById('jiraIssueKey');
+            var statusSpan = document.getElementById('jiraIssueStatus');
+            var prioritySpan = document.getElementById('jiraIssuePriority');
+            var assigneeSpan = document.getElementById('jiraIssueAssignee');
+            var reporterSpan = document.getElementById('jiraIssueReporter');
+            var descDiv = document.getElementById('jiraIssueDescription');
+            loading.style.display = 'block';
+            errorDiv.style.display = 'none';
+            fieldsDiv.style.display = 'none';
+            modal.style.display = 'flex';
+            fetch('/api/jira_issue/' + issueKey)
+              .then(resp => resp.json())
+              .then(data => {
+                loading.style.display = 'none';
+                if (data.error) {
+                  errorDiv.textContent = data.error;
+                  errorDiv.style.display = 'block';
+                } else {
+                  summary.textContent = data.summary || '';
+                  keySpan.textContent = data.key || '';
+                  statusSpan.textContent = data.status || '';
+                  prioritySpan.textContent = data.priority || '';
+                  assigneeSpan.textContent = data.assignee || '';
+                  reporterSpan.textContent = data.reporter || '';
+                  descDiv.textContent = data.description || '';
+                  var openInJira = document.getElementById('jiraIssueOpenInJira');
+                  openInJira.href = "{{ jira_base_url }}/browse/" + (data.key || issueKey);
+                  fieldsDiv.style.display = 'block';
+                }
+              })
+              .catch(err => {
+                loading.style.display = 'none';
+                errorDiv.textContent = 'Error loading issue details.';
+                errorDiv.style.display = 'block';
+              });
+          });
+        });
+        closeBtn.addEventListener('click', function() {
+          modal.style.display = 'none';
+        });
+        modal.addEventListener('click', function(e) {
+          if (e.target === modal) {
+            modal.style.display = 'none';
+          }
+        });
+      }
+
+      // --- Load Jira Filters Button ---
+      function loadJiraFilters() {
+        const filterLoading = document.getElementById('filter-loading');
+        if (filterLoading) filterLoading.style.display = 'inline';
+
+        const jiraFilterSelect = document.getElementById('jira-filter-select');
+        if (!jiraFilterSelect) return;
+
+        // Clear existing options except the first one
+        while (jiraFilterSelect.options.length > 1) {
+          jiraFilterSelect.remove(1);
+        }
+
+        fetch('/api/jira_filters')
+          .then(resp => resp.json())
+          .then(data => {
+            if (data.error) {
+              alert('Error loading filters: ' + data.error);
+              return;
+            }
+            (data.filters || []).forEach(filter => {
+              const option = document.createElement('option');
+              option.value = filter.id;
+              option.textContent = (filter.favorite ? '★ ' : '') + filter.name;
+              option.dataset.jql = filter.jql;
+              jiraFilterSelect.appendChild(option);
+            });
+          })
+          .catch(err => {
+            alert('Error loading filters: ' + err);
+          })
+          .finally(() => {
+            if (filterLoading) filterLoading.style.display = 'none';
+          });
+      }
+
+      // Always load filters on page load
+      loadJiraFilters();
+
+      if (applyFilterBtn) {
+        applyFilterBtn.addEventListener('click', function() {
+          const jiraFilterSelect = document.getElementById('jira-filter-select');
+          const jqlTextarea = document.getElementById('jql');
+          if (!jiraFilterSelect || !jqlTextarea) {
+            console.error('Required elements not found');
+            return;
+          }
+          if (jiraFilterSelect.selectedIndex === 0) {
+            alert('Please select a filter first');
+            return;
+          }
+          const selectedOption = jiraFilterSelect.options[jiraFilterSelect.selectedIndex];
+          const jql = selectedOption.dataset.jql;
+          if (jql) {
+            jqlTextarea.value = jql;
+            const form = document.getElementById('jql-form');
+            if (form) {
+              form.submit();
+            } else {
+              console.error('Form not found');
+            }
+          } else {
+            alert('Selected filter does not have a JQL query');
+          }
+        });
+      }
+
+      // --- Filter Field Change Handler ---
+      filterField.addEventListener('change', function() {
+        currentFilterField = this.value;
+        const loadingEl = document.getElementById('filterCardsLoading');
+        if (loadingEl) {
+          loadingEl.classList.remove('hidden');
+          loadingEl.classList.add('flex');
+        }
+        
+        // Small delay to show loading state
+        setTimeout(() => {
+          updateFilterValueCards();
+          if (loadingEl) {
+            loadingEl.classList.add('hidden');
+            loadingEl.classList.remove('flex');
+          }
+        }, 50);
+      });
+
+      // Function to update filter value cards
+      function updateFilterValueCards() {
+        // Clear existing cards
+        filterValueCards.innerHTML = '';
+        
+        // Add 'All' card
+        const allCard = document.createElement('div');
+        allCard.className = 'filter-value-card px-3 py-1.5 rounded-lg cursor-pointer border border-gray-200 bg-white hover:bg-gray-50 transition-all duration-200 shadow-sm hover:shadow-md flex-shrink-0';
+        allCard.style.minWidth = '60px';
+        allCard.textContent = 'All';
+        allCard.dataset.value = '';
+        allCard.addEventListener('click', function() {
+          currentFilterValue = '';
+          document.querySelectorAll('.filter-value-card').forEach(card => {
+            card.classList.remove('bg-blue-100', 'border-blue-500');
+          });
+          allCard.classList.add('bg-blue-50', 'border-blue-400', 'shadow-inner', 'font-medium');
+          filterIssues(currentFilterField, '');
+        });
+        filterValueCards.appendChild(allCard);
+        
+        // Get unique values for the current field
+        const values = new Set();
+        document.querySelectorAll('.group-section').forEach(issue => {
+          const value = issue.getAttribute(`data-${currentFilterField}`) || 'Unassigned';
+          if (value) values.add(value);
+        });
+        
+        // Create cards for each unique value
+        Array.from(values).sort().forEach(value => {
+          const card = document.createElement('div');
+          card.className = 'filter-value-card px-3 py-1.5 rounded-lg cursor-pointer border border-gray-200 bg-white hover:bg-gray-50 transition-all duration-200 shadow-sm hover:shadow-md flex-shrink-0';
+          card.style.minWidth = '60px';
+          card.textContent = value;
+          card.dataset.value = value;
+          card.addEventListener('click', function() {
+            currentFilterValue = value;
+            document.querySelectorAll('.filter-value-card').forEach(card => {
+              card.classList.remove('bg-blue-100', 'border-blue-500');
+            });
+            card.classList.add('bg-blue-50', 'border-blue-400', 'shadow-inner', 'font-medium');
+            filterIssues(currentFilterField, value);
+          });
+          filterValueCards.appendChild(card);
+        });
+      }
+      
+      // Initialize filter value cards with a small delay to ensure DOM is ready
+      setTimeout(() => {
+        updateFilterValueCards();
+      }, 100);
+
+      // --- Quick Filters Dropdown Toggle ---
+      const quickFiltersBtn = document.getElementById('quick-filters-btn');
+      const quickFiltersDropdown = document.getElementById('quick-filters-dropdown');
+      
+      // Close dropdown when clicking outside
+      document.addEventListener('click', (e) => {
+        if (quickFiltersDropdown && !quickFiltersBtn.contains(e.target) && !quickFiltersDropdown.contains(e.target)) {
+          quickFiltersDropdown.classList.add('hidden');
+        }
+      });
+      if (quickFiltersBtn && quickFiltersDropdown) {
+        quickFiltersBtn.addEventListener('click', function() {
+          quickFiltersDropdown.classList.toggle('hidden');
+        });
+      }
+
+      // --- Quick Filters ---
+      document.querySelectorAll('.quick-filter').forEach(btn => {
+        btn.addEventListener('click', function(e) {
+          e.preventDefault();
+          const field = this.dataset.field;
+          const value = this.dataset.value;
+          filterField.value = field;
+          currentFilterField = field;
+          currentFilterValue = value;
+          updateFilterValueCards();
+          // Wait for cards to update, then find and click the correct card
+          setTimeout(() => {
+            const cards = document.querySelectorAll('.filter-value-card');
+            cards.forEach(card => {
+              if (card.dataset.value === value) {
+                card.click();
+              }
+            });
+          }, 50);
+        });
+      });
+
+      // --- Clear Filters Button ---
+      document.getElementById('clear-filters').addEventListener('click', function() {
+        filterField.value = 'assignee';
+        currentFilterValue = '';
+        document.querySelectorAll('.filter-value-card').forEach(card => {
+          card.classList.remove('bg-blue-100', 'border-blue-500');
+        });
+        filterIssues('', '');
+        // Reset to show all filter values
+        currentFilterField = 'assignee';
+        updateFilterValueCards();
+      });
+
+      // Function to filter issues based on the current filter field and value
+      function filterIssues(field, value) {
+        const issues = document.querySelectorAll('.group-section');
+        issues.forEach(issue => {
+          const issueValue = issue.getAttribute(`data-${field}`) || 'Unassigned';
+          if (!value || issueValue === value) {
+            issue.style.display = '';
+          } else {
+            issue.style.display = 'none';
+          }
+        });
+      }
+    });
+  </script>
+
+<!-- Jira Issue Details Modal -->
+<div id="jiraIssueModal" style="display:none;position:fixed;z-index:9999;left:0;top:0;width:100vw;height:100vh;background:rgba(0,0,0,0.4);align-items:center;justify-content:center;">
+  <div style="background:white;max-width:600px;width:95vw;margin:auto;position:relative;box-shadow:0 0 30px #0006;border-radius:10px;display:flex;flex-direction:column;">
+    <button id="closeJiraIssueModal" style="position:absolute;top:10px;right:14px;font-size:1.5rem;background:none;border:none;color:#d00;cursor:pointer;z-index:2;">&times;</button>
+    <div id="jiraIssueModalContent" style="padding:2rem 1.5rem 1.5rem 1.5rem;max-height:80vh;overflow:auto;">
+      <div id="jiraIssueLoading" style="display:none;text-align:center;padding:2rem;">Loading...</div>
+      <div id="jiraIssueError" style="display:none;color:#d00;text-align:center;padding:1rem;"></div>
+      <div id="jiraIssueFields" style="display:none;">
+        <h2 id="jiraIssueSummary" class="text-lg font-bold mb-2"></h2>
+        <div class="mb-2"><span class="font-semibold">Key:</span> <span id="jiraIssueKey"></span></div>
+        <div class="mb-2"><a id="jiraIssueOpenInJira" href="#" class="bg-blue-600 hover:bg-blue-800 text-white px-3 py-1 rounded text-xs font-semibold" target="_blank" rel="noopener">Open in Jira</a></div>
+        <div class="mb-2"><span class="font-semibold">Status:</span> <span id="jiraIssueStatus"></span></div>
+        <div class="mb-2"><span class="font-semibold">Priority:</span> <span id="jiraIssuePriority"></span></div>
+        <div class="mb-2"><span class="font-semibold">Assignee:</span> <span id="jiraIssueAssignee"></span></div>
+        <div class="mb-2"><span class="font-semibold">Reporter:</span> <span id="jiraIssueReporter"></span></div>
+        <div class="mb-2"><span class="font-semibold">Description:</span>
+          <div id="jiraIssueDescription" style="white-space:pre-line;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    var modal = document.getElementById('jiraIssueModal');
+    var closeBtn = document.getElementById('closeJiraIssueModal');
+    
+    // Only proceed if the modal and close button exist
+    if (!modal || !closeBtn) {
+      console.warn('Jira issue modal elements not found');
+      return;
+    }
+    
+    var loading = document.getElementById('jiraIssueLoading');
+    var errorDiv = document.getElementById('jiraIssueError');
+    var fieldsDiv = document.getElementById('jiraIssueFields');
+    var summary = document.getElementById('jiraIssueSummary');
+    var keySpan = document.getElementById('jiraIssueKey');
+    var statusSpan = document.getElementById('jiraIssueStatus');
+    var prioritySpan = document.getElementById('jiraIssuePriority');
+    var assigneeSpan = document.getElementById('jiraIssueAssignee');
+    var reporterSpan = document.getElementById('jiraIssueReporter');
+    var descDiv = document.getElementById('jiraIssueDescription');
+
+    document.querySelectorAll('.jira-modal-link').forEach(function(link) {
+      link.addEventListener('click', function(e) {
+        e.preventDefault();
+        var issueKey = this.getAttribute('data-issue-key');
+        loading.style.display = 'block';
+        errorDiv.style.display = 'none';
+        fieldsDiv.style.display = 'none';
+        modal.style.display = 'flex';
+        fetch('/api/jira_issue/' + issueKey)
+          .then(resp => resp.json())
+          .then(data => {
+            loading.style.display = 'none';
+            if (data.error) {
+              errorDiv.textContent = data.error;
+              errorDiv.style.display = 'block';
+            } else {
+              summary.textContent = data.summary || '';
+              keySpan.textContent = data.key || '';
+              statusSpan.textContent = data.status || '';
+              prioritySpan.textContent = data.priority || '';
+              assigneeSpan.textContent = data.assignee || '';
+              reporterSpan.textContent = data.reporter || '';
+              descDiv.textContent = data.description || '';
+              // Set Open in Jira link
+              var openInJira = document.getElementById('jiraIssueOpenInJira');
+              openInJira.href = "{{ jira_base_url }}/browse/" + (data.key || issueKey);
+              fieldsDiv.style.display = 'block';
+            }
+          })
+          .catch(err => {
+            loading.style.display = 'none';
+            errorDiv.textContent = 'Error loading issue details.';
+            errorDiv.style.display = 'block';
+          });
+      });
+    });
+    closeBtn.addEventListener('click', function() {
+      modal.style.display = 'none';
+    });
+    modal.addEventListener('click', function(e) {
+      if (e.target === modal) {
+        modal.style.display = 'none';
+      }
+    });
+  });
+</script>
+<script>
+  // --- Move main script block here so it always runs ---
+  document.addEventListener('DOMContentLoaded', function() {
+    // All DOM-interacting code is now inside this handler
+    console.log('DOM fully loaded, attaching event listeners');
+
+    // --- Variables and DOM Elements ---
+    const loadFiltersBtn = document.getElementById('load-filters-btn');
+    const applyFilterBtn = document.getElementById('apply-filter-btn');
+    const copyJqlButtons = document.querySelectorAll('.copy-jql-btn');
+    const openJiraButtons = document.querySelectorAll('.open-jira-btn');
+    const downloadGroupButtons = document.querySelectorAll('.download-group-csv');
+    const downloadAllButton = document.getElementById('download-all-csv');
+    const copyAllJqlButton = document.getElementById('copy-all-jql');
+    const filterField = document.getElementById('filterField');
+    const filterValue = document.getElementById('filterValue');
+    const jqlInput = document.getElementById('jql');
+    const JIRA_BASE_URL = '{{ jira_base_url }}';
+    // For autocomplete
+    const suggestionsBox = document.getElementById('jql-suggestions');
+    const errorBox = document.getElementById('jql-error');
+        sugg = [...JQL_FUNCTIONS, ...JQL_KEYWORDS];
+      } else if (/\bORDER BY\s*$/i.test(val.slice(0, caret))) {
+        // After ORDER BY, suggest fields, ASC, DESC
+        sugg = [...JQL_FIELDS, 'ASC', 'DESC'];
+      }
+      if (sugg.length > 0) {
+    suggestionsBox.innerHTML = '';
+    sugg.forEach((s, idx) => {
+      const li = document.createElement('li');
+      li.textContent = s;
+      li.style.padding = '6px 12px';
+      li.style.cursor = 'pointer';
+      li.tabIndex = -1;
+      li.className = (idx === 0) ? 'jql-sugg-active' : '';
+      li.addEventListener('mousedown', function(ev) {
+        // Insert suggestion at caret
+        const before = val.slice(0, caret - lastToken.length);
+        const after = val.slice(caret);
+        jqlInput.value = before + s + after;
+        jqlInput.focus();
+        suggestionsBox.style.display = 'none';
+      });
+      suggestionsBox.appendChild(li);
+    });
+    jqlSuggActive = 0;
+    highlightJqlSugg();
+    suggestionsBox.style.display = '';
+  } else {
+    suggestionsBox.style.display = 'none';
+    jqlSuggActive = -1;
+  }
+}
+
+  jqlInput.addEventListener('input', updateJqlSuggestions);
+  jqlInput.addEventListener('focus', updateJqlSuggestions);
+  jqlInput.addEventListener('click', updateJqlSuggestions);
+  jqlInput.addEventListener('keyup', function(e) {
+    if (["ArrowLeft","ArrowRight","Home","End"].includes(e.key)) {
+      updateJqlSuggestions();
+    }
+  });
+
+  jqlInput.addEventListener('keydown', function(e) {
+    const items = suggestionsBox ? suggestionsBox.querySelectorAll('li') : [];
+    if (suggestionsBox && suggestionsBox.style.display !== 'none' && items.length > 0) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        jqlSuggActive = (jqlSuggActive + 1) % items.length;
+        highlightJqlSugg();
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        jqlSuggActive = (jqlSuggActive - 1 + items.length) % items.length;
+        highlightJqlSugg();
+      } else if (e.key === 'Enter' || e.key === 'Tab') {
+        if (jqlSuggActive >= 0 && jqlSuggActive < items.length) {
+          e.preventDefault();
+          items[jqlSuggActive].dispatchEvent(new MouseEvent('mousedown'));
+        }
+      }
+    }
+  });
+
+  function highlightJqlSugg() {
+    const items = suggestionsBox.querySelectorAll('li');
+    items.forEach((li, idx) => {
+      if (idx === jqlSuggActive) {
+        li.style.background = '#e0eaff';
+        li.classList.add('jql-sugg-active');
+      } else {
+        li.style.background = '';
+        li.classList.remove('jql-sugg-active');
+      }
+    });
+  }
+
+  // Style for active suggestion
+  const style = document.createElement('style');
+  style.innerHTML = `.jql-sugg-active { background: #e0eaff !important; }`;
+  document.head.appendChild(style);
+
+  jqlInput.addEventListener('blur', function() {
+    setTimeout(() => suggestionsBox.style.display = 'none', 100);
+  });
+  jqlInput.addEventListener('focus', function() {
+    if (suggestionsBox.innerHTML) suggestionsBox.style.display = '';
+  });
+});
+</script>
+<script>
+// --- Move main script block here so it always runs ---
+document.addEventListener('DOMContentLoaded', function() {
+  // All DOM-interacting code is now inside this handler
+  console.log('DOM fully loaded, attaching event listeners');
+
+  // --- Variables and DOM Elements ---
+  const loadFiltersBtn = document.getElementById('load-filters-btn');
+  const applyFilterBtn = document.getElementById('apply-filter-btn');
+  const copyJqlButtons = document.querySelectorAll('.copy-jql-btn');
+  const openJiraButtons = document.querySelectorAll('.open-jira-btn');
+  const downloadGroupButtons = document.querySelectorAll('.download-group-csv');
+  const downloadAllButton = document.getElementById('download-all-csv');
+  const copyAllJqlButton = document.getElementById('copy-all-jql');
+  const filterField = document.getElementById('filterField');
+  const filterValue = document.getElementById('filterValue');
+  const jqlInput = document.getElementById('jql');
+  const JIRA_BASE_URL = '{{ jira_base_url }}';
+  // For autocomplete
+  const suggestionsBox = document.getElementById('jql-suggestions');
+  const errorBox = document.getElementById('jql-error');
+
+  // --- Helper Functions ---
+  function formatJql(baseJql, field, value) {
+    let fieldJql = '';
+    if (value === 'Unassigned' || value === '') {
+      fieldJql = `${field} IS EMPTY`;
+    } else {
+      fieldJql = `${field} = "${value}"`;
+    }
+    let orderByClause = '';
+    let mainJql = baseJql;
+    const orderByMatch = baseJql.match(/ORDER BY\s+.+$/i);
+    if (orderByMatch) {
+      orderByClause = orderByMatch[0];
+      mainJql = baseJql.replace(orderByMatch[0], '').trim();
+    }
+    let finalJql = '';
+    if (mainJql) {
+      if (!mainJql.toUpperCase().includes(field.toUpperCase())) {
+        finalJql = mainJql + ` AND ${fieldJql}`;
+      } else {
+        finalJql = mainJql;
+      }
+    } else {
+      finalJql = fieldJql;
+    }
+    if (orderByClause) {
+      finalJql = finalJql + ' ' + orderByClause;
+    }
+    return finalJql.trim();
+  }
+
+  // --- Copy All JQL Button ---
+  if (copyAllJqlButton) {
+    copyAllJqlButton.addEventListener('click', function() {
+      if (jqlInput && jqlInput.value) {
+        navigator.clipboard.writeText(jqlInput.value).then(function() {
+          const originalText = copyAllJqlButton.textContent;
+          copyAllJqlButton.textContent = 'Copied!';
+          copyAllJqlButton.classList.add('bg-green-700');
+          setTimeout(() => {
+            copyAllJqlButton.textContent = originalText;
+            copyAllJqlButton.classList.remove('bg-green-700');
+          }, 2000);
+        }).catch(function(err) {
+          console.error('Could not copy text: ', err);
+          alert('Failed to copy JQL to clipboard');
+        });
+      }
+    });
+  }
+
+  // --- Copy JQL Button for Each Group ---
+  if (copyJqlButtons.length > 0 && jqlInput) {
+    copyJqlButtons.forEach(btn => {
+      btn.addEventListener('click', function() {
+        const field = this.getAttribute('data-field');
+        const value = this.getAttribute('data-value');
+        const finalJql = formatJql(jqlInput.value.trim(), field, value);
+        navigator.clipboard.writeText(finalJql).then(() => {
+          const originalText = this.textContent.trim();
+          this.textContent = 'Copied!';
+          this.classList.add('bg-green-100', 'text-green-700');
+          setTimeout(() => {
+            this.textContent = originalText;
+            this.classList.remove('bg-green-100', 'text-green-700');
+          }, 2000);
+        });
+      });
+    });
+  }
+
+  // --- Open in Jira Button ---
+  if (openJiraButtons.length > 0 && jqlInput) {
+    openJiraButtons.forEach(btn => {
+      btn.addEventListener('click', function(e) {
+        e.preventDefault();
+        const field = this.getAttribute('data-field');
+        const value = this.getAttribute('data-value');
+        const finalJql = formatJql(jqlInput.value.trim(), field, value);
+        const encodedJql = encodeURIComponent(finalJql);
+        const jiraUrl = `${JIRA_BASE_URL}/issues/?jql=${encodedJql}`;
+        window.open(jiraUrl, '_blank');
+      });
+    });
+  }
+
+  // --- Download Group CSV Button ---
+  document.querySelectorAll('.download-group-csv').forEach(button => {
+    button.addEventListener('click', function() {
+      const group = this.getAttribute('data-group');
+      const groupIssues = [];
+      const groupContainer = document.querySelector(`.sidebar-group-content[data-group="${group}"]`);
+      if (groupContainer) {
+        const issues = groupContainer.querySelectorAll('li.group-section');
+        issues.forEach(issue => {
+          const key = issue.querySelector('a')?.textContent.trim() || 'Unknown';
+          const summaryElement = issue.querySelector('div.text-base') || issue.querySelector('div.text-sm');
+          const summary = summaryElement ? summaryElement.textContent.trim() : 'Unknown';
+          const assignee = issue.getAttribute('data-assignee') || 'Unassigned';
+          const creator = issue.getAttribute('data-creator') || 'Unknown';
+          const status = issue.getAttribute('data-status') || 'Unknown';
+          const priority = issue.getAttribute('data-priority') || 'None';
+          groupIssues.push({ key, summary, assignee, creator, status, priority, group });
+        });
+      }
+      // Download the CSV with all issues in this group
+      const headers = ['Key', 'Summary', 'Assignee', 'Creator', 'Status', 'Priority', 'Group'];
+      let csvContent = headers.join(',') + '\n';
+      groupIssues.forEach(issue => {
+        const row = [
+          issue.key,
+          '"' + issue.summary.replace(/"/g, '""') + '"',
+          '"' + issue.assignee.replace(/"/g, '""') + '"',
+          '"' + issue.creator.replace(/"/g, '""') + '"',
+          '"' + issue.status.replace(/"/g, '""') + '"',
+          '"' + issue.priority.replace(/"/g, '""') + '"',
+          '"' + issue.group.replace(/"/g, '""') + '"'
+        ];
+        csvContent += row.join(',') + '\n';
+      });
+      const link = document.createElement('a');
+      link.setAttribute('href', 'data:text/csv;charset=utf-8,' + encodeURIComponent(csvContent));
+      link.setAttribute('download', `jira_issues_${group.replace(/\s+/g, '_').toLowerCase()}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      // Show feedback
+      const originalText = this.innerHTML;
+      this.textContent = 'Downloaded!';
+      this.classList.add('bg-green-700', 'text-white');
+      setTimeout(() => {
+        this.innerHTML = originalText;
+        this.classList.remove('bg-green-700', 'text-white');
+      }, 2000);
+    });
+  });
+
+  // --- Download All CSV Button ---
+  if (downloadAllButton) {
+    downloadAllButton.addEventListener('click', function() {
+      const allIssueData = [];
+      const visibleGroups = document.querySelectorAll('.sidebar-group-content:not([style*="display: none"])');
+      visibleGroups.forEach(group => {
+        const groupData = [];
+        const issues = group.querySelectorAll('li.group-section');
+        issues.forEach(issue => {
+          if (issue.style.display === 'none') return;
+          const key = issue.querySelector('a')?.textContent.trim() || 'Unknown';
+          const summaryElement = issue.querySelector('div.text-sm') || issue.querySelector('div.text-base');
+          const summary = summaryElement ? summaryElement.textContent.trim() : 'Unknown';
+          const assignee = issue.getAttribute('data-assignee') || 'Unassigned';
+          const creator = issue.getAttribute('data-creator') || 'Unknown';
+          const status = issue.getAttribute('data-status') || 'Unknown';
+          const priority = issue.getAttribute('data-priority') || 'None';
+          groupData.push({ key, summary, assignee, creator, status, priority, group: group.getAttribute('data-group') });
+        });
+        allIssueData.push(...groupData);
+      });
+      const headers = ['Key', 'Summary', 'Assignee', 'Creator', 'Status', 'Priority', 'Group'];
+      let csvContent = headers.join(',') + '\n';
+      allIssueData.forEach(issue => {
+        const row = [
+          '"' + issue.key + '"',
+          '"' + issue.summary.replace(/"/g, '""') + '"',
+          '"' + issue.assignee + '"',
+          '"' + issue.creator + '"',
+          '"' + issue.status + '"',
+          '"' + issue.priority + '"',
+          '"' + issue.group + '"'
+        ];
+        csvContent += row.join(',') + '\n';
+      });
+      const filterInfo = (filterField && filterValue && filterValue.value) ? `_filtered_by_${filterField.value || 'unknown'}_${filterValue.value || 'unknown'}` : '';
+      const filename = `jira_issues${filterInfo}_${new Date().toISOString().slice(0,10)}.csv`;
+      const link = document.createElement('a');
+      link.setAttribute('href', 'data:text/csv;charset=utf-8,' + encodeURIComponent(csvContent));
+      link.setAttribute('download', filename);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      // Show feedback
+      const originalText = this.textContent.trim();
+      this.textContent = 'Downloaded!';
+      this.classList.add('bg-green-800');
+      setTimeout(() => {
+        this.textContent = originalText;
+        this.classList.remove('bg-green-800');
+      }, 2000);
+    });
+  }
+
+  // --- JQL Autocomplete & Validation ---
+  // (Move the autocomplete code here, only once)
+  const JQL_FIELDS = [
+    'assignee', 'reporter', 'creator', 'project', 'status', 'priority', 'summary', 'description', 'created', 'updated', 'due', 'labels', 'issuetype', 'fixVersion', 'resolution', 'comment', 'sprint', 'epic', 'parent', 'component'
+  ];
+  const JQL_OPERATORS = ['=', '!=', '~', '!~', 'IN', 'NOT IN', 'IS', 'IS NOT', '>', '<', '>=', '<='];
+  const JQL_KEYWORDS = ['AND', 'OR', 'NOT', 'ORDER BY', 'ASC', 'DESC', 'ALL'];
+  const JQL_FUNCTIONS = ['currentUser()', 'membersOf()', 'now()', 'startOfDay()', 'endOfDay()', 'startOfWeek()', 'endOfWeek()', 'startOfMonth()', 'endOfMonth()'];
+  if (jqlInput) {
+    let jqlSuggActive = -1;
+    function updateJqlSuggestions() {
+      const val = jqlInput.value;
+      const caret = jqlInput.selectionStart;
+      let lastToken = val.slice(0, caret).split(/\s|,|\(/).pop();
+      let sugg = [];
+      if (/^\s*$/.test(val)) {
+        sugg = [...JQL_FIELDS, ...JQL_KEYWORDS];
+      } else if (/\b(AND|OR|NOT)?\s*([a-zA-Z_][a-zA-Z0-9_]+)?$/i.test(lastToken)) {
+        sugg = [...JQL_FIELDS.filter(f => f.startsWith(lastToken)), ...JQL_KEYWORDS.filter(k => k.startsWith(lastToken.toUpperCase()))];
+      } else if (JQL_FIELDS.some(f => val.slice(0, caret).endsWith(f + ' '))) {
+        sugg = [...JQL_OPERATORS, ...JQL_KEYWORDS];
+      } else if (val.slice(0, caret).match(/\b(IN|NOT IN|=|!=|~|!~|IS|IS NOT)\s*$/i)) {
+        sugg = [...JQL_FUNCTIONS, ...JQL_KEYWORDS];
+      } else if (/\bORDER BY\s*$/i.test(val.slice(0, caret))) {
+        sugg = [...JQL_FIELDS, 'ASC', 'DESC'];
+      }
+      if (sugg.length > 0 && suggestionsBox) {
+        suggestionsBox.innerHTML = '';
+        sugg.forEach((s, idx) => {
+          const li = document.createElement('li');
+          li.textContent = s;
+          li.style.padding = '6px 12px';
+          li.style.cursor = 'pointer';
+          li.tabIndex = -1;
+          li.className = (idx === 0) ? 'jql-sugg-active' : '';
+          li.addEventListener('mousedown', function(ev) {
+            const before = val.slice(0, caret - lastToken.length);
+            const after = val.slice(caret);
+            jqlInput.value = before + s + after;
+            jqlInput.focus();
+            suggestionsBox.style.display = 'none';
+          });
+          suggestionsBox.appendChild(li);
+        });
+        jqlSuggActive = 0;
+        highlightJqlSugg();
+        suggestionsBox.style.display = '';
+      } else if (suggestionsBox) {
+        suggestionsBox.style.display = 'none';
+        jqlSuggActive = -1;
+      }
+    }
+    function highlightJqlSugg() {
+      const items = suggestionsBox.querySelectorAll('li');
+      items.forEach((li, idx) => {
+        if (idx === jqlSuggActive) {
+          li.style.background = '#e0eaff';
+          li.classList.add('jql-sugg-active');
+        } else {
+          li.style.background = '';
+          li.classList.remove('jql-sugg-active');
+        }
+      });
+    }
+    jqlInput.addEventListener('input', updateJqlSuggestions);
+    jqlInput.addEventListener('focus', updateJqlSuggestions);
+    jqlInput.addEventListener('click', updateJqlSuggestions);
+    jqlInput.addEventListener('keyup', function(e) {
+      if (["ArrowLeft","ArrowRight","Home","End"].includes(e.key)) {
+        updateJqlSuggestions();
+      }
+    });
+    jqlInput.addEventListener('keydown', function(e) {
+      const items = suggestionsBox ? suggestionsBox.querySelectorAll('li') : [];
+      if (suggestionsBox && suggestionsBox.style.display !== 'none' && items.length > 0) {
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          jqlSuggActive = (jqlSuggActive + 1) % items.length;
+          highlightJqlSugg();
+        } else if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          jqlSuggActive = (jqlSuggActive - 1 + items.length) % items.length;
+          highlightJqlSugg();
+        } else if (e.key === 'Enter' || e.key === 'Tab') {
+          if (jqlSuggActive >= 0 && jqlSuggActive < items.length) {
+            e.preventDefault();
+            items[jqlSuggActive].dispatchEvent(new MouseEvent('mousedown'));
+          }
+        }
+      }
+    });
+    jqlInput.addEventListener('blur', function() {
+      setTimeout(() => { if (suggestionsBox) suggestionsBox.style.display = 'none'; }, 100);
+    });
+    jqlInput.addEventListener('focus', function() {
+      if (suggestionsBox && suggestionsBox.innerHTML) suggestionsBox.style.display = '';
+    });
+    // Style for active suggestion
+    const style = document.createElement('style');
+    style.innerHTML = `.jql-sugg-active { background: #e0eaff !important; }`;
+    document.head.appendChild(style);
+  }
+
+  // --- Modal for Jira Issue Details ---
+  const modal = document.getElementById('jiraIssueModal');
+  const closeBtn = document.getElementById('closeJiraIssueModal');
+  if (modal && closeBtn) {
+    document.querySelectorAll('.jira-modal-link').forEach(function(link) {
+      link.addEventListener('click', function(e) {
+        e.preventDefault();
+        var issueKey = this.getAttribute('data-issue-key');
+        var loading = document.getElementById('jiraIssueLoading');
+        var errorDiv = document.getElementById('jiraIssueError');
+        var fieldsDiv = document.getElementById('jiraIssueFields');
+        var summary = document.getElementById('jiraIssueSummary');
+        var keySpan = document.getElementById('jiraIssueKey');
+        var statusSpan = document.getElementById('jiraIssueStatus');
+        var prioritySpan = document.getElementById('jiraIssuePriority');
+        var assigneeSpan = document.getElementById('jiraIssueAssignee');
+        var reporterSpan = document.getElementById('jiraIssueReporter');
+        var descDiv = document.getElementById('jiraIssueDescription');
+        loading.style.display = 'block';
+        errorDiv.style.display = 'none';
+        fieldsDiv.style.display = 'none';
+        modal.style.display = 'flex';
+        fetch('/api/jira_issue/' + issueKey)
+          .then(resp => resp.json())
+          .then(data => {
+            loading.style.display = 'none';
+            if (data.error) {
+              errorDiv.textContent = data.error;
+              errorDiv.style.display = 'block';
+            } else {
+              summary.textContent = data.summary || '';
+              keySpan.textContent = data.key || '';
+              statusSpan.textContent = data.status || '';
+              prioritySpan.textContent = data.priority || '';
+              assigneeSpan.textContent = data.assignee || '';
+              reporterSpan.textContent = data.reporter || '';
+              descDiv.textContent = data.description || '';
+              var openInJira = document.getElementById('jiraIssueOpenInJira');
+              openInJira.href = "{{ jira_base_url }}/browse/" + (data.key || issueKey);
+              fieldsDiv.style.display = 'block';
+            }
+          })
+          .catch(err => {
+            loading.style.display = 'none';
+            errorDiv.textContent = 'Error loading issue details.';
+            errorDiv.style.display = 'block';
+          });
+      });
+    });
+    closeBtn.addEventListener('click', function() {
+      modal.style.display = 'none';
+    });
+    modal.addEventListener('click', function(e) {
+      if (e.target === modal) {
+        modal.style.display = 'none';
+      }
+    });
+  }
+
+  // --- Load Jira Filters Button ---
+  function loadJiraFilters() {
+    const filterLoading = document.getElementById('filter-loading');
+    if (filterLoading) filterLoading.style.display = 'inline';
+
+    const jiraFilterSelect = document.getElementById('jira-filter-select');
+    if (!jiraFilterSelect) return;
+  
+  // Clear existing options except the first one
+  while (jiraFilterSelect.options.length > 1) {
+    jiraFilterSelect.remove(1);
+  }
+  
+    fetch('/api/jira_filters')
+      .then(resp => resp.json())
+      .then(data => {
+        if (data.error) {
+          alert('Error loading filters: ' + data.error);
+          return;
+        }
+        (data.filters || []).forEach(filter => {
+    const option = document.createElement('option');
+    option.value = filter.id;
+    option.textContent = (filter.favorite ? '★ ' : '') + filter.name;
+    option.dataset.jql = filter.jql;
+    jiraFilterSelect.appendChild(option);
+  });
+      })
+      .catch(err => {
+        alert('Error loading filters: ' + err);
+      })
+      .finally(() => {
+  if (filterLoading) filterLoading.style.display = 'none';
+      });
+  }
+
+  // Always load filters on page load
+  loadJiraFilters();
+
+  if (applyFilterBtn) {
+    applyFilterBtn.addEventListener('click', function() {
+  const jiraFilterSelect = document.getElementById('jira-filter-select');
+  const jqlTextarea = document.getElementById('jql');
+  if (!jiraFilterSelect || !jqlTextarea) {
+    console.error('Required elements not found');
+    return;
+  }
+  if (jiraFilterSelect.selectedIndex === 0) {
+    alert('Please select a filter first');
+    return;
+  }
+  const selectedOption = jiraFilterSelect.options[jiraFilterSelect.selectedIndex];
+  const jql = selectedOption.dataset.jql;
+  if (jql) {
+    jqlTextarea.value = jql;
+    const form = document.getElementById('jql-form');
+    if (form) {
+      form.submit();
+    } else {
+      console.error('Form not found');
+    }
+  } else {
+    alert('Selected filter does not have a JQL query');
+  }
+    });
+  }
+  </script>
+  </div>
+</div>
+{% endblock %}

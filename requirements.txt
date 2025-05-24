@@ -18,6 +18,10 @@ Flask-Caching
 # --- Add any other missing libraries used in the codebase ---
 # (No evidence of markdown2 or other new packages in codebase)
 
+selenium
+beautifulsoup4
+pyspellchecker
+
 # --- Retain all existing version pins if present ---
 annotated-types==0.7.0
 anyio==4.9.0

@@ -1,0 +1,677 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto mt-10">
+  <h1 class="text-2xl font-bold mb-4">JQL Work In Progress</h1>
+  
+  <!-- JQL Query Section -->
+  <div class="mb-8 bg-gray-50 border border-gray-200 rounded-lg shadow-sm p-6" x-data="{ open: true }">
+    <div class="flex justify-between items-center mb-4 cursor-pointer" @click="open = !open">
+      <h3 class="font-semibold text-upgradRed">JQL Query</h3>
+      <button class="text-gray-500 hover:text-upgradRed">
+        <span x-show="open">▼</span>
+        <span x-show="!open">►</span>
+      </button>
+    </div>
+    <div x-show="open">
+      <form method="POST" action="/jql-wip" id="jql-form" class="w-full">
+        <div class="mb-4">
+          <label for="jql" class="block font-semibold mb-1">Enter JQL:</label>
+          <div class="flex">
+            <textarea class="w-full border rounded px-3 py-2 focus:ring-2 focus:ring-blue-400" id="jql" name="jql" rows="3">{{ jql }}</textarea>
+          </div>
+          <!-- JQL Suggestions -->
+          <ul id="jql-suggestions" style="display:none; position:absolute; left:0; right:0; z-index:10; background:white; border:1px solid #ccc; border-radius:4px; max-height:180px; overflow-y:auto; margin-top:-4px;"></ul>
+          <div id="jql-error" style="display:none; color:#d00; font-size:0.9em; margin-top:2px;"></div>
+        </div>
+        
+        <!-- Jira Filters Dropdown -->
+        <div class="mb-4" id="jira-filters-container">
+          <div class="flex items-center mb-2">
+            <label for="jira-filter-select" class="block font-semibold mr-2">Select Jira Filter:</label>
+            <button type="button" id="apply-filter-btn" class="ml-2 px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-sm">Apply Filter</button>
+            <div id="filter-loading" class="ml-2 text-sm text-gray-500" style="display: none;">Loading...</div>
+          </div>
+          <select class="w-full border rounded px-3 py-2 focus:ring-2 focus:ring-blue-400" id="jira-filter-select">
+            <option value="">-- Select a filter --</option>
+          </select>
+          <div class="mt-1 text-sm text-gray-500">
+            <small>Favorites are marked with ★</small>
+          </div>
+        </div>
+        
+        <div class="mb-4">
+          <label for="group_by" class="block font-semibold mb-1">Group By:</label>
+          <select class="w-full border rounded px-3 py-2 focus:ring-2 focus:ring-blue-400" id="group_by" name="group_by">
+            <option value="assignee" {% if group_by == 'assignee' %}selected{% endif %}>Assignee</option>
+            <option value="creator" {% if group_by == 'creator' %}selected{% endif %}>Creator</option>
+            <option value="status" {% if group_by == 'status' %}selected{% endif %}>Status</option>
+            <option value="priority" {% if group_by == 'priority' %}selected{% endif %}>Priority</option>
+          </select>
+        </div>
+        
+        <div class="flex space-x-2">
+          <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded shadow font-semibold transition">Submit</button>
+          <button type="button" id="copy-all-jql" class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded shadow font-semibold transition">Copy All JQL</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  {% if error %}
+    <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-2 rounded mb-4">{{ error }}</div>
+  {% endif %}
+
+  {% if grouped_issues %}
+    <!-- Filters Section -->
+    <div class="mb-6 bg-white border border-gray-200 rounded-lg shadow-sm px-4 py-3" x-data="{ open: true }">      
+      <div class="flex justify-between items-center mb-2 cursor-pointer" @click="open = !open">
+        <h3 class="font-semibold text-upgradRed">Filters</h3>
+        <button class="text-gray-500 hover:text-upgradRed">
+          <span x-show="open">▼</span>
+          <span x-show="!open">►</span>
+        </button>
+      </div>
+      
+      <div x-show="open" class="flex flex-wrap items-center gap-4">
+        <label for="filterField" class="font-semibold mr-2">Filter Field:</label>
+        <select id="filterField" class="border rounded px-2 py-1 focus:ring-2 focus:ring-blue-400">
+          <option value="assignee">Assignee</option>
+          <option value="creator">Creator</option>
+          <option value="status">Status</option>
+          <option value="priority">Priority</option>
+        </select>
+        
+        <label class="font-semibold mx-2">Value:</label>
+        <div class="relative">
+          <div id="filterValueCards" class="flex flex-wrap gap-2 min-h-[40px] items-center">
+            <!-- Filter value cards will be added here dynamically -->
+          </div>
+          <div id="filterCardsLoading" class="absolute inset-0 bg-white bg-opacity-70 hidden items-center justify-center">
+            <div class="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-500"></div>
+          </div>
+        </div>
+        
+        <button id="clear-filters" class="ml-2 px-3 py-1 bg-gray-200 hover:bg-gray-300 rounded text-sm">Clear Filters</button>
+        
+        <div class="relative inline-block ml-2">
+          <button id="quick-filters-btn" class="px-3 py-1 bg-blue-500 hover:bg-blue-600 text-white rounded text-sm">Quick Filters ▼</button>
+          <div id="quick-filters-dropdown" class="absolute hidden right-0 mt-1 bg-white border border-gray-200 rounded shadow-lg z-10 w-48">
+            <div class="py-1">
+              <a href="#" class="quick-filter block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" data-field="status" data-value="In Progress">Status: In Progress</a>
+              <a href="#" class="quick-filter block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" data-field="priority" data-value="High">Priority: High</a>
+              <a href="#" class="quick-filter block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" data-field="assignee" data-value="Unassigned">Assignee: Unassigned</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Grouped Issues Section -->
+    <div class="space-y-6">
+      {% for group, issues in grouped_issues.items() %}
+        <div class="bg-white rounded-lg shadow overflow-hidden">
+          <div class="px-6 py-4 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
+            <h3 class="text-lg font-semibold">{{ group or 'Unassigned' }}</h3>
+            <div class="flex space-x-2">
+              <button class="copy-jql-btn px-3 py-1 bg-green-100 text-green-700 rounded text-sm" 
+                      data-field="{{ group_by }}" data-value="{{ group }}">
+                Copy JQL
+              </button>
+              <a href="#" class="open-jira-btn px-3 py-1 bg-blue-100 text-blue-700 rounded text-sm" 
+                 data-field="{{ group_by }}" data-value="{{ group }}" target="_blank">
+                Open in Jira
+              </a>
+              <button class="download-group-csv px-3 py-1 bg-purple-100 text-purple-700 rounded text-sm" 
+                      data-group="{{ group|urlencode }}">
+                Download CSV
+              </button>
+            </div>
+          </div>
+          <div class="divide-y divide-gray-200">
+            {% for issue in issues %}
+              <div class="px-6 py-4 hover:bg-gray-50">
+                <div class="flex items-center justify-between">
+                  <div>
+                    <a href="{{ jira_base_url }}/browse/{{ issue.key }}" 
+                       class="font-medium text-blue-600 hover:text-blue-800" 
+                       target="_blank">
+                      {{ issue.key }}
+                    </a>
+                    <span class="ml-2">{{ issue.fields.summary }}</span>
+                  </div>
+                  <div class="flex items-center space-x-2">
+                    <span class="px-2 py-1 text-xs font-medium rounded-full" 
+                          style="background-color: {{ issue.fields.status.statusCategory.colorName|default('#e5e7eb') }};">
+                      {{ issue.fields.status.name }}
+                    </span>
+                    {% if issue.fields.priority %}
+                      <span class="px-2 py-1 text-xs font-medium text-gray-700 bg-gray-100 rounded-full">
+                        {{ issue.fields.priority.name }}
+                      </span>
+                    {% endif %}
+                  </div>
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+      {% endfor %}
+      
+      <!-- Download All Button -->
+      <div class="mt-4 text-right">
+        <button id="download-all-csv" class="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded shadow">
+          Download All as CSV
+        </button>
+      </div>
+    </div>
+  {% endif %}
+</div>
+
+<!-- Jira Issue Details Modal -->
+<div id="jiraIssueModal" style="display:none;position:fixed;z-index:9999;left:0;top:0;width:100vw;height:100vh;background:rgba(0,0,0,0.4);align-items:center;justify-content:center;">
+  <div class="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+    <div class="p-6">
+      <div class="flex justify-between items-start">
+        <h3 id="modalIssueKey" class="text-xl font-bold"></h3>
+        <button onclick="document.getElementById('jiraIssueModal').style.display='none'" 
+                class="text-gray-400 hover:text-gray-600">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+      <div id="modalIssueContent" class="mt-4">
+        <!-- Issue details will be loaded here -->
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// JQL Autocomplete Configuration
+const JQL_FIELDS = [
+  'assignee', 'reporter', 'creator', 'project', 'status', 'priority', 'summary',
+  'description', 'created', 'updated', 'due', 'labels', 'issuetype', 'fixVersion',
+  'resolution', 'comment', 'sprint', 'epic', 'parent', 'component'
+];
+
+const JQL_OPERATORS = ['=', '!=', '~', '!~', 'IN', 'NOT IN', 'IS', 'IS NOT', '>', '<', '>=', '<='];
+const JQL_KEYWORDS = ['AND', 'OR', 'NOT', 'ORDER BY', 'ASC', 'DESC', 'ALL'];
+
+// Main initialization when DOM is loaded
+document.addEventListener('DOMContentLoaded', function() {
+  console.log('Initializing JQL Work In Progress page');
+  
+  // DOM Elements
+  const jqlInput = document.getElementById('jql');
+  const suggestionsBox = document.getElementById('jql-suggestions');
+  const errorBox = document.getElementById('jql-error');
+  const copyAllJqlButton = document.getElementById('copy-all-jql');
+  const applyFilterBtn = document.getElementById('apply-filter-btn');
+  const filterField = document.getElementById('filterField');
+  const filterValueCards = document.getElementById('filterValueCards');
+  const filterCardsLoading = document.getElementById('filterCardsLoading');
+  const clearFiltersBtn = document.getElementById('clear-filters');
+  const quickFiltersBtn = document.getElementById('quick-filters-btn');
+  const quickFiltersDropdown = document.getElementById('quick-filters-dropdown');
+  const JIRA_BASE_URL = '{{ jira_base_url }}';
+  
+  let currentFilterField = 'assignee';
+  let currentFilterValue = '';
+  let selectedFilters = new Set();
+
+  // --- Helper Functions ---
+  
+  function formatJql(baseJql, field, value) {
+    let fieldJql = '';
+    if (value === 'Unassigned' || value === '') {
+      fieldJql = `${field} IS EMPTY`;
+    } else {
+      fieldJql = `${field} = "${value}"`;
+    }
+    
+    let orderByClause = '';
+    let mainJql = baseJql;
+    const orderByMatch = baseJql.match(/ORDER BY\s+.+$/i);
+    
+    if (orderByMatch) {
+      orderByClause = orderByMatch[0];
+      mainJql = baseJql.replace(orderByMatch[0], '').trim();
+    }
+    
+    let finalJql = '';
+    if (mainJql) {
+      if (!mainJql.toUpperCase().includes(field.toUpperCase())) {
+        finalJql = mainJql + ` AND ${fieldJql}`;
+      } else {
+        finalJql = mainJql;
+      }
+    } else {
+      finalJql = fieldJql;
+    }
+    
+    if (orderByClause) {
+      finalJql = finalJql + ' ' + orderByClause;
+    }
+    
+    return finalJql.trim();
+  }
+
+  // --- JQL Autocomplete ---
+  
+  function updateJqlSuggestions() {
+    if (!jqlInput || !suggestionsBox) return;
+    
+    const cursorPos = jqlInput.selectionStart;
+    const textBeforeCursor = jqlInput.value.substring(0, cursorPos);
+    const wordMatch = textBeforeCursor.match(/[\w\.\-]+$/);
+    const currentWord = wordMatch ? wordMatch[0] : '';
+    
+    if (!currentWord) {
+      suggestionsBox.style.display = 'none';
+      return;
+    }
+    
+    let suggestions = [];
+    const lastSpace = textBeforeCursor.lastIndexOf(' ');
+    const lastWord = lastSpace === -1 ? textBeforeCursor : textBeforeCursor.substring(lastSpace + 1);
+    
+    if (lastWord === currentWord) {
+      // Suggest fields
+      suggestions = JQL_FIELDS.filter(field => 
+        field.toLowerCase().startsWith(currentWord.toLowerCase())
+      );
+      
+      // If no field matches, suggest operators
+      if (suggestions.length === 0) {
+        suggestions = JQL_OPERATORS.filter(op => 
+          op.toLowerCase().startsWith(currentWord.toLowerCase())
+        );
+      }
+      
+      // If still no matches, suggest keywords
+      if (suggestions.length === 0) {
+        suggestions = JQL_KEYWORDS.filter(kw => 
+          kw.toLowerCase().startsWith(currentWord.toLowerCase())
+        );
+      }
+    }
+    
+    // Display suggestions
+    if (suggestions.length > 0) {
+      suggestionsBox.innerHTML = '';
+      suggestions.forEach(suggestion => {
+        const li = document.createElement('li');
+        li.textContent = suggestion;
+        li.className = 'px-3 py-1 hover:bg-gray-100 cursor-pointer';
+        li.onclick = () => {
+          const text = jqlInput.value;
+          jqlInput.value = textBeforeCursor.substring(0, textBeforeCursor.length - currentWord.length) + 
+                          suggestion + ' ';
+          suggestionsBox.style.display = 'none';
+          jqlInput.focus();
+          jqlInput.selectionStart = jqlInput.selectionEnd = jqlInput.value.length;
+        };
+        suggestionsBox.appendChild(li);
+      });
+      
+      suggestionsBox.style.display = 'block';
+    } else {
+      suggestionsBox.style.display = 'none';
+    }
+  }
+  
+  // --- Filter Value Cards ---
+  
+  function updateFilterValueCards() {
+    if (!filterValueCards || !filterCardsLoading) return;
+    
+    filterValueCards.innerHTML = '';
+    filterCardsLoading.classList.remove('hidden');
+    
+    // Simulate loading values (replace with actual API call)
+    setTimeout(() => {
+      const values = getUniqueValuesForField(currentFilterField);
+      
+      values.forEach(value => {
+        const card = document.createElement('div');
+        card.className = `px-3 py-1 rounded-full text-sm cursor-pointer transition-colors ${selectedFilters.has(value) ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 hover:bg-gray-200'}`;
+        card.textContent = value || 'Unassigned';
+        card.onclick = () => toggleFilterValue(value);
+        filterValueCards.appendChild(card);
+      });
+      
+      filterCardsLoading.classList.add('hidden');
+    }, 300);
+  }
+  
+  function getUniqueValuesForField(field) {
+    // This should be replaced with actual data from your API
+    // For now, return some sample values
+    const sampleValues = {
+      'assignee': ['John Doe', 'Jane Smith', 'Unassigned', 'Bob Johnson'],
+      'status': ['Open', 'In Progress', 'Done', 'In Review'],
+      'priority': ['High', 'Medium', 'Low', 'Critical'],
+      'creator': ['John Doe', 'Jane Smith', 'Admin User']
+    };
+    
+    return sampleValues[field] || [];
+  }
+  
+  function toggleFilterValue(value) {
+    if (selectedFilters.has(value)) {
+      selectedFilters.delete(value);
+    } else {
+      selectedFilters.add(value);
+    }
+    
+    // Update UI
+    updateFilterValueCards();
+    // Apply filters
+    applyFilters();
+  }
+  
+  function applyFilters() {
+    // Apply the selected filters to the issues
+    const issues = document.querySelectorAll('.group-section');
+    
+    if (selectedFilters.size === 0) {
+      // Show all issues if no filters are selected
+      issues.forEach(issue => {
+        issue.style.display = '';
+      });
+      return;
+    }
+    
+    // Filter issues based on selected values
+    issues.forEach(issue => {
+      const fieldValue = issue.getAttribute(`data-${currentFilterField}`) || '';
+      const displayValue = fieldValue.trim() || 'Unassigned';
+      
+      if (selectedFilters.has(displayValue)) {
+        issue.style.display = '';
+      } else {
+        issue.style.display = 'none';
+      }
+    });
+  }
+  
+  // --- Event Listeners ---
+  
+  // JQL Input
+  if (jqlInput) {
+    jqlInput.addEventListener('input', updateJqlSuggestions);
+    jqlInput.addEventListener('focus', updateJqlSuggestions);
+    jqlInput.addEventListener('click', updateJqlSuggestions);
+    
+    jqlInput.addEventListener('keyup', function(e) {
+      if (["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)) {
+        updateJqlSuggestions();
+      } else if (e.key === 'Enter' && suggestionsBox.style.display !== 'none') {
+        e.preventDefault();
+        const activeSuggestion = suggestionsBox.querySelector('.jql-sugg-active');
+        if (activeSuggestion) {
+          activeSuggestion.click();
+        }
+      } else if (e.key === 'Escape') {
+        suggestionsBox.style.display = 'none';
+      } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        const items = suggestionsBox.querySelectorAll('li');
+        if (items.length === 0) return;
+        
+        let currentIndex = -1;
+        items.forEach((item, index) => {
+          if (item.classList.contains('jql-sugg-active')) {
+            item.classList.remove('jql-sugg-active');
+            currentIndex = index;
+          }
+        });
+        
+        if (e.key === 'ArrowDown') {
+          currentIndex = (currentIndex + 1) % items.length;
+        } else {
+          currentIndex = (currentIndex - 1 + items.length) % items.length;
+        }
+        
+        items[currentIndex].classList.add('jql-sugg-active');
+        items[currentIndex].scrollIntoView({ block: 'nearest' });
+      }
+    });
+    
+    // Hide suggestions when clicking outside
+    document.addEventListener('click', function(e) {
+      if (e.target !== jqlInput && e.target !== suggestionsBox) {
+        suggestionsBox.style.display = 'none';
+      }
+    });
+  }
+  
+  // Filter Field Change
+  if (filterField) {
+    filterField.addEventListener('change', function() {
+      currentFilterField = this.value;
+      selectedFilters.clear();
+      updateFilterValueCards();
+    });
+  }
+  
+  // Clear Filters
+  if (clearFiltersBtn) {
+    clearFiltersBtn.addEventListener('click', function() {
+      selectedFilters.clear();
+      updateFilterValueCards();
+      applyFilters();
+    });
+  }
+  
+  // Quick Filters Dropdown
+  if (quickFiltersBtn && quickFiltersDropdown) {
+    quickFiltersBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      quickFiltersDropdown.classList.toggle('hidden');
+    });
+    
+    // Close dropdown when clicking outside
+    document.addEventListener('click', function() {
+      quickFiltersDropdown.classList.add('hidden');
+    });
+    
+    // Quick filter buttons
+    document.querySelectorAll('.quick-filter').forEach(btn => {
+      btn.addEventListener('click', function(e) {
+        e.preventDefault();
+        const field = this.getAttribute('data-field');
+        const value = this.getAttribute('data-value');
+        
+        // Set the filter field
+        if (filterField) {
+          filterField.value = field;
+          currentFilterField = field;
+        }
+        
+        // Select the value
+        selectedFilters.clear();
+        selectedFilters.add(value);
+        updateFilterValueCards();
+        applyFilters();
+        
+        // Close dropdown
+        quickFiltersDropdown.classList.add('hidden');
+      });
+    });
+  }
+  
+  // Copy All JQL
+  if (copyAllJqlButton) {
+    copyAllJqlButton.addEventListener('click', function() {
+      if (jqlInput && jqlInput.value) {
+        navigator.clipboard.writeText(jqlInput.value).then(function() {
+          const originalText = copyAllJqlButton.textContent;
+          copyAllJqlButton.textContent = 'Copied!';
+          copyAllJqlButton.classList.add('bg-green-700');
+          setTimeout(() => {
+            copyAllJqlButton.textContent = originalText;
+            copyAllJqlButton.classList.remove('bg-green-700');
+          }, 2000);
+        }).catch(function(err) {
+          console.error('Could not copy text: ', err);
+          alert('Failed to copy JQL to clipboard');
+        });
+      }
+    });
+  }
+  
+  // Apply Jira Filter
+  if (applyFilterBtn) {
+    applyFilterBtn.addEventListener('click', function() {
+      const jiraFilterSelect = document.getElementById('jira-filter-select');
+      const jqlTextarea = document.getElementById('jql');
+      
+      if (!jiraFilterSelect || !jqlTextarea) {
+        console.error('Required elements not found');
+        return;
+      }
+      
+      if (jiraFilterSelect.selectedIndex === 0) {
+        alert('Please select a filter first');
+        return;
+      }
+      
+      const selectedOption = jiraFilterSelect.options[jiraFilterSelect.selectedIndex];
+      const jql = selectedOption.dataset.jql;
+      
+      if (jql) {
+        jqlTextarea.value = jql;
+        const form = document.getElementById('jql-form');
+        if (form) {
+          form.submit();
+        } else {
+          console.error('Form not found');
+        }
+      } else {
+        alert('Selected filter does not have a JQL query');
+      }
+    });
+  }
+  
+  // Load Jira Filters
+  function loadJiraFilters() {
+    const jiraFilterSelect = document.getElementById('jira-filter-select');
+    const filterLoading = document.getElementById('filter-loading');
+    
+    if (!jiraFilterSelect) return;
+    
+    if (filterLoading) filterLoading.style.display = 'inline-block';
+    
+    fetch('/api/jira_filters')
+      .then(response => {
+        if (!response.ok) {
+          throw new Error('Failed to load filters');
+        }
+        return response.json();
+      })
+      .then(data => {
+        // Clear existing options except the first one
+        while (jiraFilterSelect.options.length > 1) {
+          jiraFilterSelect.remove(1);
+        }
+        
+        // Add new filter options
+        (data.filters || []).forEach(filter => {
+          const option = document.createElement('option');
+          option.value = filter.id;
+          option.textContent = (filter.favorite ? '★ ' : '') + filter.name;
+          option.dataset.jql = filter.jql;
+          jiraFilterSelect.appendChild(option);
+        });
+      })
+      .catch(err => {
+        console.error('Error loading Jira filters:', err);
+        alert('Error loading filters: ' + err.message);
+      })
+      .finally(() => {
+        if (filterLoading) filterLoading.style.display = 'none';
+      });
+  }
+  
+  // Initialize
+  loadJiraFilters();
+  updateFilterValueCards();
+  
+  // Add style for active suggestion
+  const style = document.createElement('style');
+  style.innerHTML = `
+    .jql-sugg-active { 
+      background: #e0eaff !important; 
+    }
+    #jql-suggestions {
+      max-height: 200px;
+      overflow-y: auto;
+      z-index: 1000;
+    }
+  `;
+  document.head.appendChild(style);
+});
+
+// Global function to show issue details in modal
+function showIssueDetails(issueKey) {
+  fetch(`/api/jira_issue/${issueKey}`)
+    .then(response => response.json())
+    .then(issue => {
+      const modal = document.getElementById('jiraIssueModal');
+      const modalKey = document.getElementById('modalIssueKey');
+      const modalContent = document.getElementById('modalIssueContent');
+      
+      if (!modal || !modalKey || !modalContent) return;
+      
+      modalKey.textContent = `${issue.key}: ${issue.fields.summary}`;
+      
+      // Format issue details
+      let html = `
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <h4 class="font-semibold">Status</h4>
+            <p>${issue.fields.status.name}</p>
+          </div>
+          <div>
+            <h4 class="font-semibold">Priority</h4>
+            <p>${issue.fields.priority?.name || 'Not set'}</p>
+          </div>
+          <div>
+            <h4 class="font-semibold">Assignee</h4>
+            <p>${issue.fields.assignee?.displayName || 'Unassigned'}</p>
+          </div>
+          <div>
+            <h4 class="font-semibold">Reporter</h4>
+            <p>${issue.fields.reporter?.displayName || 'Unknown'}</p>
+          </div>
+          <div class="col-span-2">
+            <h4 class="font-semibold">Description</h4>
+            <div class="prose max-w-none">
+              ${issue.fields.description || 'No description provided.'}
+            </div>
+          </div>
+        </div>
+      `;
+      
+      modalContent.innerHTML = html;
+      modal.style.display = 'flex';
+    })
+    .catch(error => {
+      console.error('Error fetching issue details:', error);
+      alert('Failed to load issue details');
+    });
+}
+
+// Close modal when clicking outside content
+window.onclick = function(event) {
+  const modal = document.getElementById('jqlIssueModal');
+  if (event.target === modal) {
+    modal.style.display = 'none';
+  }
+}
+</script>
+
+{% endblock %}

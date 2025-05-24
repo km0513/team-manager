@@ -15,13 +15,21 @@ USERS_PER_PAGE = 20
 # 7. Blueprint registration and config separation (future-proofing)
 
 import os
-from flask import Flask, render_template, request, redirect, url_for, session, jsonify, flash
+from flask import Flask, render_template, request, redirect, url_for, session, jsonify, flash, send_from_directory
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from werkzeug.utils import secure_filename
 
 from markdown import markdown as md_convert  # only one import for markdown is needed
 from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
+
+# JIRA credentials
+JIRA_USERNAME = os.environ.get('JIRA_EMAIL')  # Using JIRA_EMAIL from .env
+JIRA_API_TOKEN = os.environ.get('JIRA_API_TOKEN')
+JIRA_BASE_URL = os.environ.get('JIRA_BASE_URL', 'https://upgrad-jira.atlassian.net')
 
 import pandas as pd
 import matplotlib
@@ -40,6 +48,9 @@ import requests
 from requests.auth import HTTPBasicAuth
 from collections import defaultdict
 
+# Import webpage spellcheck utilities
+from webpage_spellcheck_utils import extract_text_and_screenshot, spellcheck_text
+
 from jira_worklog_batch import get_epoch_ms, fetch_worklog_ids_updated_since, fetch_worklogs_by_ids, fetch_issue_details_bulk
 
 from generate_testcases_core import generate_testcases_core
@@ -51,6 +62,296 @@ app = Flask(__name__)
 app.config['SERVER_NAME'] = 'teammanagerqai.herokuapp.com'
 # Load environment variables from .env file
 load_dotenv()  # This loads the .env file
+
+@app.route('/jira-export-analysis', methods=['GET', 'POST'])
+def jira_export_analysis():
+    """Page for analyzing Jira export CSV files or JQL queries"""
+    if request.method == 'POST':
+        # Debug: Print form data
+        print("Form data:", request.form)
+        print("Files:", request.files)
+        
+        # Get the form type
+        form_type = request.form.get('form_type', '')
+        print(f"Form type: {form_type}")
+        # Define status categories
+        qa_ownership_statuses = [
+            "Ready for QA", "QA-Ready", "QA Progress - Blocked",
+            "Resolved", "QA In Progress", "QA Inprogress"
+        ]
+        
+        dev_ownership_statuses = [
+            "OPEN", "Reopen", "ToDo", "To Do", "Reopened", "Dev Inprogress", "Dev - Building",
+            "Build Broken", "Ready for Development", "Dev - Frontend - InProgress",
+            "Dev - Backend - InProgress", "Dev - Backend - Todo", "Dev - Frontend - Todo",
+            "Dev- UI - InProgress", "Dev- UI - Todo", "Backlog Item", "Open (migrated)", "Open",
+            "QA - Building", "QA Progress - Blocked", "Groomed"
+        ]
+        
+        # Check if JQL query was submitted
+        jql = request.form.get('jql', '').strip()
+        print(f"JQL query: {jql}")
+        if form_type == 'jql_query' and jql:
+            try:
+                # Use the Jira API to execute the JQL query
+                import pandas as pd
+                import json
+                
+                # Get Jira credentials from environment variables
+                JIRA_BASE_URL = os.environ.get('JIRA_BASE_URL')
+                JIRA_EMAIL = os.environ.get('JIRA_EMAIL')
+                JIRA_API_TOKEN = os.environ.get('JIRA_API_TOKEN')
+                
+                if not (JIRA_BASE_URL and JIRA_EMAIL and JIRA_API_TOKEN):
+                    return render_template('jira_export_analysis.html', 
+                                          error="Jira API credentials not configured. Please check environment variables.")
+                
+                # Set up authentication
+                auth = HTTPBasicAuth(JIRA_EMAIL, JIRA_API_TOKEN)
+                headers = {"Accept": "application/json"}
+                
+                # Call Jira API with the JQL query
+                url = f"{JIRA_BASE_URL}/rest/api/3/search"
+                params = {
+                    "jql": jql,
+                    "maxResults": 1000,  # Adjust as needed
+                    "fields": "parent,status,summary,customfield_10074,updated,created,statuscategorychangedate"  # Include time in status field
+                }
+                
+                print(f"Calling Jira API with URL: {url}")
+                print(f"JQL params: {params}")
+                
+                try:
+                    response = requests.get(url, auth=auth, headers=headers, params=params)
+                    print(f"API response status: {response.status_code}")
+                except Exception as e:
+                    print(f"API call exception: {str(e)}")
+                    return render_template('jira_export_analysis.html', error=f"Error calling Jira API: {str(e)}")
+                
+                if response.status_code != 200:
+                    return render_template('jira_export_analysis.html', 
+                                          error=f"Jira API error: {response.status_code} - {response.text}")
+                
+                # Process the API response
+                data = response.json()
+                issues = data.get('issues', [])
+                
+                # Extract Jira base URL from the environment variable
+                jira_base_url = JIRA_BASE_URL.split('/rest/api')[0] if '/rest/api' in JIRA_BASE_URL else JIRA_BASE_URL
+                
+                # Print debug information about the first issue
+                if issues and len(issues) > 0:
+                    print("First issue fields:", list(issues[0].get('fields', {}).keys()))
+                    
+                    # Debug time tracking fields
+                    if 'timetracking' in issues[0].get('fields', {}):
+                        print("Time tracking data:", issues[0].get('fields', {}).get('timetracking'))
+                    if 'timespent' in issues[0].get('fields', {}):
+                        print("Time spent:", issues[0].get('fields', {}).get('timespent'))
+                    if 'aggregatetimespent' in issues[0].get('fields', {}):
+                        print("Aggregate time spent:", issues[0].get('fields', {}).get('aggregatetimespent'))
+                    if 'worklog' in issues[0].get('fields', {}):
+                        print("Worklog exists:", bool(issues[0].get('fields', {}).get('worklog')))
+                
+                if not issues:
+                    return render_template('jira_export_analysis.html', 
+                                          error="No issues found for the given JQL query")
+                
+                # Convert to DataFrame
+                rows = []
+                for issue in issues:
+                    parent_data = issue.get('fields', {}).get('parent', {})
+                    parent_summary = parent_data.get('fields', {}).get('summary', 'No Parent') if parent_data else 'No Parent'
+                    status = issue.get('fields', {}).get('status', {}).get('name', 'Unknown')
+                    issue_key = issue.get('key', '')
+                    issue_summary = issue.get('fields', {}).get('summary', '')
+                    
+                    rows.append({
+                        'Parent summary': parent_summary,
+                        'Status': status,
+                        'Issue Key': issue_key,
+                        'Issue Summary': issue_summary
+                    })
+                
+                df = pd.DataFrame(rows)
+                
+                # Basic file info
+                file_info = {
+                    'source': 'JQL Query',
+                    'query': jql,
+                    'total_rows': len(df),
+                    'columns': len(df.columns)
+                }
+                
+                # Continue with analysis as with CSV
+                parent_summary_status = df[['Parent summary', 'Status']].copy()
+                
+                # Categorize statuses
+                def categorize_status(status):
+                    if status in dev_ownership_statuses:
+                        return "Dev Ownership"
+                    elif status in qa_ownership_statuses:
+                        return "QA Ownership"
+                    else:
+                        return "Closed"
+                
+                parent_summary_status['Ownership'] = parent_summary_status['Status'].apply(categorize_status)
+                
+                # Group and count by Parent summary and Ownership
+                ownership_counts = parent_summary_status.groupby(['Parent summary', 'Ownership']).size().unstack(fill_value=0).reset_index()
+                
+                # Calculate total per parent
+                ownership_counts['Total'] = ownership_counts.sum(axis=1, numeric_only=True)
+                
+                # Ensure all columns exist
+                for col in ['Dev Ownership', 'QA Ownership', 'Closed']:
+                    if col not in ownership_counts.columns:
+                        ownership_counts[col] = 0
+                
+                # Reorder columns
+                ownership_counts = ownership_counts[['Parent summary', 'Total', 'Dev Ownership', 'QA Ownership', 'Closed']]
+                
+                # Add completion percentage
+                ownership_counts['Completion %'] = (ownership_counts['Closed'] / ownership_counts['Total'] * 100).round(0).astype(int)
+                
+                # Calculate overall totals
+                overall_totals = {
+                    'Parent summary': 'OVERALL',
+                    'Total': int(ownership_counts['Total'].sum()),
+                    'Dev Ownership': int(ownership_counts['Dev Ownership'].sum()),
+                    'QA Ownership': int(ownership_counts['QA Ownership'].sum()),
+                    'Closed': int(ownership_counts['Closed'].sum()),
+                    'Completion %': int((ownership_counts['Closed'].sum() / ownership_counts['Total'].sum() * 100).round(0))
+                }
+                
+                # Convert to records for template rendering
+                results = ownership_counts.to_dict('records')
+                
+                # Get issue details for each parent summary
+                issue_details = {}
+                
+                for issue in issues:
+                    parent_data = issue.get('fields', {}).get('parent', {})
+                    parent_summary = parent_data.get('fields', {}).get('summary', 'No Parent') if parent_data else 'No Parent'
+                    
+                    if parent_summary not in issue_details:
+                        issue_details[parent_summary] = []
+                    
+                    issue_details[parent_summary].append({
+                        'key': issue.get('key', ''),
+                        'summary': issue.get('fields', {}).get('summary', ''),
+                        'status': issue.get('fields', {}).get('status', {}).get('name', 'Unknown')
+                    })
+                
+                # Blocker processing has been moved to a dedicated API endpoint
+                # The Release Blocker Analysis is now handled through the modal
+                
+                return render_template('jira_export_analysis.html', 
+                                       file_info=file_info, 
+                                       results=results,
+                                       overall=overall_totals,
+                                       issue_details=issue_details,
+                                       jira_base_url=jira_base_url,
+                                       os=os)
+                
+            except Exception as e:
+                app.logger.error(f"Error processing JQL query: {str(e)}")
+                return render_template('jira_export_analysis.html', error=f"Error processing JQL query: {str(e)}")
+        
+        # Check if a CSV file was uploaded
+        elif form_type == 'csv_upload' and 'file' in request.files:
+            file = request.files['file']
+            if file.filename == '':
+                return render_template('jira_export_analysis.html', error='No file selected')
+                
+            if file and file.filename.endswith('.csv'):
+                try:
+                    # Read the CSV file
+                    import pandas as pd
+                    import io
+                    import json
+                
+                    # Define status categories
+                    qa_ownership_statuses = [
+                        "Ready for QA", "QA-Ready", "QA Progress - Blocked",
+                        "Resolved", "QA In Progress", "QA Inprogress"
+                    ]
+                    
+                    dev_ownership_statuses = [
+                        "OPEN", "Reopen", "ToDo", "To Do", "Reopened", "Dev Inprogress", "Dev - Building",
+                        "Build Broken", "Ready for Development", "Dev - Frontend - InProgress",
+                        "Dev - Backend - InProgress", "Dev - Backend - Todo", "Dev - Frontend - Todo",
+                        "Dev- UI - InProgress", "Dev- UI - Todo", "Backlog Item", "Open (migrated)", "Open",
+                        "QA - Building", "QA Progress - Blocked", "Groomed"
+                    ]
+                
+                    # Read the CSV file
+                    df = pd.read_csv(file, encoding='utf-8')
+                    
+                    # Basic file info
+                    file_info = {
+                        'filename': file.filename,
+                        'total_rows': len(df),
+                        'columns': len(df.columns)
+                    }
+                    
+                    # Extract parent summary and status
+                    parent_summary_status = df[['Parent summary', 'Status']].copy()
+                    
+                    # Categorize statuses
+                    def categorize_status(status):
+                        if status in dev_ownership_statuses:
+                            return "Dev Ownership"
+                        elif status in qa_ownership_statuses:
+                            return "QA Ownership"
+                        else:
+                            return "Closed"
+                    
+                    parent_summary_status['Ownership'] = parent_summary_status['Status'].apply(categorize_status)
+                    
+                    # Group and count by Parent summary and Ownership
+                    ownership_counts = parent_summary_status.groupby(['Parent summary', 'Ownership']).size().unstack(fill_value=0).reset_index()
+                    
+                    # Calculate total per parent
+                    ownership_counts['Total'] = ownership_counts.sum(axis=1, numeric_only=True)
+                    
+                    # Ensure all columns exist
+                    for col in ['Dev Ownership', 'QA Ownership', 'Closed']:
+                        if col not in ownership_counts.columns:
+                            ownership_counts[col] = 0
+                    
+                    # Reorder columns
+                    ownership_counts = ownership_counts[['Parent summary', 'Total', 'Dev Ownership', 'QA Ownership', 'Closed']]
+                    
+                    # Add completion percentage
+                    ownership_counts['Completion %'] = (ownership_counts['Closed'] / ownership_counts['Total'] * 100).round(0).astype(int)
+                    
+                    # Calculate overall totals
+                    overall_totals = {
+                        'Parent summary': 'OVERALL',
+                        'Total': int(ownership_counts['Total'].sum()),
+                        'Dev Ownership': int(ownership_counts['Dev Ownership'].sum()),
+                        'QA Ownership': int(ownership_counts['QA Ownership'].sum()),
+                        'Closed': int(ownership_counts['Closed'].sum()),
+                        'Completion %': int((ownership_counts['Closed'].sum() / ownership_counts['Total'].sum() * 100).round(0))
+                    }
+                    
+                    # Convert to records for template rendering
+                    results = ownership_counts.to_dict('records')
+                    
+                    return render_template('jira_export_analysis.html', 
+                                           file_info=file_info, 
+                                           results=results,
+                                           overall=overall_totals)
+                
+                except Exception as e:
+                    app.logger.error(f"Error processing CSV: {str(e)}")
+                    return render_template('jira_export_analysis.html', error=f"Error processing file: {str(e)}")
+            else:
+                return render_template('jira_export_analysis.html', error='Only CSV files are supported')
+    
+    return render_template('jira_export_analysis.html')
+
 print(" OpenAI Key begins with:", os.getenv("OPENAI_API_KEY")[:8])
 from openai import OpenAI
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
@@ -1214,20 +1515,31 @@ def HelperQA_AI():
         if input_type == "url":
             page_url = request.form.get('page_url')
             if page_url:
-                screenshot_url = f"https://api.screenshotone.com/take?access_key={access_key}&url={page_url}&format=png"
-                response = requests.get(screenshot_url)
-                if response.status_code == 200:
-                    filename = secure_filename(f"{page_url.replace('https://', '').replace('/', '_')}.png")
-                    filepath = os.path.join('static/uploads', filename)
-                    os.makedirs(os.path.dirname(filepath), exist_ok=True)
-                    with open(filepath, 'wb') as f:
-                        f.write(response.content)
-
-                    image_url = url_for('static', filename=f"uploads/{filename}")
-                    with open(filepath, "rb") as f:
+                # New logic: Use Selenium + BeautifulSoup to extract text and take screenshot
+                screenshot_path, extracted_text = extract_text_and_screenshot(page_url)
+                if screenshot_path and os.path.exists(screenshot_path):
+                    image_url = url_for('static', filename=f"uploads/{os.path.basename(screenshot_path)}")
+                    with open(screenshot_path, "rb") as f:
                         image_b64 = base64.b64encode(f.read()).decode()
                 else:
-                    feedback_html = f" Failed to capture screenshot. Status code: {response.status_code}"
+                    feedback_html = f"Failed to capture screenshot or extract text. {extracted_text}"
+                    return render_template("HelperQA-AI.html", feedback=feedback_html)
+                # Spell check the extracted text
+                spelling_errors = spellcheck_text(extracted_text)
+                # Generate a report (HTML block)
+                report_html = f"""
+                    <h3>Webpage Screenshot</h3>
+                    <img src='{image_url}' style='max-width: 100%; border:1px solid #ccc;'/>
+                    <h3>Spelling Errors</h3>
+                    <ul>
+                """
+                if spelling_errors:
+                    for err in spelling_errors:
+                        report_html += f"<li><b>{err['word']}</b> (suggestions: {', '.join(err['suggestion'])})<br><small>Context: ...{err['context']}...</small></li>"
+                else:
+                    report_html += "<li>No spelling errors detected.</li>"
+                report_html += "</ul>"
+                feedback_html = report_html
 
         elif input_type == "upload":
             image = request.files.get('screenshot')
@@ -1245,14 +1557,11 @@ def HelperQA_AI():
         if image_b64:
             if ai_mode == 'review':
                 prompt_text = (
-                    "Please analyze this UI screenshot thoroughly:\n\n"
-                    "1. Check for **UI layout and alignment issues** — spacing, padding, misalignments, responsiveness.\n"
-                    "2. Identify any **spelling or grammatical mistakes**.\n"
-                    "3. Suggest improvements or best practices where applicable.\n\n"
-                    "Format the response with markdown sections like:\n"
-                    "### Summary\n### Layout Issues\n### Spelling Errors\n### Suggestions"
+                    "Please review this UI screenshot and check for any **spelling or grammatical mistakes** only.\n\n"
+                    "Format the response using markdown like:\n"
+                    "### Spelling and Grammar Issues"
                 )
-                system_message = "You are a helpful UI reviewer analyzing screenshots. Use markdown formatting."
+                system_message = "You are a helpful proofreader analyzing screenshots for spelling and grammar issues only. Use markdown formatting."
             elif ai_mode == 'testcases':
                 prompt_text = (
                     "Based on this UI screenshot, draft **relevant test cases** covering UI, UX, functionality, edge cases, and responsiveness.\n"
@@ -1433,8 +1742,27 @@ def jql_wip():
     from flask import current_app
     from collections import defaultdict
 
-    jql = ''
-    group_by = 'assignee'  # default
+    # Get parameters from either POST form or GET query parameters
+    shared_card = None
+    if request.method == 'POST':
+        jql = request.form.get('jql', '')
+        group_by = request.form.get('group_by', 'assignee')
+        shared_card = request.form.get('shared_card')
+    else:  # GET method
+        jql = request.args.get('jql', '')
+        group_by = request.args.get('group_by', 'assignee')
+        shared_card = request.args.get('shared_card')
+    
+    # If we have a shared card, extract the field and value
+    shared_card_field = None
+    shared_card_value = None
+    if shared_card:
+        try:
+            shared_card_field, shared_card_value = shared_card.split(':', 1)
+            shared_card_value = shared_card_value.replace('"', '').replace("'", "").strip()
+        except (ValueError, AttributeError):
+            shared_card = None
+    
     grouped_issues = {}
     error = None
 
@@ -1452,37 +1780,67 @@ def jql_wip():
     }
     auth = (JIRA_EMAIL, JIRA_API_TOKEN)
 
-    if request.method == 'POST':
-        jql = request.form.get('jql', '')
-        group_by = request.form.get('group_by', 'assignee')
-        if jql.strip():
-            # Always fetch these fields + group_by
-            filterable_fields = ["assignee", "creator", "status", "priority"]
-            fields = ["summary", "creator", "assignee", "status", "priority"]
-            if group_by not in fields:
-                fields.append(group_by)
-            fields_param = ','.join(fields)
-            url = f"{JIRA_BASE_URL}/rest/api/3/search"
-            params = {
-                "jql": jql,
-                "fields": fields_param,
-                "maxResults": 100
-            }
-            grouped_issues = {}
-            try:
-                resp = requests.get(url, headers=headers, params=params, auth=auth)
-                if resp.ok:
-                    data = resp.json()
-                    issues = data.get('issues', [])
+    filterable_fields = ["assignee", "creator", "status", "priority"]
+    unique_values = {field: [] for field in filterable_fields}
+    
+    if jql.strip():
+        fields = ["summary", "creator", "assignee", "status", "priority"]
+        if group_by not in fields:
+            fields.append(group_by)
+        fields_param = ','.join(fields)
+        url = f"{JIRA_BASE_URL}/rest/api/3/search"
+        params = {
+            "jql": jql,
+            "fields": fields_param,
+            "maxResults": 100
+        }
+        grouped_issues = {}
+        try:
+            # Debug log the JQL query
+            print(f"\n--- JQL Query ---\n{params['jql']}\n---------------\n")
+            
+            # Make the API request
+            resp = requests.get(url, headers=headers, params=params, auth=auth)
+            print(f"\n--- API Response Status ---\n{resp.status_code}\n---------------\n")
+            
+            if resp.ok:
+                # Debug log the response keys
+                data = resp.json()
+                print(f"\n--- API Response Data ---")
+                print(f"Total issues: {data.get('total')}")
+                print(f"Issues in response: {len(data.get('issues', []))}")
+                if data.get('issues'):
+                    print(f"First issue key: {data['issues'][0].get('key')}")
+                print("---------------\n")
+                data = resp.json()
+                issues = data.get('issues', [])
+                
+                if not issues:
+                    # No issues found but request was successful
+                    error = "No issues found matching the JQL query."
+                else:
+                    # Process the issues
                     grouped = defaultdict(list)
                     for issue in issues:
-                        key = issue.get('key')
+                        key = issue.get('key', 'Unknown')
                         f = issue.get('fields', {})
+                        
+                        # Use safe getters with default values
                         summary = f.get('summary', '')
-                        creator = f.get('creator', {}).get('displayName', '')
-                        assignee = f.get('assignee', {}).get('displayName', '')
-                        status = f.get('status', {}).get('name', '')
-                        priority = f.get('priority', {}).get('name', '')
+                        
+                        # Handle potentially missing nested objects
+                        creator_obj = f.get('creator') or {}
+                        creator = creator_obj.get('displayName', 'Unassigned')
+                        
+                        assignee_obj = f.get('assignee') or {}
+                        assignee = assignee_obj.get('displayName', 'Unassigned')
+                        
+                        status_obj = f.get('status') or {}
+                        status = status_obj.get('name', 'Unknown')
+                        
+                        priority_obj = f.get('priority') or {}
+                        priority = priority_obj.get('name', 'None')
+                        
                         issue_data = {
                             'key': key,
                             'summary': summary,
@@ -1491,24 +1849,59 @@ def jql_wip():
                             'status': status,
                             'priority': priority
                         }
-                        # Group by selected field
+                        
+                        # Group by selected field with safe fallback
                         group_val = issue_data.get(group_by) or 'Unassigned'
                         grouped[group_val].append(issue_data)
+                        print(f"Adding to group '{group_val}': {issue_data['key']}")  # Debug log
+                    
                     grouped_issues = dict(grouped)
-                else:
-                    error = f"Jira API error: {resp.status_code} {resp.text}"
-            except Exception as e:
-                error = f"Jira API exception: {e}"
-            # Flatten issues for filter value extraction (move outside try)
+            else:
+                # Handle API error response
+                try:
+                    error_json = resp.json()
+                    error_message = error_json.get('errorMessages', [])
+                    if error_message:
+                        error = f"Jira API error: {error_message[0]}"
+                    else:
+                        error = f"Jira API error: {resp.status_code} - {resp.text}"
+                except:
+                    error = f"Jira API error: {resp.status_code} - {resp.text}"
+        except Exception as e:
+            error = f"Jira API exception: {str(e)}"
+            print(f"Exception in JQL WIP: {str(e)}")
+            import traceback
+            traceback.print_exc()
+        
+        # Flatten issues for filter value extraction (outside try block)
+        all_issues = []
+        if grouped_issues:
             all_issues = [issue for group in grouped_issues.values() for issue in group]
-            # Dynamically collect unique values for all filterable fields
-            unique_values = {}
-            for field in filterable_fields:
-                unique_values[field] = sorted(set(issue.get(field, '') or 'Unassigned' for issue in all_issues if issue.get(field, '') != ''))   
-            # Pass dynamic filter fields and their unique values to template
-            filterable_fields = ["assignee", "creator", "status", "priority", "originalestimate", "remainingestimate"]
-            # If unique_values is not defined (GET or error), set as empty dict
-            unique_values = locals().get('unique_values', {field: [] for field in filterable_fields})
+            
+        # Debug log the structure of grouped_issues
+        if grouped_issues:
+            app.logger.debug(f"Grouped issues keys: {list(grouped_issues.keys())}")
+            first_key = next(iter(grouped_issues))
+            app.logger.debug(f"First group key: {first_key}")
+            if grouped_issues[first_key]:
+                app.logger.debug(f"First issue in first group: {grouped_issues[first_key][0]}")
+            
+        # Debug log the first few issues
+        if all_issues:
+            app.logger.debug(f"Total issues: {len(all_issues)}")
+            for i, issue in enumerate(all_issues[:3]):
+                app.logger.debug(f"Issue {i+1}: {issue}")
+            
+        # Dynamically collect unique values for all filterable fields
+        for field in filterable_fields:
+            if all_issues:
+                unique_values[field] = sorted(set(issue.get(field, '') or 'Unassigned' for issue in all_issues if issue.get(field, '') != ''))
+            else:
+                unique_values[field] = []
+    # If we have a shared card, make sure we're grouping by the correct field
+    if shared_card_field and shared_card_field != group_by:
+        group_by = shared_card_field
+        
     return render_template(
         'jql_wip.html',
         jql=jql,
@@ -1517,8 +1910,179 @@ def jql_wip():
         error=error,
         jira_base_url=JIRA_BASE_URL,
         filterable_fields=filterable_fields,
-        unique_values=unique_values
+        unique_values=unique_values,
+        shared_card=shared_card
     )
+
+@app.route('/api/jira_filters')
+def api_jira_filters():
+    """API endpoint to fetch Jira filters"""
+    # Debug log environment variables
+    app.logger.debug(f"JIRA_BASE_URL: {'Set' if JIRA_BASE_URL else 'Not set'}")
+    app.logger.debug(f"JIRA_EMAIL: {'Set' if JIRA_EMAIL else 'Not set'}")
+    app.logger.debug(f"JIRA_API_TOKEN: {'Set' if JIRA_API_TOKEN else 'Not set'}")
+    
+    # Check if Jira credentials are available
+    if not JIRA_BASE_URL or not JIRA_EMAIL or not JIRA_API_TOKEN:
+        app.logger.error("Jira credentials not configured in environment variables")
+        return jsonify({
+            'error': 'Jira credentials not configured. Please check server configuration.',
+            'filters': []
+        }), 500
+    
+    filters = []
+    
+    try:
+        # Fetch favorite filters first
+        fav_url = f"{JIRA_BASE_URL}/rest/api/2/filter/favourite"
+        headers = {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+        }
+        auth = (JIRA_EMAIL, JIRA_API_TOKEN)
+        
+        # Fetch favorite filters
+        try:
+            app.logger.info(f"Fetching favorite filters from {fav_url}")
+            response = requests.get(
+                fav_url,
+                auth=auth,
+                headers=headers,
+                timeout=10
+            )
+            
+            if response.status_code == 200:
+                favorite_filters = response.json()
+                app.logger.info(f"Found {len(favorite_filters)} favorite filters")
+                for f in favorite_filters:
+                    try:
+                        filters.append({
+                            'id': f.get('id'),
+                            'name': f.get('name', 'Unnamed Filter'),
+                            'jql': f.get('jql', ''),
+                            'favorite': True
+                        })
+                    except Exception as e:
+                        app.logger.error(f"Error processing favorite filter {f.get('id')}: {str(e)}")
+            else:
+                app.logger.error(f"Failed to fetch favorite filters: {response.status_code} - {response.text}")
+        except requests.exceptions.RequestException as e:
+            app.logger.error(f"Request error when fetching favorite filters: {str(e)}")
+        
+        # Fetch all filters (including non-favorites)
+        try:
+            all_url = f"{JIRA_BASE_URL}/rest/api/2/filter"
+            app.logger.info(f"Fetching all filters from {all_url}")
+            response = requests.get(
+                all_url,
+                auth=auth,
+                headers=headers,
+                timeout=10
+            )
+            
+            if response.status_code == 200:
+                all_filters = response.json()
+                app.logger.info(f"Found {len(all_filters)} total filters")
+                # Add non-favorite filters
+                favorite_ids = {f['id'] for f in filters}
+                for f in all_filters:
+                    try:
+                        if f.get('id') not in favorite_ids:
+                            filters.append({
+                                'id': f.get('id'),
+                                'name': f.get('name', 'Unnamed Filter'),
+                                'jql': f.get('jql', ''),
+                                'favorite': False
+                            })
+                    except Exception as e:
+                        app.logger.error(f"Error processing filter {f.get('id')}: {str(e)}")
+            else:
+                app.logger.error(f"Failed to fetch all filters: {response.status_code} - {response.text}")
+        except requests.exceptions.RequestException as e:
+            app.logger.error(f"Request error when fetching all filters: {str(e)}")
+        
+        print(f"Returning {len(filters)} total filters")
+        app.logger.info(f"Returning {len(filters)} total filters")
+        
+        # Add some mock filters if no filters were found (for testing)
+        if len(filters) == 0:
+            print("No filters found, adding mock filters for testing")
+            filters = [
+                {
+                    'id': 'mock-1',
+                    'name': 'My Issues',
+                    'jql': 'assignee = currentUser()',
+                    'favorite': True
+                },
+                {
+                    'id': 'mock-2',
+                    'name': 'Created Recently',
+                    'jql': 'created >= -7d',
+                    'favorite': False
+                },
+                {
+                    'id': 'mock-3',
+                    'name': 'Done Last Sprint',
+                    'jql': 'status = Done AND sprint in closedSprints()',
+                    'favorite': False
+                }
+            ]
+        
+        return jsonify({
+            'filters': filters
+        })
+    
+    except Exception as e:
+        error_msg = f"Unexpected error fetching Jira filters: {str(e)}"
+        app.logger.exception(error_msg)
+        return jsonify({
+            'error': 'An unexpected error occurred while fetching filters',
+            'filters': []
+        }), 500
+
+@app.route('/api/jira_filter/<filter_id>')
+def api_jira_filter(filter_id):
+    """API endpoint to fetch a specific Jira filter"""
+    # Check if Jira credentials are available
+    if not JIRA_BASE_URL or not JIRA_EMAIL or not JIRA_API_TOKEN:
+        return jsonify({
+            'error': 'Jira credentials not configured'
+        }), 400
+    
+    try:
+        url = f"{JIRA_BASE_URL}/rest/api/2/filter/{filter_id}"
+        headers = {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+        }
+        response = requests.get(
+            url,
+            auth=(JIRA_EMAIL, JIRA_API_TOKEN),
+            headers=headers
+        )
+        
+        if response.status_code == 200:
+            filter_data = response.json()
+            return jsonify({
+                'id': filter_data.get('id'),
+                'name': filter_data.get('name'),
+                'jql': filter_data.get('jql'),
+                'favorite': filter_data.get('favourite', False)
+            })
+        else:
+            return jsonify({
+                'error': f"Error fetching filter: {response.status_code} - {response.text}"
+            }), response.status_code
+    
+    except Exception as e:
+        print(f"Error fetching Jira filter {filter_id}: {str(e)}")
+        return jsonify({
+            'error': f"Error fetching filter: {str(e)}"
+        }), 500
+
+# This endpoint has been replaced with a more comprehensive implementation above
+
+# This endpoint has been replaced with a more comprehensive implementation above
 
 @app.route('/api/jira_issue/<issue_key>')
 def api_jira_issue(issue_key):
@@ -1579,10 +2143,280 @@ def api_jira_issue(issue_key):
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+# This section was removed to fix the duplicate route issue
+
 print("Registered routes:")
 for rule in app.url_map.iter_rules():
     print(rule)
+# --- Screenshot Upload Route ---
+import re
+@app.route('/upload_screenshot', methods=['POST'])
+def upload_screenshot():
+    data = request.get_json()
+    image_data = data.get('image')
+    if not image_data or not image_data.startswith('data:image/png;base64,'):
+        return jsonify({'error': 'Invalid image data'}), 400
+    # Remove base64 header
+    img_str = re.sub('^data:image/.+;base64,', '', image_data)
+    img_bytes = base64.b64decode(img_str)
+    # Create uploads dir if not exists
+    upload_dir = os.path.join('static', 'uploads')
+    os.makedirs(upload_dir, exist_ok=True)
+    # Unique filename
+    from datetime import datetime
+    filename = f'screenshot_{datetime.now().strftime("%Y%m%d_%H%M%S_%f")}.png'
+    file_path = os.path.join(upload_dir, filename)
+    with open(file_path, 'wb') as f:
+        f.write(img_bytes)
+    image_url = url_for('static', filename=f'uploads/{filename}')
+    return jsonify({'image_url': image_url})
+
+@app.route('/release-blocker-analysis')
+def release_blocker_analysis():
+    # Render the Issue Bug Analysis page with JIRA base URL
+    return render_template('issue_bug_analysis.html', 
+                         jira_base_url=os.getenv('JIRA_BASE_URL', 'https://upgrad-jira.atlassian.net'))
+
+@app.route('/api/analyze-blockers', methods=['POST'])
+def analyze_blockers():
+    data = request.json
+    blocker_jql = data.get('jql', '').strip()
+    
+    if not blocker_jql:
+        return jsonify({'error': 'No JQL query provided'}), 400
+    
+    # Initialize authentication
+    auth = None
+    if JIRA_USERNAME and JIRA_API_TOKEN:
+        auth = (JIRA_USERNAME, JIRA_API_TOKEN)
+    
+    headers = {
+        "Accept": "application/json"
+    }
+    
+    try:
+        # Use the dedicated blocker JQL to fetch release blockers
+        blocker_url = f"{JIRA_BASE_URL}/rest/api/3/search"
+        blocker_params = {
+            "jql": blocker_jql,
+            "maxResults": 100,
+            "fields": "status,summary,parent,updated,created,statuscategorychangedate,customfield_10074"
+        }
+        
+        blocker_response = requests.get(blocker_url, auth=auth, headers=headers, params=blocker_params)
+        
+        if blocker_response.status_code != 200:
+            return jsonify({'error': f"Jira API error: {blocker_response.status_code} - {blocker_response.text}"}), 400
+        
+        blocker_data = blocker_response.json()
+        blocker_issues = blocker_data.get('issues', [])
+        
+        # Process blockers and time in status data
+        blockers = []
+        time_in_status_data = []
+        
+        for issue in blocker_issues:
+            issue_key = issue.get('key', '')
+            issue_summary = issue.get('fields', {}).get('summary', '')
+            issue_status = issue.get('fields', {}).get('status', {}).get('name', 'Unknown')
+            
+            # Get parent summary if available
+            parent_summary = None
+            if 'parent' in issue.get('fields', {}):
+                parent_summary = issue.get('fields', {}).get('parent', {}).get('fields', {}).get('summary', 'No Parent')
+            
+            # Calculate days in current status (for backward compatibility)
+            days_in_status = 0
+            status_change_date = issue.get('fields', {}).get('statuscategorychangedate')
+            
+            if status_change_date:
+                status_date = datetime.strptime(status_change_date.split('T')[0], '%Y-%m-%d')
+                days_in_status = (datetime.now() - status_date).days
+            
+            # Fetch issue changelog to get status transition history
+            changelog_url = f"{JIRA_BASE_URL}/rest/api/3/issue/{issue_key}/changelog"
+            changelog_response = requests.get(changelog_url, auth=auth, headers=headers)
+            
+            # Track all status transitions and history with detailed logging
+            status_history = []
+            current_status = issue.get('fields', {}).get('status', {}).get('name', 'Unknown')
+            print(f"Processing issue {issue_key} with current status: {current_status}")
+            
+            if changelog_response.status_code == 200:
+                changelog_data = changelog_response.json()
+                histories = changelog_data.get('values', [])
+                print(f"Found {len(histories)} history entries for issue {issue_key}")
+                
+                # Get the created date
+                created_date = issue.get('fields', {}).get('created')
+                created_datetime = None
+                if created_date:
+                    created_datetime = datetime.strptime(created_date.split('.')[0].replace('T', ' '), '%Y-%m-%d %H:%M:%S')
+                    print(f"Issue {issue_key} created at {created_datetime}")
+                    
+                    # Add initial status as the first entry
+                    status_history.append({
+                        'from_status': 'Created',
+                        'to_status': current_status,
+                        'datetime': created_datetime.strftime('%Y-%m-%d %H:%M:%S'),
+                        'days': 0,
+                        'hours': 0
+                    })
+                    print(f"Added initial status: Created -> {current_status}")
+                
+                # Process all status changes from the changelog
+                last_datetime = created_datetime
+                last_status = current_status
+                
+                # Process all changes chronologically
+                for history in histories:
+                    history_date = history.get('created')
+                    history_author = history.get('author', {}).get('displayName', 'Unknown')
+                    
+                    if history_date:
+                        history_datetime = datetime.strptime(history_date.split('.')[0].replace('T', ' '), '%Y-%m-%d %H:%M:%S')
+                        
+                        # Process all items in this history entry
+                        for item in history.get('items', []):
+                            field_name = item.get('field')
+                            from_value = item.get('fromString')
+                            to_value = item.get('toString')
+                            
+                            # Log all field changes for debugging
+                            print(f"Field change in {issue_key} at {history_datetime}: {field_name} from '{from_value}' to '{to_value}' by {history_author}")
+                            
+                            # Focus on status changes
+                            if field_name == 'status':
+                                # Calculate time in previous status
+                                if last_datetime:
+                                    time_diff = history_datetime - last_datetime
+                                    days = time_diff.days
+                                    hours = time_diff.total_seconds() / 3600  # Convert to hours
+                                    
+                                    status_entry = {
+                                        'from_status': from_value,
+                                        'to_status': to_value,
+                                        'datetime': history_datetime.strftime('%Y-%m-%d %H:%M:%S'),
+                                        'days': days,
+                                        'hours': round(hours, 2),
+                                        'author': history_author
+                                    }
+                                    
+                                    status_history.append(status_entry)
+                                    print(f"Added status change: {from_value} -> {to_value} ({round(hours, 2)} hours)")
+                                
+                                last_datetime = history_datetime
+                                last_status = to_value
+                
+                # Calculate time in current status
+                if last_datetime:
+                    now = datetime.now()
+                    time_diff = now - last_datetime
+                    days = time_diff.days
+                    hours = time_diff.total_seconds() / 3600  # Convert to hours
+                    
+                    current_entry = {
+                        'from_status': last_status,
+                        'to_status': 'Current',
+                        'datetime': now.strftime('%Y-%m-%d %H:%M:%S'),
+                        'days': days,
+                        'hours': round(hours, 2),
+                        'author': 'System'
+                    }
+                    
+                    status_history.append(current_entry)
+                    print(f"Added current status: {last_status} -> Current ({round(hours, 2)} hours)")
+            
+            # COMPLETELY REWRITTEN: Calculate time spent in Open status
+            hours_in_open = 0
+            time_ranges = []
+            open_statuses = ['open', 'open (migrated)']
+            
+            print(f"\n==== DETAILED STATUS ANALYSIS FOR {issue_key} ====\n")
+            print(f"Current status: {current_status}")
+            print(f"Total status transitions: {len(status_history)}")
+            
+            # First, log all status history for debugging
+            print(f"\nComplete status history:")
+            for i, status in enumerate(status_history):
+                print(f"  {i+1}. {status['from_status']} -> {status['to_status']} on {status['datetime']} ({status['hours']} hours)")
+            
+            # Now calculate time in Open status with detailed logging
+            print(f"\nCalculating time in Open status:")
+            for i, status in enumerate(status_history):
+                from_status_lower = status['from_status'].lower()
+                
+                # Check if this status period should be counted toward Open time
+                is_open_status = any(open_name in from_status_lower for open_name in open_statuses)
+                
+                if is_open_status:
+                    hours_in_open += status['hours']
+                    print(f"  ✓ Adding {status['hours']} hours from '{status['from_status']}' -> '{status['to_status']}' (total: {hours_in_open})")
+                    
+                    # Add to time ranges for display in modal
+                    time_ranges.append({
+                        'from_status': status['from_status'],
+                        'to_status': status['to_status'],
+                        'datetime': status['datetime'],
+                        'days': status['days'],
+                        'hours': status['hours']
+                    })
+                else:
+                    print(f"  ✗ Skipping {status['hours']} hours from '{status['from_status']}' -> '{status['to_status']}' (not an Open status)")
+            
+            # Special case: if currently in Open status, make sure we count that time too
+            if current_status and any(open_name in current_status.lower() for open_name in open_statuses):
+                # Find the most recent status entry that leads to current status
+                for status in reversed(status_history):
+                    if status['to_status'] == 'Current':
+                        print(f"\nSpecial case: Issue is CURRENTLY in an Open status: {current_status}")
+                        print(f"  ✓ Adding {status['hours']} hours from current Open status (total: {hours_in_open + status['hours']})")
+                        
+                        # Only add these hours if we haven't already counted them
+                        if status['from_status'].lower() not in open_statuses:
+                            hours_in_open += status['hours']
+                            time_ranges.append({
+                                'from_status': status['from_status'],
+                                'to_status': 'Current',
+                                'datetime': status['datetime'],
+                                'days': status['days'],
+                                'hours': status['hours']
+                            })
+                        break
+                        
+            print(f"\nFinal hours in Open status: {hours_in_open}")
+            print(f"Number of Open time ranges: {len(time_ranges)}")
+            print(f"==== END ANALYSIS FOR {issue_key} ====\n")
+            
+            # Add to blockers list with hours in open status and status history
+            blockers.append({
+                'key': issue_key,
+                'summary': issue_summary,
+                'status': issue_status,
+                'parent_summary': parent_summary,
+                'days_in_status': days_in_status,
+                'hours_in_open': round(hours_in_open, 2),  # Round to 2 decimal places
+                'time_ranges': time_ranges,
+                'status_history': status_history
+            })
+            
+            # Add to time in status data for backward compatibility
+            time_in_status_data.append({
+                'key': issue_key,
+                'days_in_status': days_in_status
+            })
+        
+        return jsonify({
+            'blockers': blockers,
+            'time_in_status_data': time_in_status_data,
+            'jira_base_url': JIRA_BASE_URL
+        })
+        
+    except Exception as e:
+        print(f"Error analyzing blockers: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host='0.0.0.0', port=5001, debug=True)

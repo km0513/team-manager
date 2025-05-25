@@ -43,7 +43,12 @@
         <!-- Results Section - Initially hidden -->
         <div id="results" class="hidden">
             <div class="flex justify-between items-center mb-4">
-                <h2 class="text-xl font-semibold">Analysis Results</h2>
+                <div class="flex items-center">
+                    <h2 class="text-xl font-semibold">Analysis Results</h2>
+                    <span id="total-issues-count" class="ml-3 bg-gray-100 text-gray-800 text-sm font-medium px-2.5 py-0.5 rounded-full">
+                        0 issues
+                    </span>
+                </div>
                 <div class="flex space-x-2">
                     <button id="export-csv" class="bg-white border border-upgradRed text-upgradRed px-3 py-1 rounded text-sm hover:bg-upgradRed hover:text-white transition-colors">
                         Export to CSV
@@ -61,8 +66,13 @@
             </div>
             
             <!-- Time in Status Summary -->
-            <div id="time-in-status-summary" class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-                <!-- Will be populated by JavaScript -->
+            <div class="space-y-6 mb-6">
+                <div id="time-in-status-summary" class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <!-- Will be populated by JavaScript -->
+                </div>
+                <div id="parent-summary">
+                    <!-- Will be populated by JavaScript -->
+                </div>
             </div>
             
             <!-- Issues Table -->
@@ -151,6 +161,9 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(data => {
             console.log('API Response:', data);
             analysisData = data.blockers || [];
+            
+            // Update total issues count
+            document.getElementById('total-issues-count').textContent = `${analysisData.length} issues`;
             
             // Process time in status data using the actual issues data
             const timeCategories = processTimeInStatusData(analysisData);
@@ -292,6 +305,105 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     
+    function groupIssuesByParent(issues) {
+        console.log('Grouping issues by parent. Total issues:', issues.length);
+        
+        // Create a map to group issues by parent
+        const parentMap = new Map();
+        
+        // Add a group for issues with no parent
+        const noParentGroup = {
+            key: 'No Parent',
+            summary: 'No Parent',
+            count: 0,
+            issues: []
+        };
+        
+        // Process each issue
+        issues.forEach(issue => {
+            // Check if the issue has a parent_summary
+            if (issue.parent_summary) {
+                const parentKey = issue.parent_summary;  // Use parent_summary as the key
+                
+                if (!parentMap.has(parentKey)) {
+                    parentMap.set(parentKey, {
+                        key: parentKey,
+                        summary: parentKey,  // Use parent_summary as the display text
+                        count: 0,
+                        issues: []
+                    });
+                }
+                
+                const parent = parentMap.get(parentKey);
+                parent.count++;
+                parent.issues.push(issue);
+            } else {
+                // No parent found for this issue
+                noParentGroup.count++;
+                noParentGroup.issues.push(issue);
+            }
+        });
+        
+        // Convert map to array and sort by count (descending)
+        const parentGroups = Array.from(parentMap.values());
+        
+        // Add no parent group if it has issues
+        if (noParentGroup.count > 0) {
+            parentGroups.push(noParentGroup);
+        }
+        
+        // Sort by count (descending)
+        parentGroups.sort((a, b) => b.count - a.count);
+        
+        console.log('Parent groups created:', parentGroups);
+        return parentGroups;
+    }
+    
+    function updateParentSummary(parents) {
+        const parentSummary = document.getElementById('parent-summary');
+        if (!parentSummary) return;
+        
+        // Calculate total time for each parent
+        parents.forEach(parent => {
+            let totalHours = 0;
+            parent.issues.forEach(issue => {
+                if (issue.hours_in_open) {
+                    totalHours += issue.hours_in_open;
+                }
+            });
+            parent.totalHours = totalHours;
+            parent.totalTimeDisplay = totalHours < 24 ? 
+                `${Math.round(totalHours * 10) / 10} hours` : 
+                `${Math.round((totalHours / 24) * 10) / 10} days`;
+        });
+        
+        parentSummary.innerHTML = `
+            <div class="bg-white shadow rounded-lg p-4">
+                <h3 class="text-lg font-medium mb-3">Issues by Parent</h3>
+                <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2">
+                    ${parents.map(parent => `
+                        <div class="border rounded p-2 hover:bg-gray-50 text-sm" title="${parent.key === 'No Parent' ? 'No Parent' : parent.summary}">
+                            <div class="flex justify-between items-center">
+                                <span class="font-medium truncate">
+                                    ${parent.key === 'No Parent' ? 'No Parent' : parent.summary}
+                                </span>
+                                <span class="bg-blue-100 text-blue-800 text-xs font-medium px-2 py-0.5 rounded-full ml-1 whitespace-nowrap">
+                                    ${parent.count}
+                                </span>
+                            </div>
+                            <div class="flex justify-between items-center mt-1">
+                                <span class="text-xs text-gray-500">Total time:</span>
+                                <span class="text-xs font-medium ${parent.totalHours > 48 ? 'text-red-600' : parent.totalHours > 24 ? 'text-orange-600' : 'text-green-600'}">
+                                    ${parent.totalTimeDisplay}
+                                </span>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+    }
+    
     function updateIssuesTable(issues) {
         const tbody = document.querySelector('table tbody');
         tbody.innerHTML = '';
@@ -306,6 +418,10 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         
+        // Update parent summary
+        const parents = groupIssuesByParent(issues);
+        updateParentSummary(parents);
+        
         // Get JIRA base URL from the response or use a default
         const jiraBaseUrl = window.JIRA_BASE_URL || 'https://upgrad-jira.atlassian.net';
         
@@ -314,6 +430,14 @@ document.addEventListener('DOMContentLoaded', function() {
             
             const row = document.createElement('tr');
             row.className = 'hover:bg-gray-50';
+            
+            // Debug: Log issue data for inspection
+            console.log('Issue data:', {
+                key: issue.key,
+                parent_key: issue.parent_key,
+                parent: issue.parent,
+                fields: issue.fields
+            });
             
             // Calculate resolution time (time from Open (migrated) to Resolved)
             let resolutionTime = 0;
@@ -372,8 +496,10 @@ document.addEventListener('DOMContentLoaded', function() {
                         ${issue.status || 'N/A'}
                     </span>
                 </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500" title="${timeInStatus}" data-sort-value="${sortableTime}">
-                    ${timeInStatus}
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500" data-sort-value="${sortableTime}">
+                    <a href="#" class="time-in-status hover:underline" data-issue-key="${issue.key}" title="Click to view status history">
+                        ${timeInStatus}
+                    </a>
                 </td>
                 <td class="px-6 py-4 text-sm text-gray-500 max-w-xs truncate" title="${issue.parent_summary || ''}">
                     ${issue.parent_summary || '—'}
@@ -395,33 +521,51 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    function showTimeInStatusDetails(issue) {
-        // Calculate resolution time (time from Open (migrated) to Resolved)
-        let resolutionTime = 0;
-        let resolutionDetails = [];
+    function calculateResolutionTime(issue) {
+        if (!issue.status_history || issue.status_history.length < 2) {
+            return { time: 0, details: [] };
+        }
         
-        if (issue.status_history && issue.status_history.length > 1) {
-            // Find the transition from 'Open (migrated)' to 'Resolved'
-            const resolutionEntry = issue.status_history.find(h => 
-                h.from_status && h.from_status.trim().toLowerCase() === 'open (migrated)' &&
-                h.to_status && h.to_status.trim().toLowerCase() === 'resolved');
+        // Sort history by datetime
+        const sortedHistory = [...issue.status_history].sort((a, b) => 
+            new Date(a.datetime) - new Date(b.datetime)
+        );
+        
+        let openMigratedTime = null;
+        let resolvedTime = null;
+        
+        // Find the last 'Open (migrated)' and first 'Resolved' after it
+        for (const entry of sortedHistory) {
+            if (!entry.to_status) continue;
             
-            if (resolutionEntry) {
-                // Use the pre-calculated hours if available
-                resolutionTime = resolutionEntry.hours || 0;
-                
-                // Find the actual entries for display
-                const openMigratedEntry = issue.status_history.find(h => 
-                    h.to_status && h.to_status.trim().toLowerCase() === 'open (migrated)');
-                const resolvedEntry = issue.status_history.find(h => 
-                    h.to_status && h.to_status.trim().toLowerCase() === 'resolved');
-                
-                if (openMigratedEntry && resolvedEntry) {
-                    resolutionDetails.push(`Opened: ${openMigratedEntry.datetime || 'N/A'}`);
-                    resolutionDetails.push(`Resolved: ${resolvedEntry.datetime || 'N/A'}`);
-                }
+            const status = entry.to_status.trim().toLowerCase();
+            
+            if (status === 'open (migrated)') {
+                openMigratedTime = new Date(entry.datetime);
+            } else if (status === 'resolved' && openMigratedTime) {
+                resolvedTime = new Date(entry.datetime);
+                break; // Take the first resolved after open (migrated)
             }
         }
+        
+        if (!openMigratedTime || !resolvedTime) {
+            return { time: 0, details: [] };
+        }
+        
+        const hours = (resolvedTime - openMigratedTime) / (1000 * 60 * 60);
+        
+        return {
+            time: hours,
+            details: [
+                `Opened: ${openMigratedTime.toLocaleString()}`,
+                `Resolved: ${resolvedTime.toLocaleString()}`
+            ]
+        };
+    }
+    
+    function showTimeInStatusDetails(issue) {
+        // Calculate resolution time using the new function
+        const { time: resolutionTime, details: resolutionDetails } = calculateResolutionTime(issue);
         
         // Create a cleaner alert message
         let message = `${issue.key}: ${issue.summary || 'No summary'}\n`;

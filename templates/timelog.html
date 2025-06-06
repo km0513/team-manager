@@ -2,12 +2,7 @@
 {% block content %}
 <!-- Banner messages for holiday, weekend, no timelogs -->
 
-<div class="flex justify-end w-0.8 mt-2 mb-4">
-  <button onclick="window.location.href='{{ url_for('timelog_today') }}'" class="relative bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 text-white px-6 py-2 rounded font-bold shadow-lg hover:scale-105 transition-transform duration-150 flex items-center sparkle-btn">
-    <svg class="w-5 h-5 mr-2 animate-spin-slow text-yellow-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 2v2m0 16v2m10-10h-2M4 12H2m15.36 6.36l-1.42-1.42M6.34 6.34L4.92 4.92m12.02 0l-1.42 1.42M6.34 17.66l-1.42 1.42"/></svg>
-    <span class="drop-shadow-lg">Today's Timelog ✨</span>
-  </button>
-</div>
+
 
 {% if not start or not end %}
   <div class="max-w-4xl mx-auto flex flex-row items-center justify-between mb-2 pr-6">
@@ -102,19 +97,14 @@
   </div>
 
   {% if start and end and summary_data and summary_data|length > 0 %}
-  <div class="max-w-4xl mx-auto flex flex-row items-center justify-between mb-2 pr-6">
-    <button onclick="window.location.href='{{ url_for('timelog_today') }}'" class="relative bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 text-white px-6 py-2 rounded font-bold shadow-lg hover:scale-105 transition-transform duration-150 flex items-center sparkle-btn ml-4">
-      <svg class="w-5 h-5 mr-2 animate-spin-slow text-yellow-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 2v2m0 16v2m10-10h-2M4 12H2m15.36 6.36l-1.42-1.42M6.34 6.34L4.92 4.92m12.02 0l-1.42 1.42M6.34 17.66l-1.42 1.42"/></svg>
-      <span class="drop-shadow-lg">Today's Timelog ✨</span>
-    </button>
-  </div>
+ 
   <div id="summary-table" class="bg-white rounded-xl shadow p-6 mb-4 border border-upgradAccent">
     <div class="flex flex-wrap items-center justify-between mb-2">
       <div class="flex flex-row items-center gap-4 mb-2">
         <h2 class="text-lg font-bold text-upgradYellow mb-0">Overall Timelog Summary from (<span class="font-bold">{{ start }}</span> to <span class="font-bold">{{ end }}</span>)</h2>
-
       </div>
-      </script>
+      <!-- CSV Download Button -->
+      <button onclick="downloadCSVAll()" class="bg-upgradAccent text-white px-4 py-2 rounded font-bold hover:bg-upgradRed text-xs">Download CSV (Summary & Details)</button>
       <div class="text-xs text-upgradAccent font-semibold mb-2">
       </div>
       <div class="text-xs font-bold text-upgradRed bg-upgradYellow px-4 py-2 rounded">
@@ -307,6 +297,52 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 
 <script>
+function downloadCSVAll() {
+  // --- Summary Section ---
+  let csv = 'Summary\nUser,Logged Hours,Expected Hours\n';
+  let totalLogged = 0;
+  let totalExpected = 0;
+  {% for row in summary_data %}
+    csv += `"{{ row.user|replace('"','""') }}","{{ row.total_hours|round_half }}","{{ row.expected|round_half }}"\r\n`;
+    totalLogged += Number({{ row.total_hours|round_half }});
+    totalExpected += Number({{ row.expected|round_half }});
+  {% endfor %}
+  csv += `\r\nTotal Logged,${totalLogged}\r\nTotal Expected,${totalExpected}\r\n\r\n`;
+
+  // --- Details Section ---
+  csv += 'Details\nUser,Date,Issue Key,Parent Summary,Task Summary,Hours\n';
+  // Loop through all rows in the DOM to get live parent/task summaries
+  document.querySelectorAll('tr[data-issue-id]').forEach(row => {
+    const user = row.closest('[x-data]')?.querySelector('h3.export-user-heading')?.innerText || '';
+    // Find the closest .mb-4 ancestor for the date (for each log group)
+    let date = '';
+    let parent = row.parentElement;
+    while (parent && !parent.classList.contains('mb-4')) parent = parent.parentElement;
+    if (parent) {
+      const h6 = parent.querySelector('h6');
+      if (h6) date = h6.innerText;
+    }
+    const issueKey = row.getAttribute('data-issue-id') || '';
+    const parentSummary = row.querySelector('.parent-summary')?.innerText.replace(/\r?\n|\r/g, ' ').trim() || '';
+    const taskSummary = row.querySelector('.task-summary')?.innerText.replace(/\r?\n|\r/g, ' ').trim() || '';
+    const hours = row.querySelector('td:last-child')?.innerText || '';
+    csv += `"${user.replace(/"/g, '""')}","${date}","${issueKey}","${parentSummary.replace(/"/g, '""')}","${taskSummary.replace(/"/g, '""')}","${hours}"\r\n`;
+  });
+
+  // Download
+  const blob = new Blob([csv], {type: 'text/csv'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `timelog_{{ start }}_to_{{ end }}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+</script>
+
+<script>
 function userLogCard(expanded, idx) {
   return {
     open: expanded || false,
@@ -404,5 +440,7 @@ window.addEventListener('DOMContentLoaded', function() {
   });
 });
 </script>
+
+
 
 {% endblock %}
